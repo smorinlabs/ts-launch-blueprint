@@ -343,3 +343,27 @@ the old one.
   10. Single-package template gains nothing from task caching but inherits config + a third command vocabulary; agent2linear's own review disowned its single-package turbo wrapping [TS_EXISTING_REPO_REVIEW.md:97,632-635; https://registry.npmjs.org/turbo/latest (2.10.4)]
   11. The doc is the example CLI's UX spec; Synthesis #4 makes cli-standards normative over the source's pre-standard exit codes [TS_PORT_INDEX.md:492-502; TS_EXISTING_REPO_REVIEW.md:572-578]
   12. Language-agnostic, indexed Copy-as-is [TS_PORT_INDEX.md:72-82]
+
+## D-025: Adopt isolatedDeclarations (reconciles D-012(1) ↔ D-013(2))
+- Ref: TS_PORT_RESEARCH.md §T02/§T03; Phase 4 gate adjudication of validator finding "unfulfilled cross-topic dependency"
+- Options: (1) adopt isolatedDeclarations: true so tsdown uses the fast oxc dts path (2) reject it and accept tsdown's tsc-based dts fallback, amending D-012(1)
+- Decision: (1) Adopt. Amends D-013(2)'s flag union to include isolatedDeclarations for the library entry point.
+- Why: D-012(1)'s tsdown recommendation depends on the flag; the template's public API surface is small and deliberately designed, so the explicit-annotation cost is low and pedagogically aligned with a best-practice template. Fallback (disable + tsc-dts) documented in §T03. Validator evidence: flag appeared only in T02 before this reconciliation (consistency-T01-T02 finding, wf_33b1d2c0-256).
+
+## D-026: node:util styleText owns the color surface (supersedes D-016(3))
+- Ref: TS_PORT_RESEARCH.md §T06/§T08; Phase 4 gate adjudication of the cross-topic color contradiction
+- Options: (1) T08's node:util styleText (built-in, zero-dep) with --no-color/NO_COLOR/FORCE_COLOR/TTY gating (2) T06's picocolors 1.1.1 + createColors
+- Decision: (1) styleText, wrapped in src/lib/colors.ts. Supersedes D-016(3); D-016's yocto-spinner rationale re-grounded on zero-dep consistency rather than avoiding a picocolors double-stack; T06's runtime-dep list drops to 5.
+- Why: T08 evaluated the platform built-in (T06 never did); picocolors was T08's contingency for a Node floor below 22.13, and D-011 sets >=24; zero-dep matches the org's no-logging-library/zero-dep CLI precedent. Validators: consistency-T05-T06 (critical) and consistency-T07-T08 (major), wf_33b1d2c0-256, both recommending T08 ownership.
+
+## D-027: CI Node matrix ["24.x","26.x"] (supersedes D-022(2)'s matrix clause)
+- Ref: TS_PORT_RESEARCH.md §T01/§T12; Phase 4 gate adjudication of the matrix contradiction
+- Options: (1) D-011(2)'s 24.x + 26.x (Active-LTS floor + Current, mirroring the source's 3.10+3.11 floor-plus-next intent) (2) D-022(2)'s LTS-only ["24"] until Oct 2026
+- Decision: (1) ["24.x","26.x"]. T12 adopts T01's values; matrix ownership is T01/D-011(2).
+- Why: T12's own status line deferred matrix values to the runtime topic, and its tradeoffs section endorses a two-version matrix; the source repo's compatibility-signal intent (test the floor and the next version) is preserved. Validators: consistency-T01-T02 and consistency-T11-T12 (both major), wf_33b1d2c0-256.
+
+## D-028: CLA contingency rewording (amends D-024(8)); FUNDING classification fix (amends D-024(12))
+- Ref: TS_PORT_RESEARCH.md §T14; Phase 4 gate adjudication of the reasoning-T13-T14 blocking finding
+- Options: (1) keep hosted cla-assistant.io primary, describe the github-action variant truthfully as archived-but-functional (v2.6.1 frozen; fork is the supported continuation), and name fork-or-DCO as the sunset contingencies (2) keep the false "actively-maintained" wording (3) drop the CLA program
+- Decision: (1). Also: D-024(12) FUNDING.yml classification corrected from "Reuse existing repo decision" to "Keep source Python repo cross-platform tool" (the existing-repo review contains no funding decision).
+- Why: contributor-assistant/github-action is archived=true (pushed_at 2026-03-23 was the archival; README: "no longer actively maintained… read-only… welcome to fork… releases remain functional" — re-verified live during rework). The hosted service remains operating with no shutdown notice, so the primary choice stands; the hedge must not rest on a false maintenance claim. DCO documented as the lighter-weight alternative.
