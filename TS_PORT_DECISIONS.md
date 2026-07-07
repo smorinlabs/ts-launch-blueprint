@@ -367,3 +367,15 @@ the old one.
 - Options: (1) keep hosted cla-assistant.io primary, describe the github-action variant truthfully as archived-but-functional (v2.6.1 frozen; fork is the supported continuation), and name fork-or-DCO as the sunset contingencies (2) keep the false "actively-maintained" wording (3) drop the CLA program
 - Decision: (1). Also: D-024(12) FUNDING.yml classification corrected from "Reuse existing repo decision" to "Keep source Python repo cross-platform tool" (the existing-repo review contains no funding decision).
 - Why: contributor-assistant/github-action is archived=true (pushed_at 2026-03-23 was the archival; README: "no longer actively maintained… read-only… welcome to fork… releases remain functional" — re-verified live during rework). The hosted service remains operating with no shutdown notice, so the primary choice stands; the hedge must not rest on a false maintenance claim. DCO documented as the lighter-weight alternative.
+
+## D-029: Port naming scheme (package, command, env, config path, rename seam)
+- Ref: TS_PORT_PLAN.md (all slices); cli-standards R3.8/R5.1 via TS_EXISTING_REPO_REVIEW.md; TS_PORT_INDEX.md py-cli/py-projects drift note
+- Options: (1) package `ts-launch-blueprint`, bin `ts-projects`, env prefix `TS_PROJECTS_*` (token: TS_PROJECTS_TOKEN), config `$XDG_CONFIG_HOME/ts-projects/ts-projects_config.toml`, src/ layout (cli.ts, lib.ts, version.ts, lib/, commands/), Justfile name variables (ts_package_name/repo_name/command_name) as the template-rename seam (2) keep source names py-* verbatim (3) generic tool name
+- Decision: (1)
+- Why: Mirrors the source naming one-for-one in TS idiom; resolves the documented source drift (binary registered as py-projects but docs say py-cli, config dir ~/.config/py-cli — INDEX cli fragment) by standardizing on ONE name everywhere per cli-standards R3.8 name-parity; TOOL_* env prefix and TOML config path follow cli-standards R4/R5 (normative per D-016/D-017); rename seam preserves the template-instantiation intent (D-024(1)) without the D-005-excluded scripts.
+
+## D-030: Phase 6 slice structure (9 vertical slices)
+- Ref: TS_PORT_PLAN.md; goal.md §7 Phase 6 row; D-004
+- Options: (1) 9 slices — S1 skeleton+toolchain, S2 quality gates+editor/AI configs, S3a CLI foundation (entry/config/logging), S3b CLI feature parity (API/prompt/formats/clipboard), S4 CI+security workflows, S5 release+versioning, S6a community+contributors, S6b docs tree+README, S7 final polish+relocation+completeness critic (2) domain-spec 9-slice example order verbatim (3) fewer, larger slices
+- Decision: (1) — an adaptation of the domain-spec example to this repo's actual content; branch-per-slice `slice/s<N>-<name>` merged to main only after the slice gate passes (D-004)
+- Why: Each slice is end-to-end testable (vertical, per domain spec Phase 5); S3/S6 split keeps slices reviewable; ordering puts working code before workflows that gate it, and final polish last so D-006 relocation happens once.

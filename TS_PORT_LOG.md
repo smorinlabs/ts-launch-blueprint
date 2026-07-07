@@ -319,3 +319,22 @@ and ask the user.
 - Adjudications recorded as D-025–D-028 (supersession entries; originals
   unedited per §5).
 - User approval: **waived** per the recorded user instruction.
+
+---
+
+## 2026-07-08 — Phase 5: TS_PORT_PLAN.md — PLAN + EXECUTE (Fable-authored)
+
+- **Scope**: vertical-slice implementation plan; 9 slices (D-030), each with
+  the 11 domain-spec slice fields, citing decision IDs D-011–D-029; coverage
+  appendix mapping all 93 pinned-SHA files to slices.
+- **Inputs**: TS_PORT_INDEX.md, TS_EXISTING_REPO_REVIEW.md, TS_PORT_RESEARCH.md,
+  TS_PORT_DECISIONS.md D-001–D-030.
+- **Executor shape**: Fable authors directly (goal.md §7 Phase 5 — planning
+  not delegable, D-001); sub-agents fact-check feasibility; validators trace
+  slices → INDEX/RESEARCH and flag orphans; 2 validators on slice
+  definitions-of-done (§4.4 critical).
+- **Definition of done**: plan committed; every slice has all 11 fields and
+  cites valid D-###s; coverage appendix complete both directions (93 files ↔
+  slices); validation passed; gate recorded.
+- **Decision IDs implemented**: D-001, D-004, D-029, D-030; plan applies
+  D-011–D-028.
