@@ -35,6 +35,11 @@
     "test:coverage": "vitest run --coverage",
     "prepare": "lefthook install"
   },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "smol-toml": "^1.7.0",
+    "zod": "^4.4.3"
+  },
   "devDependencies": {
     "@commitlint/cli": "^21.2.0",
     "@commitlint/config-conventional": "^21.2.0",
