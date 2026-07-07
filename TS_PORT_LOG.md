@@ -192,3 +192,46 @@ and ask the user.
   prior tool decisions were captured and flags re-selection of already-decided
   technology.
 - **Decision IDs implemented**: D-002, D-003, D-010.
+
+## 2026-07-07 — Phase 3: TS_EXISTING_REPO_REVIEW.md — EXECUTE / CHECK / VALIDATE / GATE
+
+- **Date**: 2026-07-07 (execution began 2026-07-06)
+- **Phase or slice**: Phase 3
+- **Source file(s)**: 8 repos (D-010), read-only shallow clones in scratchpad
+- **Target file(s)**: `TS_EXISTING_REPO_REVIEW.md` (~650 lines: discovery
+  method, reviewed table, skipped table with reasons, 8 × 18-field sections,
+  Fable-authored synthesis of reusable defaults / Phase 4 tie-breaks /
+  do-not-reuse list). Committed at `a1e6695`.
+- **Decision or change**: review executed via workflow `wf_06cdc5e5-593`
+  (8 agents, deep-research discipline, 449k tokens). Notable findings: npm is
+  the uniform package manager in recent published TS repos; the Bun POC
+  documented pnpm-over-Bun and Biome-over-Oxlint; Vitest unanimous;
+  release-please + GitHub App token + OIDC trusted publishing repeated;
+  cli-standards v1.4.x is a normative CLI spec; no docs-site generator in any
+  recent repo.
+- **Deviation from plan**: GraphQL API quota exhausted at discovery time →
+  used equivalent REST endpoints (documented in the artifact and D-010).
+- **Validation performed** (workflow `wf_8564a49a-510`, 3 validators):
+  claims-A (4 repos) PASS, 2 minors; claims-B (4 repos) PASS, 2 minors;
+  Reviewer 3 synthesis audit PASS, 4 minors (release-pattern attribution,
+  missed pre-commit data point in contributors-please-action, action-pinning
+  conflict papered over, Vitest/Bun coupling). All claims verified against the
+  actual clones with path+line citations; 0 blocking findings.
+- **Result**: Fable applied the 6 substantive validator fixes to the artifact
+  (input/output counts 32/11; POC lint:types CI wording; release attribution
+  contributors-please-vs-difftree/crates.io; Vitest contingency; git-hooks
+  pre-commit data point; new tie-break #7 action-pinning policy).
+- **Follow-up tasks**: Phase 4 must run the 7 tie-breaks listed in the
+  synthesis.
+
+### Gate record — Phase 3
+
+- **Status: PASS** (Fable gate verdict, 2026-07-07)
+- Evidence: 3 validator reports (all PASS, 0 blocking) with primary-source
+  citations; full reports in workflow journal `wf_8564a49a-510`; the 6
+  substantive fixes applied and visible in the committed diff.
+- Accepted residual findings: assorted one-line citation offsets (e.g.
+  vitest.config.ts:18-21 vs 19-22) — content accurately characterized;
+  correcting them would trigger another validate cycle for zero planning
+  impact.
+- User approval: **waived** per the recorded user instruction.

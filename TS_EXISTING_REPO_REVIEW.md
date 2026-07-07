@@ -198,7 +198,7 @@ lockfiles in the clone, with path+line citations).
 
 **13. Documentation approach**: `README.md` is usage-first (full copy-paste workflow YAML, `README.md:8-40`). `docs/RUNBOOK.md` is an operational acceptance runbook (prerequisites, secrets inventory, cutover procedure). CHANGELOG.md is release-please-generated. `skills/` ships three **Claude Code skills** (`install-contributors-please-action`, `monitor-multi-repo-ci`, `update-multi-repo-ci`) with a README explaining composition and a curl-based install recipe (`skills/README.md:8-31`) — docs-as-agent-skills is a distinctive pattern here. Three long design/analysis markdown docs sit at repo root (`contributors-please-action-resilience-analysis.md` etc.). No docs site generator, no CLAUDE.md, no .vscode/.cursor (ls grep found none).
 
-**14. CLI or app structure patterns**: Not a CLI — a GitHub Action. Entry contract is `action.yml` (28 typed inputs with defaults and detailed descriptions, 12 declared outputs, `action.yml:7-173`). Arg parsing is `@actions/core` `getInput`/`getBooleanInput`; a deliberate convention: inputs default to `''` so unset inputs **inherit from config file / core defaults** instead of clobbering them (`action.yml:41-45,62-67`). Failure = `core.setFailed(message)` and return (no raw exit codes) (`src/index.ts:114,183`). Outputs set via `core.setOutput`, JSON-encoding arrays (`src/index.ts:500-510`). Structure: thin `src/` (index.ts 660 lines + app-token.ts + proxy.ts) delegating to the engine library, loaded at runtime via a `new Function("specifier", "return import(specifier)")` dynamic import so ncc can't inline it (`src/index.ts:28-38`). Testability via an options object injecting `core`, `env`, `fetch`, and factory functions (`src/index.ts:51-60`).
+**14. CLI or app structure patterns**: Not a CLI — a GitHub Action. Entry contract is `action.yml` (32 typed inputs with defaults and detailed descriptions, 11 declared outputs, `action.yml:8-172`). Arg parsing is `@actions/core` `getInput`/`getBooleanInput`; a deliberate convention: inputs default to `''` so unset inputs **inherit from config file / core defaults** instead of clobbering them (`action.yml:41-45,62-67`). Failure = `core.setFailed(message)` and return (no raw exit codes) (`src/index.ts:114,183`). Outputs set via `core.setOutput`, JSON-encoding arrays (`src/index.ts:500-510`). Structure: thin `src/` (index.ts 660 lines + app-token.ts + proxy.ts) delegating to the engine library, loaded at runtime via a `new Function("specifier", "return import(specifier)")` dynamic import so ncc can't inline it (`src/index.ts:28-38`). Testability via an options object injecting `core`, `env`, `fetch`, and factory functions (`src/index.ts:51-60`).
 
 **15. Logging/configuration patterns**: Logging is `@actions/core` levels only — `core.info`, `core.warning` (engine warnings forwarded one per line, `src/index.ts:170-171`), `core.setFailed`; dry-run paths log with a `[dry-run]` prefix (`src/index.ts:558`). Secrets are masked immediately with `core.setSecret(credentials.token)` (`src/index.ts:117`). Configuration is layered: action inputs → env (`GITHUB_REPOSITORY`, `GITHUB_SERVER_URL` fallbacks, `src/index.ts:94-104`) → repo config file (`.contributors.yml`, `action.yml:72-75`) → engine defaults. Proxy support honors standard env via a fetch wrapper (`src/proxy.ts`, wired at `src/index.ts:91`). Version pinning of the sibling engine lives in a plain-text ref file `.contributors-please-engine-ref` guarded by `scripts/check-engine-sync.mjs` in four modes (local/trusted/release, `package.json:14-17`).
 
@@ -369,7 +369,7 @@ lockfiles in the clone, with path+line citations).
 
 **8. TypeScript configuration patterns**: Shared config package `@pkg/tsconfig` (packages/tsconfig/) with four presets extended by every workspace package (e.g. apps/api/tsconfig.json `"extends": "@pkg/tsconfig/app.json"`). base.json: `strict: true`, `target: ES2022`, `module: ESNext`, `moduleResolution: bundler`, `esModuleInterop`, `skipLibCheck`, `forceConsistentCasingInFileNames`, `resolveJsonModule`, `isolatedModules: true`, `verbatimModuleSyntax: true`, `noEmit: true`, `declaration`/`declarationMap`, `incremental` (packages/tsconfig/base.json:4-18). Variants: app.json (noEmit), library.json (composite + declarations), vite.json (DOM libs + `jsx: react-jsx`). Shared code consumed via tsconfig `paths` aliases `@shared/*` plus `include` of shared source dirs rather than build-time packages (apps/api/tsconfig.json:5-8, docs/onboarding.md "Shared Code").
 
-**9. Linting and formatting approach**: **Biome 2 as primary linter + formatter** (`biome.json`; `lint: biome check .`, `lint:fix: biome check --write .`, package.json:22-23), with a **narrow type-aware ESLint layer for CI only** (`lint:types: eslint --max-warnings 0 .`, package.json:24; eslint.config.js enables `no-floating-promises`, `no-misused-promises`, `await-thenable` as errors and turns off rules that conflict with Biome, eslint.config.js:59-74). Biome formatter settings: 2-space indent, lineWidth 100, single quotes, semicolons always, trailingCommas es5, organizeImports on (biome.json:17-28,3). Biome was deliberately upgraded 1.9.4 → 2.3.12 (commit a7dfad3). The architecture doc explicitly evaluated **Oxlint and rejected it as primary** ("Oxlint does NOT have a formatter; Oxfmt is in alpha as of Jan 2026"; recommendation is "Biome 2.0 ... with ESLint reserved for CI type-aware rules", app_architecture_typescript_monorepo.md "Linting with Biome" section). No Prettier, no dprint, no .oxlintrc anywhere.
+**9. Linting and formatting approach**: **Biome 2 as primary linter + formatter** (`biome.json`; `lint: biome check .`, `lint:fix: biome check --write .`, package.json:22-23), with a **narrow type-aware ESLint layer intended for CI per the architecture doc** (`lint:types: eslint --max-warnings 0 .`, package.json:24 — though ci.yml never actually invokes it, so no enforced ESLint CI gate existed; eslint.config.js enables `no-floating-promises`, `no-misused-promises`, `await-thenable` as errors and turns off rules that conflict with Biome, eslint.config.js:59-74). Biome formatter settings: 2-space indent, lineWidth 100, single quotes, semicolons always, trailingCommas es5, organizeImports on (biome.json:17-28,3). Biome was deliberately upgraded 1.9.4 → 2.3.12 (commit a7dfad3). The architecture doc explicitly evaluated **Oxlint and rejected it as primary** ("Oxlint does NOT have a formatter; Oxfmt is in alpha as of Jan 2026"; recommendation is "Biome 2.0 ... with ESLint reserved for CI type-aware rules", app_architecture_typescript_monorepo.md "Linting with Biome" section). No Prettier, no dprint, no .oxlintrc anywhere.
 
 **10. Testing approach**: Three-tier: **Vitest 4** for unit tests of shared/web code (root vitest.config.ts: globals true, node environment, v8 coverage with text/json/html reporters); **bun:test for the Bun-runtime API app** (apps/api/package.json `test: bun test`; vitest.config.ts:9 explicitly excludes `apps/api/**` with a comment "apps/api uses bun:test instead of vitest"); **Playwright for E2E** across chromium/firefox/webkit with CI retries=2, workers=1 in CI, trace on-first-retry, and `webServer` blocks that boot web+api (e2e/playwright.config.ts). Tests co-located with source (shared/utils/index.test.ts). A dedicated `testing.md` guide exists at repo root.
 
@@ -554,12 +554,16 @@ per-repo sections above.
    with 100% coverage thresholds; claim-npm Vitest 1.6 with 95/95/90/95;
    contributors-please Vitest 3), with a second tier of subprocess/E2E tests
    against the built CLI (claim-npm integration spawn, agent2linear hermetic
-   bash E2E, difftree assert_cmd). Reuse.
+   bash E2E, difftree assert_cmd). Reuse — contingent on the package-manager/
+   runtime tie-break: if Bun-as-runtime is chosen, re-check the POC's split
+   (Vitest for Node packages, bun:test for the Bun-runtime app).
 2. **Release: release-please manifest mode + GitHub App token + tag-triggered
-   npm Trusted Publishing (OIDC) in a protected environment** — repeated in
-   contributors-please and difftree (whose workflow comments say the pattern
-   mirrors py-launch-blueprint's own release design); agent2linear's older
-   np-based flow is the outlier. Reuse the release-please+OIDC pattern.
+   OIDC trusted publishing in a protected environment** — contributors-please
+   implements it against npm (its workflow comments at release-please.yml:2
+   explicitly say the pattern mirrors py-launch-blueprint's release design),
+   and difftree repeats the same shape against crates.io (publish.yml:86-114);
+   agent2linear's older np-based flow is the outlier. Reuse the
+   release-please + npm Trusted Publishing pattern.
 3. **TS config: strict ESM** — strict:true, target ES2022, ESM (`type:
    module`), declaration+sourceMap, explicit `.js` import extensions in every
    TS repo; extra strictness flags in the newest (claim-npm
@@ -617,14 +621,24 @@ per-repo sections above.
    sanctions Commander or oclif) vs node:util parseArgs + DI router
    (claim-npm). Both are live in-org patterns; source repo is a flat
    single-command click CLI. Needs research.
-5. **Git hooks**: only the POC has hooks (lefthook + commitlint, conventional
-   commits); published CLIs rely on CI + prepublishOnly. Source repo has a
-   heavy pre-commit suite. Domain spec: preserve lefthook if used — POC
-   precedent supports lefthook; extent of hook duties needs research.
+5. **Git hooks**: the POC has lefthook + commitlint (conventional commits),
+   and contributors-please-action carries a single-purpose pre-commit hook
+   (.pre-commit-config.yaml, local engine-sync hook, language: system) — so
+   both lefthook and pre-commit have June-2026-adjacent TS precedent;
+   published CLIs otherwise rely on CI + prepublishOnly. Source repo has a
+   heavy pre-commit suite. Domain spec: preserve lefthook if used. Phase 4
+   must weigh pre-commit continuity vs lefthook explicitly; extent of hook
+   duties needs research.
 6. **Monorepo/TurboRepo**: agent2linear wraps every script in turbo (v1,
    single package, caching); POC uses Turborepo 2 with a real workspace graph.
    The port target is a single-package template → decide turbo-as-cache vs
    plain scripts.
+7. **Action pinning policy**: most workflows pin actions by major tag, but
+   difftree-action deliberately SHA-pins the security-sensitive token-minting
+   action with a version comment (release-please.yml:40,
+   `actions/create-github-app-token@bcd2ba49… # v3.2.0`) — the newest
+   precedent. Phase 4 must decide: major tags everywhere vs SHA-pinning
+   security-sensitive third-party actions.
 
 ## Decisions NOT to reuse (with why)
 
