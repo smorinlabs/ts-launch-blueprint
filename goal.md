@@ -274,6 +274,33 @@ Run Phase 6 as one bounded goal, or split it per slice batch if a gate failure
 escalates; on resume after a session break, re-issue the goal for the current
 unit — §9 governs where to re-enter.
 
+### Autonomous full-run variant
+
+Alternative to the sequence above: a single migration-wide goal in which **the
+user explicitly waives the §6 human approval gates** (the waiver permitted by §3).
+What changes: no pauses at Phase 0–5 artifacts — Fable's gate verdict is final,
+and the user reviews after the fact through `TS_PORT_DECISIONS.md` and
+`TS_PORT_LOG.md`, which become the sole review trail. What does NOT change:
+every other rule in this contract — cross-validation, evidence citations,
+decision logging, rework limits, and the §6 **irreversible-action escalations**
+(publishing to any registry, changing repo settings/visibility, force-pushing,
+deleting files not created by the port) still stop and ask the user.
+
+```text
+/goal Autonomous full run per goal.md, with the user waiving all §6 human
+approval gates (record the waiver in TS_PORT_LOG.md as a user instruction):
+Phases 0 through 6 complete end to end — source SHA pinned and D-001 through
+D-006 logged; TS_PORT_INDEX.md, TS_EXISTING_REPO_REVIEW.md, TS_PORT_RESEARCH.md,
+and TS_PORT_PLAN.md committed, each with cross-validation evidence and a
+passing Fable gate verdict recorded in TS_PORT_LOG.md; every decision logged
+with a D-### in TS_PORT_DECISIONS.md; every TS_PORT_PLAN.md slice implemented
+on its own branch and merged after a passing gate; build, lint, typecheck, and
+tests shown passing; port artifacts relocated to docs/port/ per D-006; and the
+§11 definition of done confirmed by a completeness critic — while still
+escalating irreversible or outward-facing actions per §6 — or stop after 300
+turns
+```
+
 ## 11. Definition of Done
 
 The goal is complete when every item in the domain spec's **Expected Final Output**
