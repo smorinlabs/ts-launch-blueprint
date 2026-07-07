@@ -1,0 +1,66 @@
+# TS Port Log
+
+What actually happened during the py-launch-blueprint → ts-launch-blueprint port,
+including gate records and user approvals/waivers. Governed by `goal.md` §8 and the
+domain spec Phase 6 log-entry format. The index says what exists; the repo review
+says what prior decisions exist; the research says what should be chosen; the plan
+says what should happen; **this log says what actually happened.**
+
+---
+
+## 2026-07-06 — User instruction: §6 human approval gates waived
+
+Recorded verbatim from the user's `/goal` directive (autonomous full-run variant,
+goal.md §10):
+
+> Autonomous full run per goal.md, with the user waiving all §6 human
+> approval gates (record the waiver in TS_PORT_LOG.md as a user instruction):
+> Phases 0 through 6 complete end to end — source SHA pinned and D-001 through
+> D-006 logged; TS_PORT_INDEX.md, TS_EXISTING_REPO_REVIEW.md, TS_PORT_RESEARCH.md,
+> and TS_PORT_PLAN.md committed, each with cross-validation evidence and a
+> passing Fable gate verdict recorded in TS_PORT_LOG.md; every decision logged
+> with a D-### in TS_PORT_DECISIONS.md; every TS_PORT_PLAN.md slice implemented
+> on its own branch and merged after a passing gate; build, lint, typecheck, and
+> tests shown passing; port artifacts relocated to docs/port/ per D-006; and the
+> §11 definition of done confirmed by a completeness critic — while still
+> escalating irreversible or outward-facing actions per §6 or 2000 turns
+
+Effect: no pauses at the Phase 0–5 artifact gates; Fable's gate verdict is final,
+and the user reviews after the fact through `TS_PORT_DECISIONS.md` and this log.
+All other contract rules remain in force — cross-validation, evidence citations,
+decision logging, rework limits, and the §6 irreversible-action escalations
+(publishing to any registry, changing repo settings/visibility, force-pushing,
+deleting files not created by the port, credentialed external calls) still stop
+and ask the user.
+
+---
+
+## 2026-07-06 — Phase 0: Bootstrap
+
+- **Date**: 2026-07-06
+- **Phase or slice**: Phase 0 (Bootstrap, goal.md §2)
+- **Source file(s)**: n/a (environment + scope pinning)
+- **Target file(s)**: `TS_PORT_DECISIONS.md`, `TS_PORT_LOG.md`
+- **Decision or change**:
+  - Environment verified: main-loop model is Fable (`claude-fable-5`); source repo
+    exists at `~/c/py-launch-blueprint`; `gh` authenticated as `smorin` (keyring).
+  - **Pinned source SHA: `4828f8596b2332d74fbcff932ebab6f0030febd5`** (HEAD of
+    `~/c/py-launch-blueprint` at 2026-07-06). All scope claims mean `git ls-files`
+    at this SHA — 93 tracked files.
+  - Scope exclusions recorded (D-005): untracked working-tree files
+    `TEMPLATE_USAGE.md`, `scripts/cleanup_template.py`,
+    `scripts/init_from_template.py`, `scripts/rename_template.py`,
+    `typescript_port_process_prompt.md` are excluded from the port.
+  - Artifact skeletons created; D-001–D-006 logged in `TS_PORT_DECISIONS.md`.
+- **Rationale**: goal.md §2 bootstrap steps 1–5.
+- **Existing repo influence**: n/a
+- **Deviation from plan**: none
+- **Alternatives considered**: n/a (pre-seeded user decisions)
+- **Validation performed**: pending (VALIDATE step below)
+- **Result**: pending gate
+- **Follow-up tasks**: run VALIDATE (independent sub-agent confirms SHA, files,
+  decision entries), then GATE.
+
+### Gate record — Phase 0
+
+- Status: PENDING
