@@ -1,0 +1,46 @@
+# Git hooks (D-020(1,6)): lefthook 2.x replaces the source's pre-commit
+# framework. Activated by `npm install` via the package.json "prepare" script,
+# or manually with `just setup-hooks`.
+#
+# CI parity: `just pre-commit-run` runs the same underlying gates on ALL files
+# (format-check + lint + typecheck + test) — the source's `pre-commit-run`
+# intent without a Python runtime.
+
+pre-commit:
+  parallel: true
+  jobs:
+    # Formatter on staged files; auto-fixes are re-staged (stage_fixed).
+    # Oxfmt also owns YAML/JSON/Markdown formatting (D-014(7)), subsuming the
+    # source's yamlfmt/taplo/end-of-file-fixer/trailing-whitespace hooks.
+    - name: format
+      glob: '*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,md}'
+      run: npx oxfmt {staged_files}
+      stage_fixed: true
+    # Linter on staged source files (curated correctness+suspicious set).
+    - name: lint
+      glob: '*.{ts,tsx,js,mjs,cjs}'
+      run: npx oxlint {staged_files}
+    # Type check runs on the FULL program, not per-file — tsc semantics need
+    # the whole graph (mirrors the source's repo-wide mypy hook).
+    - name: typecheck
+      run: npx tsc --noEmit
+
+commit-msg:
+  jobs:
+    # Conventional Commits with the source 50/72/type contract
+    # (commitlint.config.mjs; replaces gitlint + cog install-hook, D-020(2,5)).
+    - name: commitlint
+      run: npx commitlint --edit {1}
+
+# Tests run at the push boundary, NOT per commit (D-020(3)): per-commit full
+# suites tax contributor DX and train --no-verify; CI is the backstop.
+# Opt-in: export TS_PROJECTS_PREPUSH_TESTS=1 to enable locally.
+pre-push:
+  jobs:
+    - name: test
+      run: |
+        if [ "${TS_PROJECTS_PREPUSH_TESTS:-0}" = "1" ]; then
+          just test
+        else
+          echo "pre-push tests skipped (opt-in: TS_PROJECTS_PREPUSH_TESTS=1)"
+        fi
