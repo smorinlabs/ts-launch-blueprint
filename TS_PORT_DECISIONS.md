@@ -42,3 +42,21 @@ the old one.
 - Options: (1) relocate `goal.md`, `typescript_port_process_prompt.md`, and all `TS_PORT_*.md` to `docs/port/` in the final-polish slice (2) keep at repo root (3) delete after port
 - Decision: (1) Relocate to `docs/port/` in the final-polish slice
 - Why: User instruction pre-seeded in goal.md §5. The finished template ships with a clean root while preserving the full port record.
+
+## D-007: Phase 1 INDEX fan-out grouping (11 file groups)
+- Ref: goal.md §7 Phase 1 row; TS_PORT_LOG.md Phase 1–2 plan entry
+- Options: (1) 11 logical groups (github-community, github-workflows, root-configs, editor-ai-configs, root-docs-build, assets-docs-infra, docs-about-contributing, docs-reference-tasks, docs-tools, docs-tutorials, python-src-tests) (2) one agent per file (93 agents) (3) one agent per top-level directory
+- Decision: (1) 11 logical groups summing to exactly 93 files, counts asserted in the workflow script
+- Why: Groups keep related files with one agent (better feature detection) while staying within workflow concurrency; per-file agents would lose cross-file context; per-directory splits unevenly (docs/ = 44 files).
+
+## D-008: Phase 1 validation sampling rate
+- Ref: goal.md §4.6; TS_PORT_LOG.md Phase 1–2 plan entry
+- Options: (1) 100% of critical entries (Omit/Replace/Needs research/Split/Merge) + 25% random sample of the rest (2) 100% of everything (3) critical-only
+- Decision: (1) 100% critical + 25% random sample of remaining entries, sampling rate recorded in the gate verdict
+- Why: §4.6 permits stated sampling where full re-verification is impractical; §4.4 requires 100% on critical calls. 25% of ~70 non-critical entries (~18 files) is a meaningful audit at reasonable cost.
+
+## D-009: Fold Phase 2 gate into Phase 1 gate
+- Ref: goal.md §7 Phase 2 row ("folds into Phase 1 user gate if run together")
+- Options: (1) run Phases 1 and 2 in one workflow with a single combined gate (2) separate gates
+- Decision: (1) Combined: index fan-out, then feature-extraction fan-out by feature area, one gate over both
+- Why: §7 explicitly permits folding; feature extraction updates the same artifact (TS_PORT_INDEX.md), so a single gate reviews a coherent document.

@@ -80,3 +80,31 @@ and ask the user.
   the template's turn budget. No discrepancy.
 - User approval: **waived** per the user instruction recorded at the top of this
   log (autonomous full-run variant, goal.md §10).
+
+---
+
+## 2026-07-06 — Phase 1–2: TS_PORT_INDEX.md — PLAN
+
+- **Scope**: catalog all 93 files from `git ls-files` at pinned SHA
+  `4828f8596b2332d74fbcff932ebab6f0030febd5`, each with the domain spec's 11
+  fields; then feature-level extraction across 8 feature areas, folded into the
+  same gate (D-009). §2.3 exclusions listed in the artifact as deliberate
+  exclusions (D-005).
+- **Inputs**: source working tree at `~/c/py-launch-blueprint` (tracked files
+  verified clean at pinned SHA by the Phase 0 validator); domain spec Phase 1–2
+  field definitions.
+- **Executor shape**: Workflow fan-out (D-002): 11 index agents, one per file
+  group (D-007), each writing a markdown fragment to the session scratchpad and
+  returning structured metadata; then 8 feature-extraction agents (CLI;
+  versioning+release; logging+error-handling; config+env; testing; docs; CI;
+  lint/format/typecheck + dev-experience/security). Fable assembles the
+  artifact mechanically (cat) and authors the framing sections.
+- **Definition of done**: every one of the 93 files has an entry with all 11
+  fields; exclusions section present; feature section maps each feature area to
+  files + intended TS representation; artifact committed.
+- **Validation criteria (§4, §7 Phase 1 row)**: completeness auditor diffs INDEX
+  entries against `git ls-files` at the pinned SHA; validators re-open 100% of
+  files categorized Omit/Replace/Needs research/Split/Merge (critical per §4.4,
+  2 validators) plus a 25% random sample of the rest (D-008); feature validators
+  re-derive features from the files independently and diff against the report.
+- **Decision IDs implemented**: D-002, D-005, D-007, D-008, D-009.
