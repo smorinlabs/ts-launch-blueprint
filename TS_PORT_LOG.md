@@ -267,3 +267,55 @@ and ask the user.
   classification scheme; Reviewer 4 (ecosystem fit) folded into the
   reasoning-validator instructions.
 - **Decision IDs implemented**: D-002, D-003; produces D-011 onward.
+
+## 2026-07-08 — Phase 4: TS_PORT_RESEARCH.md — EXECUTE / CHECK / VALIDATE / GATE
+
+- **Date**: 2026-07-08 (research fetched 2026-07-07)
+- **Phase or slice**: Phase 4
+- **Source file(s)**: TS_PORT_INDEX.md, TS_EXISTING_REPO_REVIEW.md, source repo,
+  live web documentation
+- **Target file(s)**: `TS_PORT_RESEARCH.md` (14 topics × 11 fields, 97
+  recommendations; committed `6580fd7`), `TS_PORT_DECISIONS.md` D-011–D-024
+  (one entry per topic; recommendations citable as D-0NN(k)).
+- **Decision or change**: research executed via workflow `wf_09df6180-960`.
+  Headline selections: npm + Node ≥24 (D-011); tsdown, ESM-only, Trusted
+  Publishing (D-012); NodeNext strict union (D-013); Oxlint 1.x + Oxfmt beta —
+  a documented reversal of the POC's Jan-2026 Biome pick now that Oxfmt exists
+  (D-014); single tsc gate (D-015); Commander v15 + DI, cli-standards exit
+  codes (D-016); TOML+XDG+zod config (D-017); stderr logger + styleText
+  (D-018); Vitest 4, 95/95/90/95 (D-019); lefthook 2 + commitlint (D-020);
+  release-please v5 + OIDC publish (D-021); ubuntu-latest CI, CodeQL,
+  osv-scanner, dependabot, hybrid pinning (D-022); README-centric docs
+  preserving Diátaxis (D-023); Justfile ~1:1, AGENTS.md hub, LICENSE fix,
+  contributors-please, no Turbo (D-024).
+- **Deviation from plan**: first EXECUTE attempt tripped the account usage
+  burst limit (13/14 agents failed); re-run in batches of 3–4 via workflow
+  resume succeeded 14/14. No content impact.
+- **Validation performed** (workflow `wf_33b1d2c0-256`, 14 validators — 2 per
+  topic per §4.4: reasoning+sources with live re-fetch of cited URLs, and
+  consistency vs review/INDEX/decisions): all 7 reasoning validators PASS on
+  facts (every version/maturity claim re-verified live) except one false CLA
+  maintenance claim; consistency validators surfaced 3 cross-topic
+  contradictions. 4 blocking findings total.
+- **Result**: Gate attempt 1 → **REWORK** (allowed: max 1). Fable adjudicated:
+  matrix owned by T01 → ["24.x","26.x"] (D-027); color owned by T08 →
+  node:util styleText (D-026); isolatedDeclarations adopted (D-025); CLA hedge
+  reworded archived-but-functional + fork/DCO contingency, FUNDING label fixed
+  (D-028). Rework executor (agent `a6b0bf90866d1076e`) applied all 5 artifact
+  fixes; supersessions appended (never editing prior entries). Fresh validator
+  (agent `a3f311efe4b57d10c`) re-verified: 5/5 APPLIED_CORRECTLY, append-only
+  diff confirmed (only additions in `64cfa1c`). **PASS**.
+- **Follow-up tasks**: Phase 5 slices must cite D-011–D-028.
+
+### Gate record — Phase 4
+
+- **Status: PASS** (Fable gate verdict, 2026-07-08, after one rework cycle)
+- Evidence: 14 validator reports (wf_33b1d2c0-256) + rework validation report,
+  all with primary-source citations; live URL re-fetches on every load-bearing
+  version/maturity claim.
+- Accepted residual findings: ~45 minors (citation offsets, wording precision,
+  label quibbles) — none affects a tool choice or plan input; enumerated in the
+  workflow journal.
+- Adjudications recorded as D-025–D-028 (supersession entries; originals
+  unedited per §5).
+- User approval: **waived** per the recorded user instruction.
