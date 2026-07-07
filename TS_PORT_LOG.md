@@ -369,3 +369,13 @@ and ask the user.
   D-015(2)'s pre-existing "js/ts.tsdk.path" key name — operative D-032 has the
   correct `typescript.tsdk`); none affects executability.
 - User approval: **waived** per the recorded user instruction.
+
+---
+
+## 2026-07-08 — Slice S1: skeleton + toolchain — merged
+
+- **Phase or slice**: S1 (branch `slice/s1-skeleton`, commit `e328506`, merged to main)
+- **Source→Target**: pyproject.toml→package.json/tsconfig/vitest configs; .python-version→.nvmrc; Justfile/Makefile/.gitignore adapted; __init__.py→src/lib.ts; _version.py→src/version.ts; LICENSE added (source gap fixed, D-024(7)).
+- **Validation**: executor CHECK all-green; 2 independent validators (wf_bb6dd474-50d) re-ran tsc/build/vitest+coverage/CLI/just/make + npm pkg fix — both PASS, 0 blocking. Coverage-threshold enforcement proven active via a 101% probe.
+- **Deviations (accepted at gate)**: bin recorded npm-normalized as `dist/cli.js` (npm pkg fix strips `./`; D-012(3) intent preserved — later slices must not reintroduce the prefix); tsdown `fixedExtension:false` to match the exports map; `declaration:true` required alongside isolatedDeclarations (noEmit still suppresses output); upstream SOURCEMAP_BROKEN warning (cosmetic, tracked); transitive @babel EBADENGINE warnings on Node 24.6 (advisory only; CI's 24.x resolves current).
+- **Result**: Gate PASS (Fable), merged --no-ff.
