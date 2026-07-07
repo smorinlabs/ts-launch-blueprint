@@ -57,6 +57,15 @@ describe('lefthook configuration (D-020(6))', () => {
     expect(format.stage_fixed).toBe(true);
   });
 
+  it('pre-commit includes the large-file hygiene check (D-020(6))', () => {
+    const jobs = lefthook['pre-commit'].jobs;
+    const largeFiles = jobs.find((job: { name: string }) => job.name === 'check-large-files');
+    expect(largeFiles).toBeDefined();
+    // Runs over staged files and enforces the 500KB (512000-byte) ceiling.
+    expect(largeFiles.run).toContain('{staged_files}');
+    expect(largeFiles.run).toContain('512000');
+  });
+
   it('commit-msg runs commitlint', () => {
     const jobs = lefthook['commit-msg'].jobs;
     expect(jobs.some((job: { run: string }) => job.run.includes('commitlint'))).toBe(true);
