@@ -1,0 +1,58 @@
+{
+  "name": "ts-launch-blueprint",
+  "version": "0.1.0",
+  "description": "CLI tools for project search and selection - TypeScript port of py-launch-blueprint",
+  "keywords": [
+    "cli",
+    "template",
+    "blueprint",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Steve Morin <steve.morin@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smorinlabs/ts-launch-blueprint.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/lib.d.ts",
+      "default": "./dist/lib.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "ts-projects": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=24",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "npm",
+      "onFail": "error"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "tsdown": "0.22.3",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}
