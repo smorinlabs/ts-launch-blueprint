@@ -167,3 +167,28 @@ and ask the user.
   downstream benefit.
 - User approval: **waived** per the recorded user instruction; this gate verdict
   is final under the autonomous full-run variant.
+
+---
+
+## 2026-07-06 — Phase 3: TS_EXISTING_REPO_REVIEW.md — PLAN
+
+- **Scope**: review 8 existing repos (D-010) for prior TypeScript/Bun/oxc/
+  TurboRepo/CI/release/docs/linting/testing/logging/devworkflow decisions; all
+  18 domain-spec fields per repo; record skipped repos with reasons.
+- **Inputs**: repo discovery listings (REST, 2026-07-06, shown in conversation
+  and summarized in D-010); the repos themselves (shallow-cloned read-only into
+  the session scratchpad; two are private — cloning uses existing gh auth,
+  read-only, no external writes).
+- **Executor shape**: workflow fan-out, one agent per repo (D-002) with
+  deep-research-style prompting (D-003): verify every claim against the actual
+  repo files (configs, workflows, lockfiles), cite path+line, distinguish
+  observed fact from inference; write per-repo fragment; Fable assembles.
+- **Definition of done**: TS_EXISTING_REPO_REVIEW.md committed with all 18
+  fields per reviewed repo, a reviewed/skipped table with reasons, and a
+  synthesis of reusable defaults for the port.
+- **Validation criteria (§7 Phase 3 row)**: validators re-check claimed patterns
+  against the actual repos (re-open configs/workflows/lockfiles in the clones);
+  Reviewer 3 of the domain spec (existing-repo pattern reviewer) checks that
+  prior tool decisions were captured and flags re-selection of already-decided
+  technology.
+- **Decision IDs implemented**: D-002, D-003, D-010.
