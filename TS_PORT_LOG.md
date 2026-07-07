@@ -235,3 +235,35 @@ and ask the user.
   correcting them would trigger another validate cycle for zero planning
   impact.
 - User approval: **waived** per the recorded user instruction.
+
+---
+
+## 2026-07-07 — Phase 4: TS_PORT_RESEARCH.md — PLAN
+
+- **Scope**: 14 research topics covering every domain-spec research area, every
+  INDEX `Needs research` item, and all 7 Phase 3 tie-breaks:
+  T1 package manager & runtime; T2 build & npm packaging; T3 tsconfig & module
+  format; T4 lint & format (incl. TOML/YAML formatter keep-or-drop); T5 type
+  checking strategy; T6 CLI framework & UX libs (per cli-standards); T7 config
+  loading & env; T8 logging & output streams; T9 testing; T10 git hooks &
+  commit linting; T11 versioning, release & changelog; T12 CI & security
+  workflows; T13 documentation system & API docs; T14 devex & repo hygiene
+  (Justfile/Makefile, editor/AI configs, LICENSE gap, CLA, contributors bot,
+  turbo tie-break).
+- **Inputs**: TS_PORT_INDEX.md (what must be preserved), TS_EXISTING_REPO_REVIEW.md
+  (prior decisions consulted FIRST, per domain spec), live web documentation
+  (tool maturity as of 2026-07 — never settled from memory, D-003).
+- **Executor shape**: workflow fan-out, one deep-research agent per topic
+  (D-002, D-003) with WebSearch/WebFetch; all 11 domain-spec fields per topic;
+  every recommendation returned as a structured decision candidate for D-###
+  logging.
+- **Definition of done**: TS_PORT_RESEARCH.md committed, 14 topics × 11 fields,
+  each recommendation carrying a D-### in TS_PORT_DECISIONS.md, existing-repo
+  decisions explicitly consulted in each topic, disagreements with repo
+  precedent documented as explicit tradeoffs.
+- **Validation criteria (§7 Phase 4 row, §4.4)**: 2 independent validators per
+  recommendation — one checks reasoning + sources (re-fetching cited docs), one
+  checks consistency with TS_EXISTING_REPO_REVIEW.md and the domain-spec
+  classification scheme; Reviewer 4 (ecosystem fit) folded into the
+  reasoning-validator instructions.
+- **Decision IDs implemented**: D-002, D-003; produces D-011 onward.
