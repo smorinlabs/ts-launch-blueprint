@@ -26,7 +26,7 @@ Follow this order exactly:
 
 3. **Create `TS_EXISTING_REPO_REVIEW.md`**
    - Review my recent and relevant existing repos.
-   - Identify TypeScript, Bun, Oxide, TurboRepo, CI, release, docs, linting, testing, logging, and developer workflow decisions already made.
+   - Identify TypeScript, Bun, oxc/Oxlint, TurboRepo, CI, release, docs, linting, testing, logging, and developer workflow decisions already made.
    - Treat recent deliberate choices as defaults unless there is a strong reason to deviate.
    - Preserve cross-platform tooling that does not need replacement.
 
@@ -153,7 +153,7 @@ The goal is to avoid re-deciding technologies we have already researched, select
 I have existing repositories, including recent TypeScript projects, that may already contain deliberate decisions around tools such as:
 
 - Bun
-- Oxide
+- oxc/Oxlint
 - TurboRepo
 - TypeScript configuration
 - package management
@@ -209,7 +209,7 @@ Examples:
 
 - If recent repos have standardized on Bun, do not casually re-select npm, pnpm, or yarn.
 - If recent repos use TurboRepo for monorepo structure, consider that the default for similar repo shapes.
-- If recent repos use Oxide or other specific tooling, investigate whether that decision applies here before choosing an alternative.
+- If recent repos use oxc/Oxlint or other specific tooling, investigate whether that decision applies here before choosing an alternative.
 - If left-hook is already used cross-platform, preserve it instead of replacing it.
 - If shared GitHub Actions patterns exist, adapt them rather than starting from scratch.
 - If shared TypeScript compiler settings exist, reuse or extend them unless this project has a specific reason not to.
@@ -608,7 +608,7 @@ Focus on CLI behavior, logging, versioning, configuration, release workflows, do
 
 Check whether relevant existing repos were reviewed before fresh research.
 
-Verify that prior TypeScript, Bun, Oxide, TurboRepo, CI, release, docs, linting, testing, logging, and developer workflow decisions were captured.
+Verify that prior TypeScript, Bun, oxc/Oxlint, TurboRepo, CI, release, docs, linting, testing, logging, and developer workflow decisions were captured.
 
 Flag any places where the port re-selects a technology that was already deliberately chosen elsewhere.
 
@@ -698,4 +698,4 @@ The goal is to make the TypeScript project carry forward the same product qualit
 
 ## Short Prepend Instruction
 
-First create `TS_PORT_INDEX.md` by cataloging every source file and extracting the features, capabilities, and best-practice intent embedded in each one. Then create `TS_EXISTING_REPO_REVIEW.md` by reviewing my recent and relevant existing repos for prior TypeScript, Bun, Oxide, TurboRepo, CI, release, docs, linting, testing, logging, and developer workflow decisions. Then create `TS_PORT_RESEARCH.md` to choose idiomatic TypeScript/Node equivalents, reusing or adapting existing repo decisions where appropriate and preserving cross-platform tooling that still fits. Only after that, create `TS_PORT_PLAN.md` for phased vertical-slice implementation. During implementation, maintain `TS_PORT_LOG.md` to record what actually changed, where the work deviated from the plan, and how each slice was validated.
+First create `TS_PORT_INDEX.md` by cataloging every source file and extracting the features, capabilities, and best-practice intent embedded in each one. Then create `TS_EXISTING_REPO_REVIEW.md` by reviewing my recent and relevant existing repos for prior TypeScript, Bun, oxc/Oxlint, TurboRepo, CI, release, docs, linting, testing, logging, and developer workflow decisions. Then create `TS_PORT_RESEARCH.md` to choose idiomatic TypeScript/Node equivalents, reusing or adapting existing repo decisions where appropriate and preserving cross-platform tooling that still fits. Only after that, create `TS_PORT_PLAN.md` for phased vertical-slice implementation. During implementation, maintain `TS_PORT_LOG.md` to record what actually changed, where the work deviated from the plan, and how each slice was validated.
