@@ -338,3 +338,34 @@ and ask the user.
   slices); validation passed; gate recorded.
 - **Decision IDs implemented**: D-001, D-004, D-029, D-030; plan applies
   D-011–D-028.
+
+## 2026-07-08 — Phase 5: TS_PORT_PLAN.md — CHECK / VALIDATE / GATE
+
+- **Validation performed** (workflow `wf_fda7e68b-23d`, 3 validators:
+  traceability×2 per §4.4 on slice DoDs + feasibility): coverage PASS twice
+  (both expanded the appendix and set-diffed against `git ls-tree` at the
+  pinned SHA — exactly 93 ↔ 93, empty diff both directions); all 9 slices have
+  all 11 fields; ordering walk found no dependency breaks; every named tool
+  matches an accepted decision. 4 distinct blocking findings: S3a DoD encoded
+  the superseded exit-1-for-missing-token (caught by all 3 validators);
+  orphaned mandatory fuzzy-search decision; S3a D-016(7)→(8) mis-citation
+  (plus two minor mis-cites); unreconciled D-015(2)↔D-024(4) tsdk/settings.json
+  contradiction.
+- **Result**: Gate attempt 1 → **REWORK**. Fable (plan author) applied fixes
+  directly: exit-4 DoD + full R6.1 mapping in S3a; citation fixes (D-016(8),
+  D-015(4), D-024(7)); D-031 minted (drop fuzzy claim + deps — parity with
+  observed behavior) and cited in S3b; D-032 minted (one-key
+  .vscode/settings.json typescript.tsdk, amending D-024(4)) and cited in S2.
+  Committed `c278cda`. Fresh validator (agent `abb04ea1a76c841ec`) re-verified
+  6/6 APPLIED_CORRECTLY, append-only diff confirmed, zero residual exit-1
+  contract text. **PASS**.
+
+### Gate record — Phase 5
+
+- **Status: PASS** (Fable gate verdict, 2026-07-08, after one rework cycle)
+- Evidence: 3 validator reports (wf_fda7e68b-23d) + rework validation report;
+  coverage proven mechanically by two independent expansions.
+- Accepted residual findings: ~21 minors (wording/citation precision, e.g.
+  D-015(2)'s pre-existing "js/ts.tsdk.path" key name — operative D-032 has the
+  correct `typescript.tsdk`); none affects executability.
+- User approval: **waived** per the recorded user instruction.
