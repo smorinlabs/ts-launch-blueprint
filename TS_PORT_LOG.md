@@ -56,11 +56,27 @@ and ask the user.
 - **Existing repo influence**: n/a
 - **Deviation from plan**: none
 - **Alternatives considered**: n/a (pre-seeded user decisions)
-- **Validation performed**: pending (VALIDATE step below)
-- **Result**: pending gate
-- **Follow-up tasks**: run VALIDATE (independent sub-agent confirms SHA, files,
-  decision entries), then GATE.
+- **Validation performed**: independent validator sub-agent (agent id
+  `ac7440166b05e03bc`) re-verified all claims against primary sources:
+  (1) `git -C ~/c/py-launch-blueprint rev-parse HEAD` →
+  `4828f8596b2332d74fbcff932ebab6f0030febd5` PASS; (2) `git ls-files | wc -l` →
+  93 PASS; (3) `git status --porcelain` → exactly the five D-005 untracked files
+  PASS; (4) `TS_PORT_DECISIONS.md` committed in `ac98f3c`, D-001–D-006 present
+  with all four fields, substance matches goal.md §5 one-for-one PASS;
+  (5) `TS_PORT_LOG.md` committed, SHA + waiver recorded PASS; (6) `gh auth
+  status` → logged in as smorin PASS. Overall: PASS.
+- **Result**: VALIDATE passed; one flag adjudicated (see gate record)
+- **Follow-up tasks**: none
 
 ### Gate record — Phase 0
 
-- Status: PENDING
+- **Status: PASS** (Fable gate verdict, 2026-07-06)
+- Evidence reviewed: executor CHECK (environment command output in conversation)
+  + validator report above. All six validation items PASS with cited evidence.
+- Adjudication: validator flagged that the waiver quote ends "per §6 or 2000
+  turns" while the goal.md §10 template ends "or stop after 300 turns". Fable
+  (which received the user's actual /goal directive) confirms the user's
+  directive said "2000 turns" — the log quote is verbatim; the user modified
+  the template's turn budget. No discrepancy.
+- User approval: **waived** per the user instruction recorded at the top of this
+  log (autonomous full-run variant, goal.md §10).
