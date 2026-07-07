@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    // Language/runtime — ES2022 is the org baseline; a target/lib bump to ES2024
+    // is a T01-gated follow-up (D-013(3)), not taken here.
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext", // implies moduleResolution NodeNext + esModuleInterop (D-013(1))
+    "types": ["node"], // explicit since TS 6.0 (types defaults to [])
+
+    // Strictness (union of org flags + mypy/pyright-parity additions, D-013(2))
+    "strict": true, // explicit even though TS 6.0 defaults it
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true, // mypy warn_no_return
+    "allowUnreachableCode": false, // mypy warn_unreachable
+    "allowUnusedLabels": false,
+    "exactOptionalPropertyTypes": true,
+
+    // Module hygiene
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true, // implied by verbatimModuleSyntax; kept explicit
+    "isolatedDeclarations": true, // enables tsdown's fast oxc dts path (D-025)
+    "declaration": true, // required companion of isolatedDeclarations; noEmit suppresses output
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+
+    // Emit is owned by tsdown (D-012(1)); this config only typechecks (D-013(4))
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "tsdown.config.ts", "vitest.config.ts"]
+}

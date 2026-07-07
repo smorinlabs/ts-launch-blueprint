@@ -1,0 +1,181 @@
+# Set project-wide variables (template-rename seam, D-029)
+ts_package_name := "ts-launch-blueprint"
+repo_name := "ts-launch-blueprint"
+command_name := "ts-projects"
+args := " "
+
+# Text colors
+BLACK := '\033[30m'
+RED := '\033[31m'
+GREEN := '\033[32m'
+YELLOW := '\033[33m'
+BLUE := '\033[34m'
+MAGENTA := '\033[35m'
+CYAN := '\033[36m'
+WHITE := '\033[37m'
+GRAY := '\033[90m'
+
+# Background colors
+BG_BLACK := '\033[40m'
+BG_RED := '\033[41m'
+BG_GREEN := '\033[42m'
+BG_YELLOW := '\033[43m'
+BG_BLUE := '\033[44m'
+BG_MAGENTA := '\033[45m'
+BG_CYAN := '\033[46m'
+BG_WHITE := '\033[47m'
+
+# Text styles
+BOLD := '\033[1m'
+DIM := '\033[2m'
+ITALIC := '\033[3m'
+UNDERLINE := '\033[4m'
+
+# Reset all styles
+NC := '\033[0m'
+
+# Display a symbol
+CHECK := GREEN + "✓" + NC
+CROSS := RED + "✗" + NC
+DASH := GRAY + "-" + NC
+
+# List all available recipes
+[group('help')]
+@default:
+    just --list --unsorted
+
+# ================================
+# COMMANDS GROUPS
+# ================================
+# SETUP: Initial project setup and environment initialization
+# INSTALL: Installing the project and its dependencies
+# UPDATE: Updating dependencies, versions, and configurations
+# DEV: Development workflow commands and utilities
+# TEST: Test execution and test environment management
+# BUILD: Building distributable packages and artifacts
+# RUN: Executing the application in various modes
+# DOCS: Documentation generation and management
+# PRE-COMMIT: Linting, formatting, and code quality checks
+# HELP: Usage instructions and command information
+# UTILITIES: General utility and maintenance commands
+# DEBUG: Debugging and troubleshooting tools
+# RELEASES: Version management and publishing
+# WORKFLOW: CI/CD pipelines and multi-step processes
+# QUICK START: Essential commands for basic usage
+# CLEAN: Removing build artifacts, caches, and temporary files
+# LEGACY: Deprecated recipes kept only for reference
+# ================================
+# (CLEAN and LEGACY were used-but-undocumented in the Python source's block;
+# listed here to fix that drift. The legacy pip recipes themselves are dropped
+# per D-024(1); the LEGACY group is reserved.)
+
+# Check if required tools are installed
+[group('setup'), group('debug')]
+check-deps:
+    #!/usr/bin/env sh
+    if ! command -v node >/dev/null 2>&1; then printf "{{YELLOW}}node is not installed{{NC}}\n RUN {{BLUE}}make install-node{{NC}}\n"; exit 1; fi
+    if ! command -v npm >/dev/null 2>&1; then printf "{{YELLOW}}npm is not installed{{NC}} (it ships with Node)\n RUN {{BLUE}}make install-node{{NC}}\n"; exit 1; fi
+    if ! command -v just >/dev/null 2>&1; then printf "{{YELLOW}}just is not installed{{NC}}\n RUN {{BLUE}}make install-just{{NC}}\n"; exit 1; fi
+    if ! command -v git >/dev/null 2>&1; then printf "{{YELLOW}}git is not installed{{NC}}\n Install: {{BLUE}}xcode-select --install{{NC}} (macOS) or {{BLUE}}sudo apt install git{{NC}} (Debian/Ubuntu)\n"; exit 1; fi
+    echo "All required tools are installed"
+
+alias c := check-deps
+
+# Install project dependencies (generates/updates package-lock.json)
+[group('install'), group('quick start')]
+@install: check-deps
+    npm install
+
+# Build distributable package (dist/) with tsdown
+[group('build'), group('dev')]
+@build:
+    npm run build
+
+alias b := build
+
+# Run type checker (tsc --noEmit)
+[group('dev')]
+@typecheck:
+    echo "Running type checker..."
+    echo "  tsc --noEmit"
+    npm run typecheck
+
+alias tc := typecheck
+
+# Run tests
+[group('test'), group('dev')]
+@test *options:
+    npx vitest run {{options}}
+
+alias t := test
+
+# Run tests with coverage (95/95/90/95 thresholds enforced)
+[group('test')]
+@coverage:
+    npm run test:coverage
+
+# Run package command
+[group('run'), group('quick start')]
+@run *args=args:
+    node dist/cli.js {{args}}
+
+# Check built package version
+[group('releases'), group('utilities')]
+@version:
+    node dist/cli.js --version
+
+# Clean up build artifacts, caches, and installed dependencies
+[group('clean')]
+@clean:
+    rm -rf dist
+    rm -rf coverage
+    rm -rf node_modules
+    rm -f *.tsbuildinfo
+
+# Collect system and environment information for debugging (dependency-free)
+[group('debug')]
+debug-info:
+    #!/usr/bin/env sh
+    echo "## Debug Information"
+    echo ""
+    echo "### System Information"
+    echo "- Date: $(date)"
+    echo "- OS Family: {{os_family()}}"
+    if [ "{{os()}}" = "macos" ]; then
+        echo "- macOS Version: $(sw_vers -productVersion)"
+        echo "- Kernel: $(uname -r)"
+        echo "- Architecture: $(uname -m)"
+    elif [ "{{os_family()}}" = "unix" ]; then
+        if command -v lsb_release >/dev/null 2>&1; then
+            echo "- Distribution: $(lsb_release -ds)"
+        elif [ -f /etc/os-release ]; then
+            . /etc/os-release
+            echo "- Distribution: ${PRETTY_NAME}"
+        fi
+        echo "- Kernel: $(uname -r)"
+        echo "- Architecture: $(uname -m)"
+    else
+        echo "- Kernel: $(uname -r)"
+        echo "- Architecture: $(uname -m)"
+    fi
+    echo "- Git Branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'Not a git repository or error')"
+    echo ""
+    echo "### Development Tools"
+    if command -v node >/dev/null 2>&1; then echo "node: $(node --version)"; else echo "node: Not Found"; fi
+    if command -v npm >/dev/null 2>&1; then echo "npm: $(npm --version)"; else echo "npm: Not Found"; fi
+    if command -v git >/dev/null 2>&1; then echo "git: $(git --version)"; else echo "git: Not Found"; fi
+    if command -v just >/dev/null 2>&1; then echo "just: $(just --version)"; else echo "just: Not Found"; fi
+    echo "CLI Version ({{command_name}}): $(node dist/cli.js --version 2>/dev/null || echo 'Not Found (run: just build)')"
+    if command -v node >/dev/null 2>&1; then
+        echo "Project Version: $(node -p "JSON.parse(require('node:fs').readFileSync('package.json','utf8')).version" 2>/dev/null || echo 'Version Not Found')"
+    fi
+    echo ""
+    echo "### Installed Project Packages"
+    if command -v npm >/dev/null 2>&1; then npm ls --depth=0 2>/dev/null || echo "(no node_modules; run 'just install')"; else echo "npm not found, cannot list packages"; fi
+    echo ""
+    echo "### Declared Dependencies (package.json)"
+    if command -v node >/dev/null 2>&1; then
+        node -p "const p=JSON.parse(require('node:fs').readFileSync('package.json','utf8')); JSON.stringify({dependencies:p.dependencies??{},devDependencies:p.devDependencies??{}},null,2)" 2>/dev/null || echo "Could not read dependencies from package.json"
+    else
+        echo "node not found, cannot read package.json"
+    fi
