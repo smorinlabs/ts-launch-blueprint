@@ -41,11 +41,11 @@ Conventions used below:
    (package.json import, D-021(2)), `src/cli.ts` (stub printing version),
    `tests/version.test.ts`, `vitest.config.ts` (v8, 95/95/90/95 thresholds,
    D-019), `.gitignore` (adapted: dist/, coverage/, node_modules/; inverse
-   lockfile comment), `LICENSE` (MIT root, D-024(7)/D-028), `Makefile`
+   lockfile comment), `LICENSE` (MIT root, D-024(7)), `Makefile`
    (bootstrap-only: check/install-just/install-node, D-024(2)), `Justfile`
    (name variables seam D-029; groups taxonomy incl. clean+legacy fix; recipes:
    default list, install, build, typecheck/tc, test, clean, check-deps with
-   per-tool remediation, debug-info; D-024(1)/D-015(3)), minimal `README.md`
+   per-tool remediation, debug-info; D-024(1)/D-015(4)), minimal `README.md`
    stub (full port in S6b).
 4. **Research decisions applied**: D-011 (all 5), D-012(1,2,3), D-013 (all),
    D-025, D-015(1,4), D-019(1,3), D-024(1,2,7), D-029.
@@ -90,11 +90,14 @@ Conventions used below:
    D-024(5)), `CLAUDE.md` (terse command card), `.cursor/rules/*.mdc`
    (re-pointed to AGENTS.md), `.claude/settings.json` (companyAnnouncements
    welcome string naming the project and relevant commands + plugin enables,
-   D-024(6)), Justfile recipes: format, format-check, lint, lint-fix,
+   D-024(6)), `.vscode/settings.json` containing ONLY `typescript.tsdk`
+   pinning the editor to the workspace TypeScript (the editor≡CI compensating
+   control from D-015(2), reconciled with the no-settings.json principle via
+   D-032), Justfile recipes: format, format-check, lint, lint-fix,
    pre-commit-run (hook suite runner), all (format lint typecheck test),
    setup-hooks.
 4. **Research decisions applied**: D-014 (all 7), D-020 (all 6), D-024(3,4,5,6),
-   D-018 partially (logger file lands in S3a).
+   D-015(2) via D-032 (tsdk pin), D-018 partially (logger file lands in S3a).
 5. **Existing repo decisions**: lefthook+commitlint (POC), difftree `all`
    recipe, .claude/settings.json announcements (difftree), plugins
    (agent2linear); documented Biome→Oxlint reversal (D-014 tie-break).
@@ -135,12 +138,14 @@ Conventions used below:
    zod v4 schema, precedence flag > TS_PROJECTS_TOKEN > config file; 0600
    write + POSIX loose-permissions warning; actionable multi-remedy
    missing-token error, D-017), `src/lib/errors.ts` (ConfigError/ApiError
-   taxonomy → exit codes 1/3/4 + cli-standards 2/5/130/143 mapping, D-016(2)),
+   taxonomy mapped to the cli-standards R6.1 contract adopted in D-016(2):
+   generic/config error→1, usage→2, not-found→3, auth incl. missing/invalid
+   token→4, conflict→5, SIGINT→130, SIGTERM→143),
    `tests/config.test.ts` (ports test_config.py intent: precedence, isolation
    via injected env/fs, error messages), `tests/cli-core.test.ts` (in-process
    runCli: --version, --help shape, unknown command → exit 2 + did-you-mean,
    -v/-q levels).
-4. **Research decisions applied**: D-016(1,2,7 + D-026), D-017 (all 6), D-018
+4. **Research decisions applied**: D-016(1,2,8 + D-026), D-017 (all 6), D-018
    (all 5), D-029.
 5. **Existing repo decisions**: claim-npm DI router + injected writers;
    agent2linear stderr logger; cli-standards normative surface (Synthesis #4).
@@ -156,7 +161,8 @@ Conventions used below:
 10. **Risks**: Commander v15 exitOverride edge cases (usage exit 2 vs source's
     click behavior); zod v4 error-message shaping for the multi-remedy text.
 11. **Definition of done**: `just all` green; `node dist/cli.js --version`,
-    `--help`, bad-flag→exit 2, missing-token→exit 1 with the three-remedy
+    `--help`, bad-flag→exit 2, missing-token→exit 4 (auth, per D-016(2)) with
+    the three-remedy
     message, `TS_PROJECTS_TOKEN=x node dist/cli.js config --show` (or
     equivalent flag surface) works; config tests port every test_config.py
     behavior (or document intentional divergence inline).
@@ -187,14 +193,19 @@ Conventions used below:
    env, piped-stdout JSON parses cleanly WITHOUT regex-stripping — the
    progress-on-stdout wart is deliberately not preserved, D-018(5)).
 4. **Research decisions applied**: D-016 (all, as amended by D-026), D-018(4,5),
-   D-019 (all 6), D-012(3) (bin smoke via packed tarball deferred to S5).
+   D-019 (all 6), D-012(3) (bin smoke via packed tarball deferred to S5),
+   D-031 (fuzzy-search claim dropped).
 5. **Existing repo decisions**: claim-npm mock-registry subprocess tier;
    agent2linear --json envelope conventions.
 6. **Implementation tasks**: implement modules; port all EXAMPLECLI flag
    semantics; correct the two source quirks documented in INDEX (token-alone
    still requires config? — preserve source precedence behavior exactly;
    mis-mocked prompt tests — port with correct seams and pin BOTH paths:
-   empty selection→exit 0 early return AND populated selection→format path).
+   empty selection→exit 0 early return AND populated selection→format path);
+   resolve the advertised-but-unimplemented fuzzy search per D-031: ship NO
+   fuzzy dependency and remove the fuzzy claim from EXAMPLECLI/README/module
+   docs (parity with actual source behavior; @inquirer checkbox's built-in
+   list navigation is the selection aid).
 7. **Tests**: as above; parity assertions comparing against source behavior
    table derived from INDEX cli fragment (exit codes, format shapes, default
    limit 200).

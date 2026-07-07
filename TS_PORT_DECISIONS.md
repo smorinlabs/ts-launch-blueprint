@@ -379,3 +379,15 @@ the old one.
 - Options: (1) 9 slices — S1 skeleton+toolchain, S2 quality gates+editor/AI configs, S3a CLI foundation (entry/config/logging), S3b CLI feature parity (API/prompt/formats/clipboard), S4 CI+security workflows, S5 release+versioning, S6a community+contributors, S6b docs tree+README, S7 final polish+relocation+completeness critic (2) domain-spec 9-slice example order verbatim (3) fewer, larger slices
 - Decision: (1) — an adaptation of the domain-spec example to this repo's actual content; branch-per-slice `slice/s<N>-<name>` merged to main only after the slice gate passes (D-004)
 - Why: Each slice is end-to-end testable (vertical, per domain spec Phase 5); S3/S6 split keeps slices reviewable; ordering puts working code before workflows that gate it, and final polish last so D-006 relocation happens once.
+
+## D-031: Drop the advertised-but-unimplemented fuzzy search (resolves the INDEX-mandated decision)
+- Ref: TS_PORT_INDEX.md cli feature "Advertised-but-unimplemented fuzzy search"; TS_PORT_RESEARCH.md §T06; TS_PORT_PLAN.md S3b; Phase 5 gate adjudication (trace-1 orphan finding, wf_fda7e68b-23d)
+- Options: (1) drop the fuzzy claim and ship no fuzzy dependency — the port matches the source's ACTUAL behavior (thefuzz/python-Levenshtein were declared but never imported; the docstring/EXAMPLECLI claims were false advertising) (2) implement fuzzy filtering (e.g. fuse.js/fuzzysort in the selection prompt), making the claim true for the first time
+- Decision: (1) Drop claim and deps. S3b removes the fuzzy wording from EXAMPLECLI/README/module docs; no fuzzy library enters package.json. A future feature may revisit via a new decision.
+- Why: The port's parity target is observed behavior, not aspirational text; shipping advertised-but-dead capability or unused runtime deps is exactly what the INDEX forbids. Implementing new behavior would exceed port scope (preserve intent — the intent never materialized in the source).
+
+## D-032: Commit .vscode/settings.json with only typescript.tsdk (reconciles D-015(2) ↔ D-024(4))
+- Ref: TS_PORT_RESEARCH.md §T05/§T14; TS_PORT_PLAN.md S2; Phase 5 gate adjudication (trace-2 finding, wf_fda7e68b-23d)
+- Options: (1) commit a one-key .vscode/settings.json ({"typescript.tsdk": "node_modules/typescript/lib"}) as a narrow exception to the source's no-settings.json principle (2) drop the tsdk pin, amending D-015(2)'s compensating control
+- Decision: (1) Adopt the one-key settings.json. Amends D-024(4)'s "preserve no-settings.json principle" to "no OPINIONATED settings.json — the single typescript.tsdk key is permitted as the editor≡CI version-pinning control".
+- Why: D-015(2) omitted the second type-checker on the argument that editor and CI share one engine — that argument only holds if the editor actually uses the workspace TypeScript version; the tsdk key is the minimal mechanism. A one-key file does not impose user preferences, which was the intent behind the source's no-settings.json stance.
