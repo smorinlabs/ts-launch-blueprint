@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "description": "CLI tools for project search and selection - TypeScript port of py-launch-blueprint",
   "keywords": [
+    "blueprint",
     "cli",
     "template",
-    "blueprint",
     "typescript"
   ],
   "license": "MIT",
@@ -14,6 +14,12 @@
     "type": "git",
     "url": "git+https://github.com/smorinlabs/ts-launch-blueprint.git"
   },
+  "bin": {
+    "ts-projects": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "exports": {
     ".": {
@@ -22,37 +28,39 @@
     },
     "./package.json": "./package.json"
   },
-  "bin": {
-    "ts-projects": "dist/cli.js"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prepare": "lefthook install"
   },
-  "engines": {
-    "node": ">=24"
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.0",
+    "@commitlint/config-conventional": "^21.2.0",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "lefthook": "^2.1.9",
+    "oxfmt": "0.58.0",
+    "oxlint": "^1.73.0",
+    "tsdown": "0.22.3",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10",
+    "yaml": "^2.9.0"
   },
   "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "onFail": "error"
+    },
     "runtime": {
       "name": "node",
       "version": ">=24",
       "onFail": "error"
-    },
-    "packageManager": {
-      "name": "npm",
-      "onFail": "error"
     }
   },
-  "devDependencies": {
-    "@types/node": "^24.0.0",
-    "@vitest/coverage-v8": "^4.1.10",
-    "tsdown": "0.22.3",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.10"
+  "engines": {
+    "node": ">=24"
   }
 }
