@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "CLI: Launch (tsx)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "tsx",
+      "program": "${workspaceFolder}/src/cli.ts",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "CLI: Launch (tsx, With Args)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "tsx",
+      "program": "${workspaceFolder}/src/cli.ts",
+      "args": ["--workspace", "test", "--limit", "10"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "CLI: Launch dist build",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/dist/cli.js",
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "console": "integratedTerminal"
+    }
+  ]
+}

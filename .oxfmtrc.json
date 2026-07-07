@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  // Formatter style (D-014(2)): org-consistent values where agent2linear's
+  // Prettier config and the POC's Biome config agree; the source's 88-col
+  // ruff width is a Python norm, not portable intent.
+  "printWidth": 100,
+  "singleQuote": true,
+  "semi": true,
+  "trailingComma": "es5",
+  "endOfLine": "lf",
+  // Import sorting as a formatting concern (D-014(3)): ruff `I`/isort intent,
+  // carried via Oxfmt's built-in perfectionist-like algorithm (off by default).
+  "sortImports": true,
+  // Oxfmt also formats JSON/YAML/Markdown here (D-014(7)) — the source's
+  // taplo/yamlfmt intent (every config format machine-formatted) collapses
+  // into this one tool.
+  "ignorePatterns": [
+    // Port process artifacts (relocated to docs/port/ in S7 per D-006): they
+    // cross-reference each other by line number, so reformatting would corrupt
+    // those references. Template content is NOT excluded.
+    "TS_PORT_*.md",
+    "TS_EXISTING_REPO_REVIEW.md",
+    "goal.md",
+    "typescript_port_process_prompt.md"
+  ]
+}

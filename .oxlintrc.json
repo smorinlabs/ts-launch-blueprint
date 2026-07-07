@@ -1,0 +1,70 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Lint gate (D-014): Oxlint 1.x replaces ruff lint. Category/rule severity is
+  // "error" everywhere (the POC's warn-level laxity is explicitly not reused).
+  // Ruff-select intent map (map intent, not rule names):
+  //   E/W (pycodestyle)  -> formatter's job (oxfmt) + correctness category
+  //   F   (pyflakes)     -> correctness category + no-unused-vars below
+  //   I   (isort)        -> oxfmt sortImports (.oxfmtrc.json, D-014(3))
+  //   B   (bugbear)      -> suspicious category + eqeqeq/no-caller/no-proto
+  //   C4  (comprehensions) / UP (pyupgrade) -> unicorn plugin + no-var/prefer-const
+  //   N   (pep8-naming)  -> no direct equivalent; TS naming left to review
+  //   S   (bandit)       -> security-adjacent built-ins below + CodeQL in CI
+  //                         (layered coverage per D-014(5); eslint-plugin-security
+  //                         deferred until Oxlint JS plugins leave alpha)
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "plugins": ["typescript", "unicorn", "oxc", "import", "promise", "node", "vitest"],
+  "rules": {
+    // Unused-code diagnostics live here, not in tsconfig (T03 note / D-015(2)):
+    // supports the org's `^_`-prefix escape convention (agent2linear) + autofix.
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
+    // In the suspicious category, but it flags the `^_` escape identifiers
+    // themselves — disabled so the unused-code convention above stays usable.
+    "no-underscore-dangle": "off",
+    // Security-adjacent built-ins (ruff S / flake8-bandit intent, D-014(5)).
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "no-script-url": "error",
+    // Bugbear-adjacent correctness hardening (ruff B intent).
+    "no-caller": "error",
+    "no-proto": "error",
+    "eqeqeq": "error",
+    // Modernization (ruff UP intent).
+    "no-var": "error",
+    "prefer-const": "error"
+  },
+  // Per-context relaxations (D-014(4)): direct structural equivalent of the
+  // source's ruff per-file-ignores for tests/* (S101/S105/S106), each
+  // relaxation commented as the source does. Some listed rules are not in the
+  // enabled categories today; they are pinned "off" here so tightening the
+  // global gate (more categories, type-aware mode) never taxes test code.
+  "overrides": [
+    {
+      "files": ["tests/**", "**/*.test.ts"],
+      "rules": {
+        // Tests assert freely, including on possibly-undefined values —
+        // non-null assertions are idiomatic in test bodies (ruff S101 analog).
+        "typescript/no-non-null-assertion": "off",
+        // Loose typing is acceptable inside test fixtures and mocks.
+        "typescript/no-explicit-any": "off",
+        // Literal expected values in assertions are the point of a test.
+        "no-magic-numbers": "off",
+        // Debug output in tests is harmless (rule is off globally today, but
+        // kept here so enabling it repo-wide never taxes tests).
+        "no-console": "off"
+      }
+    }
+  ],
+  "ignorePatterns": ["dist/**", "coverage/**"]
+}
