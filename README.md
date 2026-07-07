@@ -18,13 +18,27 @@ ts-projects --version
 
 ```bash
 make check      # verify the foundational tools (just, node) are installed
-npm install     # install dev dependencies
+npm install     # install dev dependencies (also installs git hooks)
 just build      # bundle CLI + library to dist/ (tsdown)
 just typecheck  # tsc --noEmit
 just test       # vitest
+just all        # every quality gate: format-check, lint, typecheck, test
 ```
 
 Run `just` (no arguments) to list every available recipe.
+
+### Git hooks
+
+`npm install` activates the [lefthook](https://lefthook.dev) git hooks via the
+`prepare` script. To (re)install them and wire the commit-message template:
+
+```bash
+just setup-hooks
+```
+
+Pre-commit formats (oxfmt) and lints (oxlint) staged files and type-checks the
+repo; commit messages are checked by commitlint (Conventional Commits, 50/72).
+Tests run on push only if you opt in: `export TS_PROJECTS_PREPUSH_TESTS=1`.
 
 ## License
 

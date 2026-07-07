@@ -93,6 +93,38 @@ alias c := check-deps
 
 alias b := build
 
+# Format code (oxfmt writes fixes; imports sorted via sortImports, D-014(3))
+[group('dev'), group('pre-commit')]
+@format:
+    echo "Running formatter..."
+    echo "  oxfmt --write (+ sortImports)"
+    npx oxfmt
+
+alias f := format
+
+# Check formatting without writing (CI-parity gate)
+[group('pre-commit')]
+@format-check:
+    echo "Checking formatting..."
+    echo "  oxfmt --check"
+    npx oxfmt --check
+
+alias fc := format-check
+
+# Run linter (oxlint: correctness+suspicious at error severity, D-014)
+[group('dev'), group('pre-commit')]
+@lint:
+    echo "Running linters..."
+    echo "  oxlint"
+    npx oxlint
+
+alias l := lint
+
+# Run linter with autofixes applied
+[group('dev')]
+@lint-fix:
+    npx oxlint --fix
+
 # Run type checker (tsc --noEmit)
 [group('dev')]
 @typecheck:
@@ -113,6 +145,26 @@ alias t := test
 [group('test')]
 @coverage:
     npm run test:coverage
+
+# Run all quality gates (format-check, lint, typecheck, test)
+[group('test'), group('dev'), group('quick start')]
+@all: format-check lint typecheck test
+
+alias a := all
+
+# Run the full hook-suite gates on ALL files (CI mirror of the
+# pre-commit/commit-time discipline; source pre-commit-run intent)
+[group('pre-commit')]
+@pre-commit-run: format-check lint typecheck test
+
+alias pc := pre-commit-run
+
+# Install git hooks (lefthook) and wire the commit-message template
+[group('setup'), group('pre-commit')]
+@setup-hooks:
+    npx lefthook install
+    git config commit.template .gitmessage
+    echo "Hooks installed; commit template wired (.gitmessage)"
 
 # Run package command
 [group('run'), group('quick start')]
