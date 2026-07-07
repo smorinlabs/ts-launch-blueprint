@@ -170,7 +170,57 @@ loop at the first unit whose gate has not passed. Never redo passed work; never
 trust unvalidated work found on disk — re-run VALIDATE for any artifact whose gate
 status is not recorded.
 
-## 9. Definition of Done
+## 9. Driving This Contract with `/goal`
+
+This contract is executed via Claude Code's built-in `/goal` feature
+(docs: code.claude.com/docs/en/goal). Facts that shape how it is used here:
+
+- After each turn a small evaluator model checks the goal condition **against the
+  transcript only** — it cannot read files or run commands. Conditions must
+  therefore reference evidence Claude surfaces: committed artifacts, command
+  output, and gate verdicts recorded in `TS_PORT_LOG.md` and shown in conversation.
+- Only one goal is active per session; goals survive `--resume` and compaction;
+  `/goal` alone shows status, `/goal clear` cancels. Condition limit: 4,000 chars.
+
+**Rule: one goal per human gate — never a single migration-wide goal.** The
+evaluator auto-continues until its condition is met, so a whole-migration goal
+would push straight through the §5 approval pauses. Each goal below ends at the
+point where the user reviews; after approval, the user issues the next goal.
+
+Kickoff sequence:
+
+```text
+/goal Phases 1-2 of goal.md ready for user review: TS_PORT_INDEX.md committed
+covering every file in the source repo's git ls-files with all 11 fields,
+feature extraction incorporated, cross-validation evidence and a passing Fable
+gate verdict recorded in TS_PORT_LOG.md and summarized in conversation, and the
+user has been asked for approval — or stop after 40 turns
+
+/goal Phase 3 of goal.md ready for user review: TS_EXISTING_REPO_REVIEW.md
+committed with all 18 fields per reviewed repo, researched via deep-research
+prompting, validation evidence and gate verdict in TS_PORT_LOG.md, user asked
+for approval — or stop after 30 turns
+
+/goal Phase 4 of goal.md ready for user review: TS_PORT_RESEARCH.md committed
+with all 11 fields per topic, every recommendation carrying a D-### in
+TS_PORT_DECISIONS.md, 2-validator evidence and gate verdict in TS_PORT_LOG.md,
+user asked for approval — or stop after 40 turns
+
+/goal Phase 5 of goal.md ready for user review: TS_PORT_PLAN.md committed with
+vertical slices citing decision IDs, traceability validation passed with gate
+verdict in TS_PORT_LOG.md, user asked for approval — or stop after 20 turns
+
+/goal Phase 6 of goal.md complete: every TS_PORT_PLAN.md slice implemented with
+its gate passed and validator evidence in TS_PORT_LOG.md, all repo checks
+(build, lint, typecheck, tests) shown passing, TS_PORT_DECISIONS.md current,
+and the §10 definition of done confirmed — or stop after 150 turns
+```
+
+Run Phase 6 as one bounded goal, or split it per slice batch if a gate failure
+escalates; on resume after a session break, re-issue the goal for the current
+unit — §8 governs where to re-enter.
+
+## 10. Definition of Done
 
 The goal is complete when every item in the domain spec's **Expected Final Output**
 list is satisfied, every phase and slice gate has passed, all escalations are
