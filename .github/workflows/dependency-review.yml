@@ -50,8 +50,17 @@ jobs:
     steps:
       - name: 'Checkout repository'
         uses: actions/checkout@v7
+        with:
+          # No job here pushes; drop the persisted token (zizmor artipacked).
+          persist-credentials: false
+      # SHA-pinned even though this is an official actions/* action:
+      # dependency-review-action publishes NO floating major tag (no `v5`,
+      # and no `v4` either — the Python source's `@v4` carried this exact
+      # latent resolution bug); only exact tags like v5.0.0 exist, so a
+      # `@v5` ref would fail to resolve on first run. Dependabot's
+      # github-actions ecosystem keeps the SHA fresh.
       - name: 'Dependency Review'
-        uses: actions/dependency-review-action@v5
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         # Commonly enabled options, see https://github.com/actions/dependency-review-action#configuration-options for all available options.
         with:
           comment-summary-in-pr: always

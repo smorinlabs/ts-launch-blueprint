@@ -64,6 +64,8 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: refs/pull/${{ github.event.inputs.pr_number }}/head
+          # No job here pushes; drop the persisted token (zizmor artipacked).
+          persist-credentials: false
 
       # Third-party action → full-SHA pin + version comment (D-022(9)); kept
       # fresh by the Dependabot github-actions ecosystem. `continue-on-error`
@@ -86,14 +88,18 @@ jobs:
         id: results
         if: always()
         run: |
+          # Dynamic heredoc delimiter: a static marker could collide with a
+          # line in the (attacker-influenced) report and truncate/inject the
+          # multiline output.
+          delimiter="osv-$(date +%s)-$RANDOM"
           {
-            echo 'report<<OSV_EOF'
+            echo "report<<$delimiter"
             if [ -f osv-results.md ]; then
               cat osv-results.md
             else
               echo '(OSV-Scanner produced no results file.)'
             fi
-            echo 'OSV_EOF'
+            echo "$delimiter"
           } >> "$GITHUB_OUTPUT"
 
       - name: Update PR comment with security scan results

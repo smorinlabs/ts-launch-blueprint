@@ -181,6 +181,10 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
   // Hybrid pinning policy (D-022(9)): official actions/* and github/* pin to a
   // major tag; every third-party action must be full-SHA-pinned with a trailing
   // version comment so Dependabot's github-actions ecosystem can refresh it.
+  // Official actions may ALSO be SHA-pinned (with a version comment): some
+  // official actions publish no floating major tag at all (e.g.
+  // actions/dependency-review-action has only exact tags like v5.0.0 — a
+  // `@v5` ref would fail to resolve), so a SHA pin is the only safe ref.
   it('third-party actions are SHA-pinned with a version comment; official actions use tags', () => {
     const usesLineRe = /^\s*(?:-\s*)?uses:\s*(\S+)(?:\s*#\s*(.+?))?\s*$/;
     const shaRe = /^[0-9a-f]{40}$/;
@@ -206,9 +210,13 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
         if (atIndex <= 0) {
           violations.push(`${spec}: missing @ref`);
         } else if (org === 'actions' || org === 'github') {
-          // Official actions: major-tag pin (e.g. v7), never a bare SHA.
-          if (!majorTagRe.test(ref))
-            violations.push(`${spec}: official action should use a vN tag`);
+          // Official actions: a vN major-tag pin, OR a full SHA with a
+          // version comment (for official actions without floating majors).
+          if (shaRe.test(ref)) {
+            if (!comment) violations.push(`${spec}: SHA pin needs a version comment`);
+          } else if (!majorTagRe.test(ref)) {
+            violations.push(`${spec}: official action should use a vN tag or SHA+comment`);
+          }
         } else {
           // Third-party: full 40-hex SHA + a trailing version comment.
           thirdPartyChecked += 1;
