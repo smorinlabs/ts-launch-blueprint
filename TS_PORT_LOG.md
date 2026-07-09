@@ -387,3 +387,26 @@ and ask the user.
 - **Validation**: 2 independent validators (wf_68571b07-db6) re-ran just all/coverage/build + 9 behavioral probes on dist/cli.js (version, help, did-you-mean→2, tokenless→4 with three remedies stderr-only, redaction, precedence flag>env>file, --config nonexistent, --no-color) — both PASS, 0 blocking. Coverage real: 161/161 statements, 95.3% branches vs 90 threshold.
 - **Deviations (accepted)**: remedy order matches port precedence (flag/env/file) vs source order — content parity kept; AuthError extends ConfigError with exitCode 4 override (source semantics + R6.1); SIGINT/SIGTERM handlers by inspection — subprocess tier lands in S3b per plan.
 - **Result**: Gate PASS (Fable), merged --no-ff. Suite: 72/72; deps added commander 15.0.0, smol-toml 1.7.0, zod 4.4.3.
+
+---
+
+## 2026-07-09 — User instruction: model-tier routing for sub-agents (D-034)
+
+Recorded verbatim from the user's message during S3b validation:
+
+> Let's make sure all future work utilizes the correct sub-agent. Whether
+> that's Opus, Sonnet, or Haiku, the planning should be done with Fable and
+> then execution should be broken up and planned by Fable specifically to be
+> done by Opus, Sonnet, and Haiku. Before going to each subtask and element,
+> that should be done as well as using the task tool so it's easy to
+> understand where we are with progress. My guess is things like documentation
+> can be done with Haiku.
+
+Effect (D-034): from this point, newly dispatched executors/validators are
+routed by task complexity — Opus for complex/security-sensitive implementation
+and the final completeness critic; Sonnet for standard implementation and
+code-level validation; Haiku for documentation porting and mechanical checks.
+Fable retains all planning, gating, and adjudication (D-001). In-flight agent
+continuations (the S3b rework already dispatched) keep their existing model
+for context continuity. Remaining slices are tracked as harness tasks with
+their planned tiers.
