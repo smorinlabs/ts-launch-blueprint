@@ -12,9 +12,18 @@ import { homedir as osHomedir } from 'node:os';
 
 import { Command, CommanderError } from 'commander';
 
+import { registerProjectsCommand } from './commands/projects.js';
+import {
+  type ClipboardWriter,
+  type Prompter,
+  realClipboard,
+  realPrompter,
+  realSpinner,
+  type SpinnerFactory,
+} from './lib/adapters.js';
 import { type Colors, colorEnabled, createColors } from './lib/colors.js';
 import { type ConfigFs, redactToken, requireToken, resolveConfig } from './lib/config.js';
-import { CliError, EXIT_CODES, exitCodeFor } from './lib/errors.js';
+import { EXIT_CODES, exitCodeFor } from './lib/errors.js';
 import { createLogger, type Logger, resolveLevel } from './lib/logger.js';
 import { VERSION } from './version.js';
 
@@ -28,14 +37,18 @@ export interface CliDeps {
   homedir: () => string;
   stdoutIsTTY: boolean;
   stderrIsTTY: boolean;
+  /** TTY-ness of stdin — gates the interactive multi-select. */
+  stdinIsTTY: boolean;
   /** fs surface for config discovery/reading (defaults to node:fs). */
   fs?: ConfigFs | undefined;
-  /** HTTP transport seam — unused until S3b (API client). */
-  fetchImpl?: typeof fetch | undefined;
-  /** Interactive prompt seam — unused until S3b (multi-select). */
-  prompter?: unknown;
-  /** Clipboard seam — unused until S3b (--copy). */
-  clipboard?: unknown;
+  /** HTTP transport seam — the API client's only transport (D-019(5)). */
+  fetchImpl: typeof fetch;
+  /** Interactive multi-select seam (D-016(6)). */
+  prompter: Prompter;
+  /** Clipboard seam for --copy (D-016(7)). */
+  clipboard: ClipboardWriter;
+  /** Spinner seam; invoked only when TTY/CI gating allows (D-016(5)). */
+  spinner: SpinnerFactory;
 }
 
 /** Real process-backed deps for the production entry point. */
@@ -51,20 +64,28 @@ export function realDeps(): CliDeps {
     homedir: osHomedir,
     stdoutIsTTY: process.stdout.isTTY ?? false,
     stderrIsTTY: process.stderr.isTTY ?? false,
+    stdinIsTTY: process.stdin.isTTY ?? false,
     fetchImpl: globalThis.fetch,
+    prompter: realPrompter,
+    clipboard: realClipboard,
+    spinner: realSpinner,
   };
 }
 
-interface GlobalOpts {
+/** Global option values shared by every command. */
+export interface GlobalOpts {
   verbose: number;
   quiet: boolean;
   debug: boolean;
   color: boolean;
+  /** false when --no-input was passed (Commander negated-flag key). */
+  input: boolean;
   config?: string;
   token?: string;
 }
 
-interface CliContext {
+/** Per-invocation context derived from the global options. */
+export interface CliContext {
   opts: GlobalOpts;
   colors: Colors;
   logger: Logger;
@@ -110,16 +131,11 @@ function buildProgram(deps: CliDeps): Command {
     .option('-q, --quiet', 'only show warnings and errors', false)
     .option('--debug', 'maximum diagnostics; implies -v and overrides -q', false)
     .option('--no-color', 'disable colored output')
+    .option('--no-input', 'never prompt; select all fetched projects')
     .option('--config <path>', 'path to config file (replaces discovery)')
     .option('--token <token>', 'personal access token');
 
-  program
-    .command('projects')
-    .description('search and select projects (full command lands in S3b)')
-    .action(() => {
-      // S3b replaces this stub with the ported fetch/select/output flow.
-      throw new CliError('not implemented: the projects command arrives in slice S3b');
-    });
+  registerProjectsCommand(program, deps, () => buildContext(program, deps));
 
   const configCommand = program
     .command('config')
