@@ -410,3 +410,11 @@ Fable retains all planning, gating, and adjudication (D-001). In-flight agent
 continuations (the S3b rework already dispatched) keep their existing model
 for context continuity. Remaining slices are tracked as harness tasks with
 their planned tiers.
+
+## 2026-07-09 — Slice S3b: CLI feature parity — merged
+
+- **Phase or slice**: S3b (branch `slice/s3b-cli-parity`, commits 6af76fe..efa7827)
+- **Source→Target**: projects.py (API client/command/formats) → src/lib/api.ts, src/commands/projects.ts, src/lib/format.ts, src/lib/adapters.ts; tests/test_api.py+test_cli.py → tests/{api,cli,e2e}.test.ts with CORRECT mock seams (source mis-mocks at test_cli.py:82/100/155 fixed; both prompt paths pinned); EXAMPLECLI.md completed (fuzzy claim removed per D-031); parity table docs/port-parity-s3b.md (34 rows: 12 same, 5 stream-moved per D-018(4), 17 deviations each with D-ref).
+- **Validation**: 2 Fable validators (wf_d2a9fbe9-554; one PTY-probed the real binary) + 1 Sonnet rework validator (D-034 routing). Attempt 1 → REWORK on a real find: ^C during the interactive prompt leaked inquirer internals and exited 1 (source: swallow→0; contract: 130). Adjudicated as D-033: Cancelled. + exit 130 in every mode; also implemented the D-018(4) JSON error envelope + --json alias, parity rows for the 30s timeout and --limit tightening, and a 0-column spinner flood guard. Rework validator re-probed via PTY: PASS on all 7 items.
+- **Deviations (accepted, all with D-refs)**: exit taxonomy per D-016(2) incl. API/network→1; CSV RFC-4180 quoting; 30s request timeout; positive --limit; interrupt→130 (D-033); --output stays the file sink vs cli-standards -o enum (documented).
+- **Result**: Gate PASS (Fable). Suite: 139/139; SIGINT/SIGTERM subprocess verification closed (130/143 mid-fetch). Deps: @inquirer/prompts 8.5.2, cli-table3 0.6.5, clipboardy 5.3.1, yocto-spinner 1.2.1.
