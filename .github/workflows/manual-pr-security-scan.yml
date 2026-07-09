@@ -1,0 +1,133 @@
+# Copyright (c) 2025, Steve Morin
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+# the Software, and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# Manual, environment-gated PR security review (D-022(6)).
+#
+# Ports the Python source's manual scan, replacing the secret-bearing
+# pyupio/safety-action with google/osv-scanner (no API key). Two source bugs are
+# fixed here:
+#   1. The scan step now has an explicit `id:` so downstream `steps.*.outputs`
+#      references actually resolve (the source referenced `steps.safety.*` on a
+#      step that had no id).
+#   2. Scanner output reaches the PR comment via `env:` rather than being
+#      interpolated into the github-script body as a template literal (which is
+#      a script-injection footgun).
+# The security-review environment gate, the attributed PR comment, and the
+# workflow_dispatch inputs are preserved.
+
+name: Manual PR Security Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull Request Number'
+        required: true
+        type: string
+      reviewer:
+        description: 'Security Reviewer Name'
+        required: true
+        type: string
+
+# Deny-all baseline (D-022(10)); the job re-grants the least-privilege set.
+permissions: {}
+
+jobs:
+  security-review:
+    runs-on: ubuntu-latest
+    # Environment gate preserved from the source: protection rules on
+    # `security-review` (required reviewers, etc.) gate this manual run.
+    environment: security-review
+    permissions:
+      # Read-only checkout of the PR head.
+      contents: read
+      # Required to post the attributed review comment on the PR.
+      pull-requests: write
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v7
+        with:
+          ref: refs/pull/${{ github.event.inputs.pr_number }}/head
+
+      # Third-party action → full-SHA pin + version comment (D-022(9)); kept
+      # fresh by the Dependabot github-actions ecosystem. `continue-on-error`
+      # lets the comment step run even when vulnerabilities are found (a
+      # non-zero exit), so the reviewer always gets a report.
+      - name: Run OSV-Scanner
+        id: scan
+        continue-on-error: true
+        uses: google/osv-scanner-action/osv-scanner-action@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+        with:
+          scan-args: |-
+            --format=markdown
+            --output=osv-results.md
+            --recursive
+            ./
+
+      # Capture the scanner's markdown report into a step output so it can be
+      # passed to the comment step via env: (never interpolated into the script).
+      - name: Collect scan results
+        id: results
+        if: always()
+        run: |
+          {
+            echo 'report<<OSV_EOF'
+            if [ -f osv-results.md ]; then
+              cat osv-results.md
+            else
+              echo '(OSV-Scanner produced no results file.)'
+            fi
+            echo 'OSV_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Update PR comment with security scan results
+        if: always()
+        uses: actions/github-script@v9
+        env:
+          # Pass everything as env — the script reads process.env, so no
+          # user-controlled value is interpolated into the JS body.
+          SCAN_OUTCOME: ${{ steps.scan.outcome }}
+          SCAN_REPORT: ${{ steps.results.outputs.report }}
+          REVIEWER: ${{ github.event.inputs.reviewer }}
+          PR_NUMBER: ${{ github.event.inputs.pr_number }}
+        with:
+          script: |
+            const outcome = process.env.SCAN_OUTCOME;
+            const report = process.env.SCAN_REPORT;
+            const status = outcome === 'success' ? '✅ PASSED' : '❌ FAILED';
+
+            const body = [
+              '## Security Review Results',
+              '',
+              `Reviewer: @${process.env.REVIEWER}`,
+              '',
+              `### OSV-Scanner Status: ${status}`,
+              '',
+              '```',
+              report,
+              '```',
+              '',
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              issue_number: Number(process.env.PR_NUMBER),
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });

@@ -1,7 +1,7 @@
 // Repo-hygiene meta-tests (plan S2 field 7): the quality-gate configs must
 // stay internally consistent, and the formatter gate must actually bite.
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -136,5 +136,100 @@ describe('formatter gate is real (D-014)', () => {
   it('passes oxfmt --check for a well-formatted snippet', () => {
     const status = checkSnippet("const x = 'single quoted';\nexport { x };\n");
     expect(status).toBe(0);
+  });
+});
+
+describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
+  const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
+  const workflowFiles = readdirSync(WORKFLOW_DIR).filter(
+    (name) => name.endsWith('.yml') || name.endsWith('.yaml')
+  );
+
+  it('has the four expected S4 workflow files', () => {
+    // ci, codeql, dependency-review, manual-pr-security-scan (+ any future).
+    expect(workflowFiles.length).toBeGreaterThanOrEqual(4);
+    expect(workflowFiles).toContain('ci.yml');
+    expect(workflowFiles).toContain('codeql.yml');
+    expect(workflowFiles).toContain('dependency-review.yml');
+    expect(workflowFiles).toContain('manual-pr-security-scan.yml');
+  });
+
+  it.each(workflowFiles)('%s parses as YAML', (file) => {
+    const parsed = parse(readFileSync(join(WORKFLOW_DIR, file), 'utf8'));
+    expect(parsed).toBeTypeOf('object');
+    expect(parsed).not.toBeNull();
+  });
+
+  it.each(workflowFiles)(
+    '%s declares an explicit top-level permissions key (D-022(10))',
+    (file) => {
+      const parsed = parse(readFileSync(join(WORKFLOW_DIR, file), 'utf8')) as Record<
+        string,
+        unknown
+      >;
+      expect(Object.prototype.hasOwnProperty.call(parsed, 'permissions')).toBe(true);
+    }
+  );
+
+  it('ci.yml Node matrix equals the D-027 values ["24.x","26.x"]', () => {
+    const ci = parse(readFileSync(join(WORKFLOW_DIR, 'ci.yml'), 'utf8')) as {
+      jobs: { ci: { strategy: { matrix: { 'node-version': string[] } } } };
+    };
+    expect(ci.jobs.ci.strategy.matrix['node-version']).toEqual(['24.x', '26.x']);
+  });
+
+  // Hybrid pinning policy (D-022(9)): official actions/* and github/* pin to a
+  // major tag; every third-party action must be full-SHA-pinned with a trailing
+  // version comment so Dependabot's github-actions ecosystem can refresh it.
+  it('third-party actions are SHA-pinned with a version comment; official actions use tags', () => {
+    const usesLineRe = /^\s*(?:-\s*)?uses:\s*(\S+)(?:\s*#\s*(.+?))?\s*$/;
+    const shaRe = /^[0-9a-f]{40}$/;
+    const majorTagRe = /^v\d/;
+    // Collect violations (asserted once, outside the loop) so there is no
+    // conditional expect, and count the third-party pins we verified.
+    const violations: string[] = [];
+    let thirdPartyChecked = 0;
+
+    for (const file of workflowFiles) {
+      const lines = readFileSync(join(WORKFLOW_DIR, file), 'utf8').split('\n');
+      for (const line of lines) {
+        // Skip commented-out scaffolding (first non-space char is '#').
+        if (line.trimStart().startsWith('#')) continue;
+        const match = line.match(usesLineRe);
+        if (!match) continue;
+        const [, spec, comment] = match;
+        const atIndex = spec!.lastIndexOf('@');
+        const repoPath = spec!.slice(0, Math.max(atIndex, 0));
+        const ref = atIndex > 0 ? spec!.slice(atIndex + 1) : '';
+        const org = repoPath.split('/')[0];
+
+        if (atIndex <= 0) {
+          violations.push(`${spec}: missing @ref`);
+        } else if (org === 'actions' || org === 'github') {
+          // Official actions: major-tag pin (e.g. v7), never a bare SHA.
+          if (!majorTagRe.test(ref))
+            violations.push(`${spec}: official action should use a vN tag`);
+        } else {
+          // Third-party: full 40-hex SHA + a trailing version comment.
+          thirdPartyChecked += 1;
+          if (!shaRe.test(ref)) violations.push(`${spec}: third-party action must be SHA-pinned`);
+          if (!comment) violations.push(`${spec}: third-party action needs a version comment`);
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
+    // The port pins at least setup-just and osv-scanner-action by SHA.
+    expect(thirdPartyChecked).toBeGreaterThanOrEqual(2);
+  });
+
+  it('dependabot.yml lists both the github-actions and npm ecosystems (D-022(8))', () => {
+    const dependabot = parse(
+      readFileSync(join(REPO_ROOT, '.github', 'dependabot.yml'), 'utf8')
+    ) as { version: number; updates: { 'package-ecosystem': string }[] };
+    expect(dependabot.version).toBe(2);
+    const ecosystems = dependabot.updates.map((u) => u['package-ecosystem']);
+    expect(ecosystems).toContain('github-actions');
+    expect(ecosystems).toContain('npm');
   });
 });

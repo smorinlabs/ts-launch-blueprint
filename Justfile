@@ -78,6 +78,8 @@ check-deps:
     if ! command -v just >/dev/null 2>&1; then printf "{{YELLOW}}just is not installed{{NC}}\n RUN {{BLUE}}make install-just{{NC}}\n"; exit 1; fi
     if ! command -v git >/dev/null 2>&1; then printf "{{YELLOW}}git is not installed{{NC}}\n Install: {{BLUE}}xcode-select --install{{NC}} (macOS) or {{BLUE}}sudo apt install git{{NC}} (Debian/Ubuntu)\n"; exit 1; fi
     echo "All required tools are installed"
+    # Optional tools (advisory only; not required to build/test the project):
+    if ! command -v actionlint >/dev/null 2>&1; then printf "{{YELLOW}}(optional) actionlint not installed{{NC}} — lints .github/workflows/; install: {{BLUE}}brew install actionlint{{NC}} or {{BLUE}}go install github.com/rhysd/actionlint/cmd/actionlint@latest{{NC}}\n"; fi
 
 alias c := check-deps
 
@@ -158,6 +160,13 @@ alias a := all
 @pre-commit-run: format-check lint typecheck test
 
 alias pc := pre-commit-run
+
+# Run the full CI sequence locally (mirror of .github/workflows/ci.yml).
+# Same order CI runs: install deps, the direct quality gates, build, then the
+# whole hook suite on all files (the source's dual-enforcement parity).
+[group('workflow')]
+@ci: install format-check lint typecheck test build
+    npx lefthook run pre-commit --all-files
 
 # Install git hooks (lefthook) and wire the commit-message template
 [group('setup'), group('pre-commit')]
