@@ -60,6 +60,12 @@ Pre-commit formats (oxfmt) and lints (oxlint) staged files and type-checks the
 repo; commit messages are checked by commitlint (Conventional Commits, 50/72).
 Tests run on push only if you opt in: `export TS_PROJECTS_PREPUSH_TESTS=1`.
 
+## Releases
+
+Versions are bumped automatically by [release-please](https://github.com/googleapis/release-please) from Conventional Commit history; there is no hand-edited version file. When you merge a Release PR (titled `chore(release): publish v*`), release-please tags the commit as `vX.Y.Z`, which triggers the `publish.yml` workflow. That workflow runs a `verify` job (free of registry contact) that confirms the tag matches package.json and `.release-please-manifest.json`, then runs the full quality gate and build before queuing the `publish` job. Merging the Release PR cuts the release; publishing then requires a one-click approval of the `npm` environment deployment.
+
+Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no long-lived npm token is ever stored. Use `just release-status` to check for version drift (package.json, manifest, latest tag) and `just pack-check` to locally validate the packaged distribution. See [docs/maintainers-release.md](./docs/maintainers-release.md) for setup and release runbook details.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).
