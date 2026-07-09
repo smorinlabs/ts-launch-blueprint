@@ -20,8 +20,8 @@ describe('VERSION', () => {
     expect(LIB_VERSION).toBe(VERSION);
   });
 
-  it('library exposes the Project type stub', () => {
-    const project: Project = { id: 'p1', name: 'example' };
+  it('library exposes the Project type', () => {
+    const project: Project = { id: 'p1', name: 'example', workspace: { name: 'Acme' } };
     expect(project.name).toBe('example');
   });
 });
