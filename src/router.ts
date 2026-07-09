@@ -190,8 +190,33 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
       // the message via configureOutput. Everything else is usage -> 2.
       return err.exitCode === 0 ? EXIT_CODES.success : EXIT_CODES.usage;
     }
-    const { opts, logger } = buildContext(program, deps);
+    // Prompt interrupt (D-033): @inquirer rejects with ExitPromptError on
+    // both ^C and stdin-close mid-prompt. Detected by name so the prompt
+    // stack stays a dynamic import (@inquirer/core is not a direct dep).
+    // A clean "Cancelled." replaces the library internals ("User force
+    // closed the prompt with SIGINT" / "... with 13 null"); exit 130 per
+    // the R6.1 interrupt contract — a documented deviation from the
+    // source, whose questionary swallowed ^C into exit 0.
+    if (err instanceof Error && err.name === 'ExitPromptError') {
+      deps.stderr('Cancelled.\n');
+      return EXIT_CODES.sigint;
+    }
     const message = err instanceof Error ? err.message : String(err);
+    // Machine-mode error envelope (D-018(4)/D-033, cli-standards R7.8):
+    // when the requested format is json, stderr carries a single
+    // {"error":{"code","message"}} JSON object instead of the human
+    // text (and never a stack trace). Usage errors above are exempt —
+    // "after arg parsing" is the contract boundary.
+    if (machineMode(program)) {
+      const code = err instanceof Error ? err.name : 'Error';
+      // Concise, single-line message: multi-line remediation prose (the
+      // missing-token tutorial) is human-mode content; machines get the
+      // headline only.
+      const concise = message.split('\n', 1)[0] ?? message;
+      deps.stderr(`${JSON.stringify({ error: { code, message: concise } })}\n`);
+      return exitCodeFor(err);
+    }
+    const { opts, logger } = buildContext(program, deps);
     logger.error(message);
     // Source --verbose traceback intent: stack traces only under
     // --debug or -v and up (D-018(3)).
@@ -200,4 +225,16 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
     }
     return exitCodeFor(err);
   }
+}
+
+/** True when the failed invocation asked for JSON output (--format json
+ * or its --json alias on the projects command). Unparsed commands report
+ * their defaults (text), so non-projects invocations stay human-mode. */
+function machineMode(program: Command): boolean {
+  const projects = program.commands.find((command) => command.name() === 'projects');
+  if (projects === undefined) {
+    return false;
+  }
+  const opts = projects.opts<{ format?: string; json?: boolean }>();
+  return opts.json === true || opts.format === 'json';
 }

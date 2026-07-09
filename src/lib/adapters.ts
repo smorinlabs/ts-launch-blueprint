@@ -53,6 +53,15 @@ export const realClipboard: ClipboardWriter = async (text) => {
 
 /** Real spinner: yocto-spinner on stderr (its default; D-016(5)). */
 export const realSpinner: SpinnerFactory = (text) => {
+  // Flood guard (D-033): yocto-spinner's line-clear loop divides the
+  // rendered length by the stream width, so a TTY reporting 0 columns
+  // (some pseudo-terminals/serial consoles) makes Math.ceil(len/0) =
+  // Infinity and floods stderr with clear sequences. Treat a width-less
+  // or nonsensical width as non-TTY and skip the spinner entirely.
+  const columns = process.stderr.columns;
+  if (!Number.isFinite(columns) || columns <= 0) {
+    return { stop: () => undefined };
+  }
   const spinner = yoctoSpinner({ text, stream: process.stderr }).start();
   return {
     stop: () => {

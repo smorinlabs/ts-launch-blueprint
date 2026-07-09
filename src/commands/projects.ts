@@ -28,6 +28,8 @@ interface ProjectsOptions {
   workspace?: string;
   limit: number;
   format: OutputFormat;
+  /** --json alias (cli-standards R4.2): json output when true. */
+  json?: boolean;
   output?: string;
   copy: boolean;
 }
@@ -72,6 +74,12 @@ export function registerProjectsCommand(
     .addOption(
       new Option('--format <format>', 'output format').choices(OUTPUT_FORMATS).default('text')
     )
+    // --json ≡ --format json (cli-standards R4.2 alias, D-018(4)/D-033);
+    // conflicting explicit --format values are a usage error. Note the
+    // recorded divergence (EXAMPLECLI.md): --output remains the FILE
+    // sink for source parity, so the standard's -o/--output format enum
+    // is deliberately not adopted.
+    .addOption(new Option('--json', 'output json (alias for --format json)').conflicts('format'))
     .option('--output <file>', 'write results to file')
     .option('--copy', 'copy results to clipboard', false)
     .action(async (cmdOpts: ProjectsOptions, command: Command) => {
@@ -86,6 +94,7 @@ async function runProjects(
   ctx: CliContext
 ): Promise<void> {
   const { opts, colors, logger } = ctx;
+  const format: OutputFormat = cmdOpts.json === true ? 'json' : cmdOpts.format;
 
   // Token required before any network call; missing -> AuthError exit 4
   // (D-016(2); the source exited 1 here).
@@ -139,7 +148,7 @@ async function runProjects(
 
   // Text-mode preview table (projects.py:368-370), on stderr and only
   // when interactive so redirected output never carries it.
-  if (cmdOpts.format === 'text' && interactive) {
+  if (format === 'text' && interactive) {
     deps.stderr(`${renderTable(projects, opts.verbose >= 1)}\n`);
   }
 
@@ -163,7 +172,7 @@ async function runProjects(
     return;
   }
 
-  const result = formatOutput(selected, cmdOpts.format);
+  const result = formatOutput(selected, format);
 
   // Result routing (projects.py:390-395): file sink replaces stdout;
   // confirmations are stderr notices.

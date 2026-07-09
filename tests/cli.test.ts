@@ -388,6 +388,115 @@ describe('API failure classes (source exit-3 gap closure, remapped)', () => {
   });
 });
 
+/** @inquirer/prompts rejects with ExitPromptError on ^C and on
+ * stdin-close mid-prompt; the router detects it by name so the prompt
+ * stack stays a dynamic import. */
+function exitPromptError(message: string): Error {
+  const err = new Error(message);
+  err.name = 'ExitPromptError';
+  return err;
+}
+
+describe('prompt interrupt -> 130 (D-033)', () => {
+  it('^C during the checkbox -> clean "Cancelled." on stderr, exit 130', async () => {
+    const prompter = vi.fn<Prompter>(() =>
+      Promise.reject(exitPromptError('User force closed the prompt with SIGINT'))
+    );
+    const h = makeInteractiveHarness([], { prompter });
+    const code = await runCli(['projects'], h.deps);
+    expect(code).toBe(130);
+    expect(h.stdout()).toBe('');
+    expect(h.stderr()).toContain('Cancelled.');
+    // No leaked library internals (the validator-observed message).
+    expect(h.stderr()).not.toContain('force closed');
+  });
+
+  it('stdin-close during the prompt -> same clean 130', async () => {
+    const prompter = vi.fn<Prompter>(() =>
+      Promise.reject(exitPromptError('User force closed the prompt with 13 null'))
+    );
+    const h = makeInteractiveHarness([], { prompter });
+    expect(await runCli(['projects'], h.deps)).toBe(130);
+    expect(h.stderr()).toContain('Cancelled.');
+    expect(h.stderr()).not.toContain('13 null');
+  });
+
+  it('interrupt wins over the json error envelope', async () => {
+    const prompter = vi.fn<Prompter>(() =>
+      Promise.reject(exitPromptError('User force closed the prompt with SIGINT'))
+    );
+    const h = makeInteractiveHarness([], { prompter });
+    expect(await runCli(['projects', '--format', 'json'], h.deps)).toBe(130);
+    expect(h.stderr()).toBe('Cancelled.\n');
+  });
+});
+
+describe('machine-mode error envelope (D-018(4)/D-033, R7.8)', () => {
+  it('auth error under --format json -> single {"error":{code,message}} object', async () => {
+    const h = makeHarness({ env: {} });
+    const code = await runCli(['projects', '--no-input', '--format', 'json'], h.deps);
+    expect(code).toBe(4);
+    expect(h.stdout()).toBe('');
+    const envelope = JSON.parse(h.stderr()) as { error: { code: string; message: string } };
+    expect(envelope.error.code).toBe('AuthError');
+    // Concise single-line message: the multi-remedy tutorial stays
+    // human-mode only.
+    expect(envelope.error.message).toBe(
+      'No TS_PROJECTS_TOKEN found in environment or config file.'
+    );
+  });
+
+  it('API error under --json -> ApiError envelope, exit 1', async () => {
+    const { fetchImpl } = makeApiFetch(PROJECTS, {
+      '/projects': new Response(JSON.stringify({ errors: [{ message: 'boom' }] }), {
+        status: 500,
+      }),
+    });
+    const h = makeHarness({ fetchImpl });
+    const code = await runCli(['projects', '--no-input', '--json'], h.deps);
+    expect(code).toBe(1);
+    const envelope = JSON.parse(h.stderr()) as { error: { code: string; message: string } };
+    expect(envelope.error).toEqual({ code: 'ApiError', message: 'API request failed: boom' });
+  });
+
+  it('json-mode errors never carry a stack trace, even under -v', async () => {
+    const h = makeHarness({ env: {} });
+    await runCli(['-v', 'projects', '--no-input', '--format', 'json'], h.deps);
+    expect(() => JSON.parse(h.stderr())).not.toThrow();
+  });
+
+  it('text mode keeps the human error text (no envelope)', async () => {
+    const h = makeHarness({ env: {} });
+    expect(await runCli(['projects', '--no-input'], h.deps)).toBe(4);
+    expect(h.stderr()).toContain('Error:');
+    expect(() => JSON.parse(h.stderr())).toThrow(SyntaxError);
+  });
+});
+
+describe('--json alias (cli-standards R4.2, D-033)', () => {
+  it('--json output is byte-identical to --format json', async () => {
+    const first = makeHarness();
+    await runCli(['projects', '--no-input', '--format', 'json'], first.deps);
+    const second = makeHarness();
+    await runCli(['projects', '--no-input', '--json'], second.deps);
+    expect(second.stdout()).toBe(first.stdout());
+    expect(JSON.parse(second.stdout())).toEqual({ projects: PROJECTS });
+  });
+
+  it('--json suppresses the text-mode preview table', async () => {
+    const h = makeInteractiveHarness([ALPHA]);
+    await runCli(['projects', '--json'], h.deps);
+    expect(h.stderr()).not.toContain('Project Name');
+    expect(JSON.parse(h.stdout())).toEqual({ projects: [ALPHA] });
+  });
+
+  it('--json conflicting with an explicit --format is a usage error', async () => {
+    const h = makeHarness();
+    expect(await runCli(['projects', '--no-input', '--json', '--format', 'csv'], h.deps)).toBe(2);
+    expect(h.stderr()).toContain('cannot be used with');
+  });
+});
+
 describe('default command dispatch (bare py-projects parity)', () => {
   it('bare invocation with flags runs projects', async () => {
     const h = makeHarness();
