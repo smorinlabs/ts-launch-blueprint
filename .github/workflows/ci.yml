@@ -1,0 +1,117 @@
+# Copyright (c) 2025, Steve Morin
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+# the Software, and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# CI — quality gates for the TypeScript port (D-022(1)).
+#
+# Dual enforcement (mirrors the Python source's ci.yaml shape): the individual
+# quality gates run as named `just` recipes AND the whole hook suite is re-run
+# on every file, so the committed pre-commit discipline is exercised in CI, not
+# just the recipes. The `just`-recipe steps map 1:1 to the source's explicit
+# per-check steps (mypy / ruff / pre-commit-run) in TS idiom.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Deny-all baseline (D-022(10)); the job below re-grants only what it needs.
+permissions: {}
+
+jobs:
+  ci:
+    name: continuous-integration
+    runs-on: ubuntu-latest
+    permissions:
+      # Read-only checkout of the repository; nothing here writes.
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # D-027 / D-011(2): Active-LTS floor (24.x) + Current (26.x) — the
+        # source's "test the floor and the next version" compatibility signal.
+        node-version: ['24.x', '26.x']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # No job here pushes; drop the persisted token (zizmor artipacked).
+          persist-credentials: false
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          # setup-node's built-in cache keyed to the committed package-lock.json
+          # (D-022(3); npm per D-011(1)).
+          cache: npm
+
+      # Third-party action → full-SHA pin + version comment (D-022(9));
+      # kept fresh by the Dependabot github-actions ecosystem.
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      # --- Direct quality gates as named just recipes (source per-check steps) ---
+      - name: Check formatting
+        run: just format-check
+
+      - name: Lint
+        run: just lint
+
+      - name: Type check
+        run: just typecheck
+
+      - name: Test
+        run: just test
+
+      - name: Build
+        run: just build
+
+      # --- Dual enforcement: re-run the WHOLE hook suite on all files, mirroring
+      #     the source's `just pre-commit-run` step (D-022(1)). ---
+      - name: Run pre-commit hook suite (all files)
+        run: npx lefthook run pre-commit --all-files
+
+      # ============================================================
+      # Commented scaffolding — uncomment-to-enable (executable docs),
+      # preserved from the source ci.yaml's disabled-but-documented intent.
+      # ============================================================
+
+      # Coverage upload — enable once a Codecov token / OIDC is configured:
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/codecov-action@v5
+      #   with:
+      #     files: ./coverage/coverage-final.json
+
+      # Always-on SCA gate (D-022(7)): PM-native audit — no third-party action,
+      # no secret. The same-repo fork guard mirrors the source's security job so
+      # it never runs in a forked-PR context (where secrets/attack surface
+      # differ). Uncomment to enforce:
+      # - name: Audit dependencies (SCA)
+      #   if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+      #   run: npm audit --audit-level=high
+
+      # Publish job — owned by the release topic (release-please publish.yml,
+      # D-022(13)); intentionally not defined here.
