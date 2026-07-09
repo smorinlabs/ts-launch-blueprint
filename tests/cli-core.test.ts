@@ -44,6 +44,11 @@ function makeHarness(overrides: Partial<CliDeps> = {}): Harness {
     homedir: () => makeTempDir(),
     stdoutIsTTY: false,
     stderrIsTTY: false,
+    stdinIsTTY: false,
+    fetchImpl: () => Promise.reject(new Error('no network in cli-core tests')),
+    prompter: () => Promise.resolve([]),
+    clipboard: () => Promise.resolve(),
+    spinner: () => ({ stop: () => undefined }),
     ...overrides,
   };
   return { deps, stdout: () => out.join(''), stderr: () => err.join('') };
@@ -89,10 +94,12 @@ describe('version and help (cli-standards R4.1)', () => {
     expect(help).toContain('config');
   });
 
-  it('no arguments shows help and exits 2 (usage)', async () => {
+  it('no arguments dispatches to the default projects command', async () => {
+    // Source parity: bare `py-projects` ran the command; with no token
+    // anywhere that is the missing-token auth path (exit 4, D-016(2)).
     const h = makeHarness();
-    expect(await runCli([], h.deps)).toBe(2);
-    expect(h.stderr()).toContain('Usage: ts-projects');
+    expect(await runCli([], h.deps)).toBe(4);
+    expect(h.stderr()).toContain('No TS_PROJECTS_TOKEN found');
   });
 });
 
@@ -106,29 +113,16 @@ describe('usage errors (exit 2, D-016(2,8))', () => {
     expect(h.stdout()).toBe('');
   });
 
-  it('unknown command -> exit 2 with a did-you-mean suggestion', async () => {
+  it('unknown command word -> exit 2 usage error', async () => {
+    // With projects as the DEFAULT command (S3b), a stray word becomes
+    // an unexpected operand of projects — the same usage-error semantics
+    // as bare `py-projects projcts` under click ("unexpected extra
+    // argument", exit 2). Option did-you-mean is unaffected (above).
     const h = makeHarness();
     const code = await runCli(['projcts'], h.deps);
     expect(code).toBe(2);
-    expect(h.stderr()).toContain("unknown command 'projcts'");
-    expect(h.stderr()).toContain('Did you mean projects?');
-  });
-
-  it('dissimilar unknown command still exits 2', async () => {
-    const h = makeHarness();
-    const code = await runCli(['definitely-not-a-command'], h.deps);
-    expect(code).toBe(2);
-    expect(h.stderr()).toContain("unknown command 'definitely-not-a-command'");
-  });
-});
-
-describe('projects stub (replaced in S3b)', () => {
-  it('exits 1 with a not-implemented error', async () => {
-    const h = makeHarness();
-    const code = await runCli(['projects'], h.deps);
-    expect(code).toBe(1);
-    expect(h.stderr()).toContain('not implemented');
-    expect(h.stdout()).toBe('');
+    expect(h.stderr()).toContain("too many arguments for 'projects'");
+    expect(h.stderr()).toContain('projcts');
   });
 });
 
@@ -329,7 +323,11 @@ describe('realDeps (process-backed wiring)', () => {
     expect(typeof deps.homedir()).toBe('string');
     expect(typeof deps.stdoutIsTTY).toBe('boolean');
     expect(typeof deps.stderrIsTTY).toBe('boolean');
+    expect(typeof deps.stdinIsTTY).toBe('boolean');
     expect(deps.fetchImpl).toBe(globalThis.fetch);
+    expect(typeof deps.prompter).toBe('function');
+    expect(typeof deps.clipboard).toBe('function');
+    expect(typeof deps.spinner).toBe('function');
     // Writers target the real streams; exercise them with empty writes.
     deps.stdout('');
     deps.stderr('');

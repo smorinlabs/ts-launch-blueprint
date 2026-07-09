@@ -12,9 +12,18 @@ import { homedir as osHomedir } from 'node:os';
 
 import { Command, CommanderError } from 'commander';
 
+import { registerProjectsCommand } from './commands/projects.js';
+import {
+  type ClipboardWriter,
+  type Prompter,
+  realClipboard,
+  realPrompter,
+  realSpinner,
+  type SpinnerFactory,
+} from './lib/adapters.js';
 import { type Colors, colorEnabled, createColors } from './lib/colors.js';
 import { type ConfigFs, redactToken, requireToken, resolveConfig } from './lib/config.js';
-import { CliError, EXIT_CODES, exitCodeFor } from './lib/errors.js';
+import { EXIT_CODES, exitCodeFor } from './lib/errors.js';
 import { createLogger, type Logger, resolveLevel } from './lib/logger.js';
 import { VERSION } from './version.js';
 
@@ -28,14 +37,18 @@ export interface CliDeps {
   homedir: () => string;
   stdoutIsTTY: boolean;
   stderrIsTTY: boolean;
+  /** TTY-ness of stdin — gates the interactive multi-select. */
+  stdinIsTTY: boolean;
   /** fs surface for config discovery/reading (defaults to node:fs). */
   fs?: ConfigFs | undefined;
-  /** HTTP transport seam — unused until S3b (API client). */
-  fetchImpl?: typeof fetch | undefined;
-  /** Interactive prompt seam — unused until S3b (multi-select). */
-  prompter?: unknown;
-  /** Clipboard seam — unused until S3b (--copy). */
-  clipboard?: unknown;
+  /** HTTP transport seam — the API client's only transport (D-019(5)). */
+  fetchImpl: typeof fetch;
+  /** Interactive multi-select seam (D-016(6)). */
+  prompter: Prompter;
+  /** Clipboard seam for --copy (D-016(7)). */
+  clipboard: ClipboardWriter;
+  /** Spinner seam; invoked only when TTY/CI gating allows (D-016(5)). */
+  spinner: SpinnerFactory;
 }
 
 /** Real process-backed deps for the production entry point. */
@@ -51,20 +64,28 @@ export function realDeps(): CliDeps {
     homedir: osHomedir,
     stdoutIsTTY: process.stdout.isTTY ?? false,
     stderrIsTTY: process.stderr.isTTY ?? false,
+    stdinIsTTY: process.stdin.isTTY ?? false,
     fetchImpl: globalThis.fetch,
+    prompter: realPrompter,
+    clipboard: realClipboard,
+    spinner: realSpinner,
   };
 }
 
-interface GlobalOpts {
+/** Global option values shared by every command. */
+export interface GlobalOpts {
   verbose: number;
   quiet: boolean;
   debug: boolean;
   color: boolean;
+  /** false when --no-input was passed (Commander negated-flag key). */
+  input: boolean;
   config?: string;
   token?: string;
 }
 
-interface CliContext {
+/** Per-invocation context derived from the global options. */
+export interface CliContext {
   opts: GlobalOpts;
   colors: Colors;
   logger: Logger;
@@ -110,16 +131,11 @@ function buildProgram(deps: CliDeps): Command {
     .option('-q, --quiet', 'only show warnings and errors', false)
     .option('--debug', 'maximum diagnostics; implies -v and overrides -q', false)
     .option('--no-color', 'disable colored output')
+    .option('--no-input', 'never prompt; select all fetched projects')
     .option('--config <path>', 'path to config file (replaces discovery)')
     .option('--token <token>', 'personal access token');
 
-  program
-    .command('projects')
-    .description('search and select projects (full command lands in S3b)')
-    .action(() => {
-      // S3b replaces this stub with the ported fetch/select/output flow.
-      throw new CliError('not implemented: the projects command arrives in slice S3b');
-    });
+  registerProjectsCommand(program, deps, () => buildContext(program, deps));
 
   const configCommand = program
     .command('config')
@@ -174,8 +190,33 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
       // the message via configureOutput. Everything else is usage -> 2.
       return err.exitCode === 0 ? EXIT_CODES.success : EXIT_CODES.usage;
     }
-    const { opts, logger } = buildContext(program, deps);
+    // Prompt interrupt (D-033): @inquirer rejects with ExitPromptError on
+    // both ^C and stdin-close mid-prompt. Detected by name so the prompt
+    // stack stays a dynamic import (@inquirer/core is not a direct dep).
+    // A clean "Cancelled." replaces the library internals ("User force
+    // closed the prompt with SIGINT" / "... with 13 null"); exit 130 per
+    // the R6.1 interrupt contract — a documented deviation from the
+    // source, whose questionary swallowed ^C into exit 0.
+    if (err instanceof Error && err.name === 'ExitPromptError') {
+      deps.stderr('Cancelled.\n');
+      return EXIT_CODES.sigint;
+    }
     const message = err instanceof Error ? err.message : String(err);
+    // Machine-mode error envelope (D-018(4)/D-033, cli-standards R7.8):
+    // when the requested format is json, stderr carries a single
+    // {"error":{"code","message"}} JSON object instead of the human
+    // text (and never a stack trace). Usage errors above are exempt —
+    // "after arg parsing" is the contract boundary.
+    if (machineMode(program)) {
+      const code = err instanceof Error ? err.name : 'Error';
+      // Concise, single-line message: multi-line remediation prose (the
+      // missing-token tutorial) is human-mode content; machines get the
+      // headline only.
+      const concise = message.split('\n', 1)[0] ?? message;
+      deps.stderr(`${JSON.stringify({ error: { code, message: concise } })}\n`);
+      return exitCodeFor(err);
+    }
+    const { opts, logger } = buildContext(program, deps);
     logger.error(message);
     // Source --verbose traceback intent: stack traces only under
     // --debug or -v and up (D-018(3)).
@@ -184,4 +225,16 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
     }
     return exitCodeFor(err);
   }
+}
+
+/** True when the failed invocation asked for JSON output (--format json
+ * or its --json alias on the projects command). Unparsed commands report
+ * their defaults (text), so non-projects invocations stay human-mode. */
+function machineMode(program: Command): boolean {
+  const projects = program.commands.find((command) => command.name() === 'projects');
+  if (projects === undefined) {
+    return false;
+  }
+  const opts = projects.opts<{ format?: string; json?: boolean }>();
+  return opts.json === true || opts.format === 'json';
 }

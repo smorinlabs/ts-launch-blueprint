@@ -15,9 +15,19 @@ pre-commit:
     #     yamlfmt, taplo format, and the parse-validity intent of
     #     check-yaml/check-toml for the formats oxfmt formats;
     #   implemented below as check-large-files: check-added-large-files.
+    # exclude mirrors .oxfmtrc.json ignorePatterns (meta-test enforces the
+    # mirror): oxfmt exits 2 when every path it is given is ignore-listed, so
+    # excluded files must never reach it — lefthook skips the job when no
+    # staged files remain. --no-error-on-unmatched-pattern is drift insurance
+    # for ignorePatterns entries added without a matching exclude here.
     - name: format
       glob: '*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,md}'
-      run: npx oxfmt {staged_files}
+      exclude:
+        - 'TS_PORT_*.md'
+        - 'TS_EXISTING_REPO_REVIEW.md'
+        - 'goal.md'
+        - 'typescript_port_process_prompt.md'
+      run: npx oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
     # Reject staged files larger than 500KB (pre-commit's
     # check-added-large-files intent; dependency-free POSIX shell).
@@ -35,8 +45,13 @@ pre-commit:
         done
         exit $status
     # Linter on staged source files (curated correctness+suspicious set).
+    # exclude mirrors .oxlintrc.json ignorePatterns for the same reason as the
+    # format job: oxlint exits 1 when every given path is ignore-listed.
     - name: lint
       glob: '*.{ts,tsx,js,mjs,cjs}'
+      exclude:
+        - 'dist/**'
+        - 'coverage/**'
       run: npx oxlint {staged_files}
     # Type check runs on the FULL program, not per-file — tsc semantics need
     # the whole graph (mirrors the source's repo-wide mypy hook).

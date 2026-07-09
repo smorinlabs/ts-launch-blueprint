@@ -14,6 +14,26 @@ npm install -g ts-launch-blueprint
 ts-projects --version
 ```
 
+## Usage
+
+`ts-projects` fetches projects from the (placeholder) API, lets you
+interactively multi-select, and emits the selection as text, JSON, or
+CSV — results on stdout, everything else on stderr:
+
+```bash
+export TS_PROJECTS_TOKEN=your_token_here
+
+ts-projects                                   # fetch, preview, select
+ts-projects --workspace "My Workspace"        # filter by workspace
+ts-projects --no-input --format json | jq .   # pipe-safe, no prompt
+ts-projects --format csv --output out.csv     # write to a file
+ts-projects --copy                            # copy result to clipboard
+```
+
+See [EXAMPLECLI.md](./EXAMPLECLI.md) for the full UX spec:
+configuration precedence, environment variables (including
+`TS_PROJECTS_API_URL`), output formats, and the exit-code contract.
+
 ## Development quickstart
 
 ```bash
