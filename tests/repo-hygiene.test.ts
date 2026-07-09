@@ -70,6 +70,32 @@ describe('lefthook configuration (D-020(6))', () => {
     const jobs = lefthook['commit-msg'].jobs;
     expect(jobs.some((job: { run: string }) => job.run.includes('commitlint'))).toBe(true);
   });
+
+  // Regression: oxfmt exits 2 (and oxlint exits 1) when EVERY path passed to
+  // it is ignore-listed, which used to fail commits staging only port
+  // artifacts (e.g. TS_PORT_LOG.md). The jobs' lefthook `exclude` lists must
+  // mirror the tools' ignorePatterns so excluded files never reach the tools
+  // and lefthook skips when no staged files remain.
+  it('format/lint excludes mirror the tools ignorePatterns', () => {
+    // Both configs are JSONC with full-line comments only.
+    const readJsonc = (file: string): { ignorePatterns: string[] } => {
+      const text = readFileSync(join(REPO_ROOT, file), 'utf8')
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('//'))
+        .join('\n');
+      return JSON.parse(text);
+    };
+    const jobs = lefthook['pre-commit'].jobs;
+    const jobExclude = (name: string): string[] =>
+      jobs.find((job: { name: string }) => job.name === name).exclude;
+
+    expect(new Set(jobExclude('format'))).toEqual(
+      new Set(readJsonc('.oxfmtrc.json').ignorePatterns)
+    );
+    expect(new Set(jobExclude('lint'))).toEqual(
+      new Set(readJsonc('.oxlintrc.json').ignorePatterns)
+    );
+  });
 });
 
 describe('Node version pin consistency (D-011(3))', () => {
