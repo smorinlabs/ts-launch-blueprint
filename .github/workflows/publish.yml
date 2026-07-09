@@ -1,0 +1,171 @@
+# Copyright (c) 2025, Steve Morin
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+# the Software, and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# Publish (D-021(5), D-012(5)): a `v*` tag (pushed when a release-please Release
+# PR is merged) triggers a cheap `verify` gate that must pass before the
+# environment-gated `publish` job runs. This is the direct descendant of the
+# Python source's release.yml tag-vs-version guard, upgraded from a
+# commented-out publish block to a wired-but-protected npm Trusted Publishing
+# flow (no long-lived publish secret anywhere; OIDC only).
+
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Deny-all baseline (D-022(10)); each job re-grants only what it needs.
+permissions: {}
+
+jobs:
+  # --- Cheap, un-privileged integrity gate: never contacts the registry. -----
+  verify:
+    name: verify-release
+    runs-on: ubuntu-latest
+    permissions:
+      # Read-only checkout + history for the ancestry check; nothing writes.
+      contents: read
+    steps:
+      - name: Checkout repository (full history)
+        uses: actions/checkout@v7
+        with:
+          # Need the whole graph to prove the tag descends from main.
+          fetch-depth: 0
+          # No job here pushes; drop the persisted token (zizmor artipacked).
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          # Node 24 bundles npm >= 11 (Trusted Publishing needs >= 11.5.1).
+          node-version: '24.x'
+          cache: npm
+
+      # Third-party action → full-SHA pin + version comment (D-022(9)); kept
+      # fresh by the Dependabot github-actions ecosystem.
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+
+      - name: Assert tag is an ancestor of main (D-021(5))
+        run: |-
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "::error::Tag ${GITHUB_REF_NAME} (${GITHUB_SHA}) is not reachable from main."
+            exit 1
+          fi
+          echo "Tag ${GITHUB_REF_NAME} is an ancestor of main."
+
+      - name: Assert tag == package.json == manifest version (D-021(5)/D-022(13))
+        run: |-
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          MANIFEST_VERSION="$(node -p "require('./.release-please-manifest.json')['.']")"
+          echo "tag=${TAG_VERSION} package.json=${PKG_VERSION} manifest=${MANIFEST_VERSION}"
+          if [ "${TAG_VERSION}" != "${PKG_VERSION}" ] || [ "${TAG_VERSION}" != "${MANIFEST_VERSION}" ]; then
+            echo "::error::Version mismatch between tag, package.json, and manifest."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Quality gates (just all)
+        run: just all
+
+      - name: Build
+        run: npm run build
+
+      # Local-only integrity check: `--dry-run` never contacts the registry.
+      # Asserts the tarball contains ONLY dist/** plus the root whitelist.
+      - name: Assert packed file list (dist + package.json/README/LICENSE/CHANGELOG)
+        run: |-
+          set -euo pipefail
+          npm pack --dry-run --json --ignore-scripts > pack.json
+          node -e '
+            const pack = require("./pack.json");
+            const files = pack[0].files.map((f) => f.path);
+            const rootWhitelist = new Set([
+              "package.json",
+              "README.md",
+              "LICENSE",
+              "CHANGELOG.md",
+            ]);
+            const bad = files.filter(
+              (p) => !p.startsWith("dist/") && !rootWhitelist.has(p)
+            );
+            if (bad.length > 0) {
+              console.error("Unexpected packed files:", bad);
+              process.exit(1);
+            }
+            for (const required of ["package.json", "dist/cli.js", "dist/lib.js", "dist/lib.d.ts"]) {
+              if (!files.includes(required)) {
+                console.error("Missing required packed file:", required);
+                process.exit(1);
+              }
+            }
+            console.log("Packed file list OK:", files.length, "files.");
+          '
+
+  # --- Registry publish: runs ONLY inside the protected `npm` environment,
+  #     after human approval, on GitHub-hosted runners. Never runs locally. ---
+  publish:
+    name: publish-npm
+    needs: verify
+    runs-on: ubuntu-latest
+    # Protected environment: configure required reviewers on GitHub so a human
+    # must approve before this job runs (preserves the source's publish-opt-in
+    # intent). The npmjs.com trusted publisher must also name this environment.
+    environment: npm
+    permissions:
+      contents: read
+      # Mint the OIDC token npm exchanges for a short-lived publish credential
+      # (Trusted Publishing). This is the ONLY auth — no long-lived secret.
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          # Trusted Publishing (OIDC) requires npm CLI >= 11.5.1 and
+          # Node >= 22.14.0 on a GitHub-hosted runner. Node 24 bundles a
+          # compliant npm; if a runner ever ships an older npm, add a
+          # `npm install -g npm@latest` step before publishing.
+          node-version: '24.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # No publish secret: authenticated by the id-token OIDC exchange above.
+      # Provenance attestations are generated automatically for public repos
+      # under Trusted Publishing. This step is inert until a trusted publisher
+      # for this package is configured on npmjs.com.
+      - name: Publish to npm (Trusted Publishing / OIDC)
+        run: npm publish

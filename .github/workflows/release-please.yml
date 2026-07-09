@@ -1,0 +1,79 @@
+# Copyright (c) 2025, Steve Morin
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+# the Software, and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# Release-please (D-021(1,3,5)): every push to main is scanned for Conventional
+# Commits; release-please maintains a "Release PR" that bumps package.json +
+# .release-please-manifest.json and regenerates CHANGELOG.md. Merging that PR
+# tags `vX.Y.Z`, which is what triggers publish.yml. Versions are therefore
+# NEVER hand-edited — the bot PR owns them (the hatch-vcs "never hand-edit"
+# intent, ported).
+
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+  # Manual re-trigger if a push event was missed.
+  workflow_dispatch:
+
+# Deny-all baseline (D-022(10)); the job re-grants the least-privilege set.
+permissions: {}
+
+# Never cancel an in-flight release-PR update; serialize instead.
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      # Create/update the Release PR, its branch, and the release + tag.
+      contents: write
+      # Open/update the Release pull request.
+      pull-requests: write
+    steps:
+      # --- GitHub App token upgrade (recommended for production) -------------
+      # The active `token:` below uses the built-in GITHUB_TOKEN so this
+      # template ships runnable with zero secrets. GITHUB_TOKEN has one hard
+      # limit: pushes it makes (the release tag) CANNOT trigger other
+      # workflows, so merging a Release PR will NOT automatically fire
+      # publish.yml — you would push the tag manually or re-run publish. To
+      # make the tag auto-trigger publish (contributors-please's pattern,
+      # D-021(5)), mint a GitHub App token and pass it as `token:` instead:
+      #
+      #   - name: Mint GitHub App token
+      #     id: app-token
+      #     uses: actions/create-github-app-token@v3
+      #     with:
+      #       app-id: ${{ vars.RELEASE_PLEASE_APP_ID }}
+      #       private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
+      #
+      # then set `token: ${{ steps.app-token.outputs.token }}` on the step
+      # below and drop the GITHUB_TOKEN line.
+      # ----------------------------------------------------------------------
+
+      # Third-party action → full-SHA pin + version comment (D-022(9)); kept
+      # fresh by the Dependabot github-actions ecosystem.
+      - name: Run release-please
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
