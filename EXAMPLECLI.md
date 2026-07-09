@@ -149,6 +149,12 @@ lets you select the subset of projects to output. Only the selected
 projects flow into the output formats and sinks. Selecting nothing is a
 graceful no-op: `No projects selected` on stderr, exit 0.
 
+Interrupting the prompt (`Ctrl-C`, or stdin closing mid-prompt) prints
+`Cancelled.` on stderr and exits **130** (D-033). This deliberately
+diverges from the Python source, whose questionary prompt swallowed
+`Ctrl-C` into an empty selection and exited 0 — hiding the cancellation
+from scripts.
+
 ### Non-Interactive Use
 
 The prompt requires a TTY. With `--no-input`, or whenever stdin/stderr
@@ -174,7 +180,37 @@ ts-projects --format csv
 
 # Text output (default): one project ID per line (xargs-friendly)
 ts-projects --format text
+
+# --json is an alias for --format json (cli-standards R4.2)
+ts-projects --json
 ```
+
+`--json` and an explicit `--format` together are a usage error
+(exit 2).
+
+> **cli-standards divergence (D-033)**: the standard's
+> `-o/--output <table|json|...>` format enum is deliberately NOT
+> adopted — `--output` remains the **file sink** for parity with the
+> Python source, and the format lives on `--format`/`--json`.
+
+**Machine-mode errors**: when json output is requested (`--format
+json` or `--json`), any error after argument parsing is emitted on
+stderr as a single JSON object per cli-standards R7.8 instead of the
+human text:
+
+```json
+{
+  "error": {
+    "code": "AuthError",
+    "message": "No TS_PROJECTS_TOKEN found in environment or config file."
+  }
+}
+```
+
+`code` is the error class (`AuthError`, `ApiError`, `NotFoundError`,
+`ConfigError`, ...) whose exit-code mapping is the table below. Prompt
+cancellation is not an error: it prints `Cancelled.` and exits 130 in
+every mode.
 
 ### Result Sinks
 
@@ -238,7 +274,7 @@ Per cli-standards R6.1 (D-016(2)):
 | 3    | Not found (e.g. workspace not found)                   |
 | 4    | Authentication error (missing/invalid token)           |
 | 5    | Conflict                                               |
-| 130  | Interrupted (SIGINT)                                   |
+| 130  | Interrupted (SIGINT, incl. `Ctrl-C` at the prompt)     |
 | 143  | Terminated (SIGTERM)                                   |
 
 > **Mapping vs the Python source (D-024(11))**: the source _documented_
