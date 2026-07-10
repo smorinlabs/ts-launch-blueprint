@@ -22,7 +22,7 @@ DASH := $(GRAY)-$(NC)
 # resolved at recipe runtime from the user's login $SHELL.
 DETECT_RC = case "$${SHELL\#\#*/}" in zsh) RC_FILE="$$HOME/.zshenv";; bash) RC_FILE="$$HOME/.bashrc";; *) RC_FILE="$$HOME/.profile";; esac
 
-.PHONY: all check install-just install-just-force install-node install-node-force set-path help
+.PHONY: all check install-just install-just-force install-node install-node-force install-pnpm set-path help
 
 all: help
 
@@ -117,6 +117,18 @@ install-node-force: ## Install Node 24 via mise (opt-in force variant)
 		echo "  nvm:  https://github.com/nvm-sh/nvm (shell function; run 'nvm install' yourself)"; \
 		exit 1; \
 	fi
+
+install-pnpm: ## Print pnpm install guidance (print-first, Corepack-free)
+	@echo "pnpm 10 is the package manager for this project (see package.json"
+	@echo "  \"packageManager\"). It self-manages its exact version once any"
+	@echo "  pnpm >=10 is on PATH (managePackageManagerVersions in .npmrc)."
+	@echo "Install pnpm with one of:"
+	@printf "  standalone: $(CYAN)curl -fsSL https://get.pnpm.io/install.sh | sh -$(NC)\n"
+	@printf "  npm:        $(CYAN)npm install -g pnpm@10$(NC)  (npm ships with Node)\n"
+	@printf "  Homebrew:   $(CYAN)brew install pnpm$(NC)\n"
+	@echo "Corepack is NOT used (it is being removed from Node); the standalone"
+	@echo "  script or a global npm install is the supported bootstrap path."
+	@echo "Other options: https://pnpm.io/installation"
 
 set-path: ## Add SET_PATH to PATH in your shell rc if not already present
 	@if [ -z "$(SET_PATH)" ]; then \

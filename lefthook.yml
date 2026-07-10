@@ -1,5 +1,5 @@
 # Git hooks (D-020(1,6)): lefthook 2.x replaces the source's pre-commit
-# framework. Activated by `npm install` via the package.json "prepare" script,
+# framework. Activated by `pnpm install` via the package.json "prepare" script,
 # or manually with `just setup-hooks`.
 #
 # CI parity: `just pre-commit-run` runs the same underlying gates on ALL files
@@ -28,7 +28,7 @@ pre-commit:
         - 'docs/port/goal.md'
         - 'docs/port/typescript_port_process_prompt.md'
         - '.claude/settings.local.json'
-      run: npx oxfmt --no-error-on-unmatched-pattern {staged_files}
+      run: pnpm exec oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
     # Reject staged files larger than 500KB (pre-commit's
     # check-added-large-files intent; dependency-free POSIX shell).
@@ -53,18 +53,18 @@ pre-commit:
       exclude:
         - 'dist/**'
         - 'coverage/**'
-      run: npx oxlint {staged_files}
+      run: pnpm exec oxlint {staged_files}
     # Type check runs on the FULL program, not per-file — tsc semantics need
     # the whole graph (mirrors the source's repo-wide mypy hook).
     - name: typecheck
-      run: npx tsc --noEmit
+      run: pnpm exec tsc --noEmit
 
 commit-msg:
   jobs:
     # Conventional Commits with the source 50/72/type contract
     # (commitlint.config.mjs; replaces gitlint + cog install-hook, D-020(2,5)).
     - name: commitlint
-      run: npx commitlint --edit {1}
+      run: pnpm exec commitlint --edit {1}
 
 # Tests run at the push boundary, NOT per commit (D-020(3)): per-commit full
 # suites tax contributor DX and train --no-verify; CI is the backstop.
