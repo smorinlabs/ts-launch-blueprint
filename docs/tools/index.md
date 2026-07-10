@@ -6,6 +6,7 @@ Each of these sections contains detailed instructions and best practices to help
 
 - [TypeScript](typescript.md) — Type checking and compilation
 - [Vitest](vitest.md) — Testing framework
+- [Bun](../tasks/setting-up-development.md#bun-lane-optional) — Optional, advisory dev/test lane (`just test-bun`); not a required gate (D-036)
 - [Oxlint](oxlint.md) — Linting
 - [Formatting](formatting.md) — Code formatting
 - [pnpm](pnpm.md) — Package management and scripts

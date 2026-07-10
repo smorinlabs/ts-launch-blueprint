@@ -81,6 +81,7 @@ check-deps:
     echo "All required tools are installed"
     # Optional tools (advisory only; not required to build/test the project):
     if ! command -v actionlint >/dev/null 2>&1; then printf "{{YELLOW}}(optional) actionlint not installed{{NC}} — lints .github/workflows/; install: {{BLUE}}brew install actionlint{{NC}} or {{BLUE}}go install github.com/rhysd/actionlint/cmd/actionlint@latest{{NC}}\n"; fi
+    if ! command -v bun >/dev/null 2>&1; then printf "{{YELLOW}}(optional) bun not installed{{NC}} — advisory dev/test lane only (D-036), runs 'just test-bun'; install: {{BLUE}}curl -fsSL https://bun.sh/install | bash{{NC}} or {{BLUE}}brew install oven-sh/bun/bun{{NC}}. Do NOT run 'bun install' (keeps the lockfile pnpm-only)\n"; fi
 
 alias c := check-deps
 
@@ -143,6 +144,29 @@ alias tc := typecheck
     pnpm exec vitest run {{options}}
 
 alias t := test
+
+# Run the non-e2e test tiers under Bun (OPTIONAL, ADVISORY — D-036). Bun is a
+# dev/test convenience only; the published package + engines are unchanged and
+# consumers still run Node. Three hard rules baked in: (1) installs stay
+# pnpm-only — never `bun install`, which would fork a bun.lock and drift from
+# pnpm-lock.yaml; (2) NEVER bare `bun test` — that invokes Bun's own runner
+# (Vitest's docs warn explicitly); Vitest is always the driver via
+# `bun run vitest`; (3) tests/e2e.test.ts stays Node-only and is excluded here
+# because it spawns process.execPath and under Bun would silently exercise
+# Bun's signal emulation (SIGINT->130/SIGTERM->143) instead of the published
+# Node contract. Prints install guidance and exits 0 when bun is absent
+# (advisory — it never fails a machine that has no Bun).
+[group('test')]
+test-bun:
+    #!/usr/bin/env sh
+    if ! command -v bun >/dev/null 2>&1; then
+        printf "{{YELLOW}}bun is not installed{{NC}} (optional dev/test lane, advisory-only, D-036).\n"
+        printf "Install:   {{BLUE}}curl -fsSL https://bun.sh/install | bash{{NC}}  or  {{BLUE}}brew install oven-sh/bun/bun{{NC}}\n"
+        printf "Then run:  {{BLUE}}just test-bun{{NC}}\n"
+        printf "Do NOT run 'bun install' (keeps the lockfile pnpm-only); this lane drives Vitest under Bun, never bare 'bun test'.\n"
+        exit 0
+    fi
+    bun run vitest run --exclude tests/e2e.test.ts
 
 # Run tests with coverage (95/95/90/95 thresholds enforced)
 [group('test')]
@@ -330,6 +354,7 @@ debug-info:
     if command -v npm >/dev/null 2>&1; then echo "npm: $(npm --version)"; else echo "npm: Not Found"; fi
     if command -v git >/dev/null 2>&1; then echo "git: $(git --version)"; else echo "git: Not Found"; fi
     if command -v just >/dev/null 2>&1; then echo "just: $(just --version)"; else echo "just: Not Found"; fi
+    if command -v bun >/dev/null 2>&1; then echo "bun: $(bun --version) (optional dev/test lane, D-036)"; else echo "bun: Not Found (optional, D-036)"; fi
     echo "CLI Version ({{command_name}}): $(node dist/cli.js --version 2>/dev/null || echo 'Not Found (run: just build)')"
     if command -v node >/dev/null 2>&1; then
         echo "Project Version: $(node -p "JSON.parse(require('node:fs').readFileSync('package.json','utf8')).version" 2>/dev/null || echo 'Version Not Found')"
