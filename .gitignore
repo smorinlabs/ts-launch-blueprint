@@ -4,11 +4,11 @@ dist/
 build/
 *.tsbuildinfo
 
-# NOTE: package-lock.json IS committed (D-011(5)) — the inverse of the Python
-# source, which gitignored uv.lock ("remove if you want to pin versions").
-# Node CI (npm ci, setup-node caching, the GitHub dependency graph) is designed
-# around a committed lockfile; delete the lockfile and add it here if you want
-# unpinned installs.
+# NOTE: pnpm-lock.yaml IS committed (D-035, amending D-011(5)) — the inverse of
+# the Python source, which gitignored uv.lock ("remove if you want to pin
+# versions"). Node CI (pnpm install --frozen-lockfile, setup-node caching, the
+# GitHub dependency graph) is designed around a committed lockfile; delete the
+# lockfile and add it here if you want unpinned installs.
 
 # Test / coverage
 coverage/
