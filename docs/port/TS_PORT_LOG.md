@@ -380,6 +380,21 @@ and ask the user.
 - **Deviations (accepted at gate)**: bin recorded npm-normalized as `dist/cli.js` (npm pkg fix strips `./`; D-012(3) intent preserved — later slices must not reintroduce the prefix); tsdown `fixedExtension:false` to match the exports map; `declaration:true` required alongside isolatedDeclarations (noEmit still suppresses output); upstream SOURCEMAP_BROKEN warning (cosmetic, tracked); transitive @babel EBADENGINE warnings on Node 24.6 (advisory only; CI's 24.x resolves current).
 - **Result**: Gate PASS (Fable), merged --no-ff.
 
+## 2026-07-08 — Slice S2: quality gates + editor/AI configs — merged
+
+> Retroactive record (written 2026-07-09, S7 completeness-critic finding):
+> the original entry was lost when its append was `&&`-chained after a merge
+> command whose commit-msg hook rejected an over-long header — the chain
+> short-circuited and the follow-up commit completed the pending merge
+> without the log text. The S2 work itself merged and validated normally;
+> only this record was missing. Evidence below is from the original gate.
+
+- **Phase or slice**: S2 (branch `slice/s2-quality`, 7 commits f60062d..45b7fdb, merge commit `eb92a31`)
+- **Source→Target**: .pre-commit-config.yaml→lefthook.yml; .gitlint→commitlint (types reconciled with .gitmessage; lower-case subject guidance matching config-conventional); ruff intent→.oxlintrc.json (oxlint 1.73.0); formatting→.oxfmtrc.json (oxfmt 0.58.0 exact-pinned, YAML included per D-014(7)); .taplo.toml/.yamlfmt omitted per D-014(6,7); AGENTS.md hub replacing .windsurfrules (D-024(5)); CLAUDE.md command card; .cursor rules re-pointed; .vscode extensions/launch/settings (one-key tsdk per D-032); .claude/settings.json announcements+plugins (D-024(6)); Justfile quality recipes; repo-hygiene meta-tests.
+- **Validation**: 2 independent validators (wf_d6dc9d76-56c) re-ran just all / hook suite / commitlint gates (bad message rejected, good passes) / formatter negative-proof / vitest / tsc — both PASS, 0 blocking. Shared minor (D-020(6) large-file check missing) fixed in `45b7fdb` with a 600KB negative proof, independently re-verified by a third validator.
+- **Deviations (accepted at gate)**: oxfmt ignorePatterns exclude the port-process artifacts (line-number cross-references; relocated in S7); no-underscore-dangle off (conflicts with the _-prefix unused convention, probe-verified); commitlint.config.d.mts companion for the typed meta-test import; package.json key-sort by oxfmt; `all` = format-check variant (CI-safe); pre-push tests env-guarded (TS_PROJECTS_PREPUSH_TESTS=1).
+- **Result**: Gate PASS (Fable), merged --no-ff as `eb92a31`. Suite: 13/13 tests at the time.
+
 ## 2026-07-09 — Slice S3a: CLI foundation — merged
 
 - **Phase or slice**: S3a (branch `slice/s3a-cli-core`, 4 commits ending `99c9ab5`)
