@@ -435,3 +435,11 @@ their planned tiers.
 - **No registry contact of any kind** (§6): npm pack/publint/attw/local installs only; publish requires the human-gated GitHub environment.
 - **Deviations (accepted)**: attw 0.18.5 vs research's 0.18.4 (current); npm pack --ignore-scripts (prepare-script stdout pollutes --json; build runs explicitly first).
 - **Result**: Gate PASS (Fable). 161/161 tests; actionlint clean.
+
+## 2026-07-09 — Slice S6a: community files + contributors — merged
+
+- **Phase or slice**: S6a (branch `slice/s6a-community`, commit 5a8e98b). Executor: Sonnet; validators: Sonnet conformance + Haiku mechanical (D-034).
+- **Source→Target**: 9 community files ported (CODE_OF_CONDUCT content-identical with [INSERT CONTACT] preserved; CONTRIBUTING npm/just flow; FUNDING as-is with SPDX header per D-028; issue templates adapted incl. Node-version field; SECURITY now truthful about dependabot per D-022(8); PR template just-recipes); update-contributors.yml → contributors-please-action (mode: pull-request, SHA-pinned v1.3.9, GITHUB_TOKEN default with App upgrade path); CONTRIBUTORS.md reset with the tool's real markers and correct attribution (false cog header fixed); .contributors.yml validated against the real CLI; just contributors recipe (source's malformed/divergent recipes not carried); 10 meta-tests.
+- **Validation**: Sonnet conformance validator line-by-line diffed every file vs source (zero stale Python-toolchain references in shipped files), verified the action tag→SHA live, re-ran just all (173 tests)/actionlint (7 workflows); Haiku mechanical validator parsed all YAML, verified markers against the tool README, greps clean. Both PASS, 0 blocking.
+- **Deviations (accepted)**: schedule+dispatch triggers instead of the source's push set (documented in-workflow; sidesteps the action's push-loop caveat); full workflow headers retained matching in-repo precedent — repo-wide SPDX sweep deferred to S7; CONTRIBUTING's CLA links are forward references to S6b's docs tree (docs-check in S6b must confirm they resolve).
+- **Result**: Gate PASS (Fable). 173/173 tests; actionlint clean.
