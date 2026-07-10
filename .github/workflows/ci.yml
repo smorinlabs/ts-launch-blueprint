@@ -86,6 +86,9 @@ jobs:
       - name: Test
         run: just test
 
+      - name: Docs link check
+        run: just docs-check
+
       - name: Build
         run: just build
 

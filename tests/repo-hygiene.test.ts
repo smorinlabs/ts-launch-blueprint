@@ -180,6 +180,16 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
     expect(ci.jobs.ci.strategy.matrix['node-version']).toEqual(['24.x', '26.x']);
   });
 
+  // S6b field 9: docs-check must run in CI, not just locally.
+  it('ci.yml runs `just docs-check` as a step (S6b: docs link check in CI)', () => {
+    const ci = parse(readFileSync(join(WORKFLOW_DIR, 'ci.yml'), 'utf8')) as {
+      jobs: { ci: { steps: { name?: string; run?: string }[] } };
+    };
+    const steps = ci.jobs.ci.steps;
+    const docsCheckStep = steps.find((step) => step.run?.trim() === 'just docs-check');
+    expect(docsCheckStep).toBeDefined();
+  });
+
   // Hybrid pinning policy (D-022(9)): official actions/* and github/* pin to a
   // major tag; every third-party action must be full-SHA-pinned with a trailing
   // version comment so Dependabot's github-actions ecosystem can refresh it.
