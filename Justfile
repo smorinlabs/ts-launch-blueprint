@@ -161,6 +161,30 @@ alias a := all
 
 alias pc := pre-commit-run
 
+# Check that every relative link in README.md + docs/ resolves to a file
+# that exists (offline; dependency-free node script, D-023(5)). lychee was
+# considered but is not installed on this machine/CI image and would add an
+# external-binary dependency; scripts/check-links.mjs needs nothing beyond
+# the Node already required to build this project.
+[group('docs'), group('pre-commit')]
+@docs-check:
+    node scripts/check-links.mjs README.md docs
+
+# Generate API docs with TypeDoc (OPTIONAL, NOT CI-gated, D-023(4)). TypeDoc
+# is deliberately NOT a devDependency — mirrors the source repo's
+# configured-but-unused sphinx.ext.autodoc posture (latent capability, not a
+# build requirement). Prints install guidance instead of failing if absent.
+[group('docs')]
+@docs-api:
+    #!/usr/bin/env sh
+    if ! npx --no-install typedoc --version >/dev/null 2>&1; then
+        printf "{{YELLOW}}typedoc is not installed{{NC}} (optional, not CI-gated, D-023(4)).\n"
+        printf "Install it first: {{BLUE}}npm install --no-save typedoc typedoc-plugin-markdown{{NC}}\n"
+        printf "Then rerun:       {{BLUE}}just docs-api{{NC}}\n"
+        exit 0
+    fi
+    npx typedoc --out docs/reference/api src/lib.ts
+
 # Run the full CI sequence locally (mirror of .github/workflows/ci.yml).
 # Same order CI runs: install deps, the direct quality gates, build, then the
 # whole hook suite on all files (the source's dual-enforcement parity).
