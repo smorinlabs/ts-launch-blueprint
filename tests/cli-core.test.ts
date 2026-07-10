@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { createColors } from '../src/lib/colors.js';
 import { CONFIG_FILE_NAME, TOKEN_ENV_VAR } from '../src/lib/config.js';
 import { type CliDeps, realDeps, runCli } from '../src/router.js';
 import { VERSION } from '../src/version.js';
@@ -284,7 +285,7 @@ describe('stack traces (source --verbose traceback intent)', () => {
   });
 });
 
-describe('color gating (D-026, D-018(2))', () => {
+describe('color gating (D-018(2), D-038)', () => {
   it('FORCE_COLOR yields ANSI on error output', async () => {
     const h = makeHarness({ env: { FORCE_COLOR: '1' } });
     await runCli(['config', '--show'], h.deps);
@@ -313,6 +314,22 @@ describe('color gating (D-026, D-018(2))', () => {
     const h = makeHarness({ stderrIsTTY: true });
     await runCli(['config', '--show'], h.deps);
     expect(h.stderr()).toMatch(ANSI_PATTERN);
+  });
+
+  // D-038: createColors(enabled) must be fully determined by the passed
+  // boolean, never by picocolors' own module-load env/argv/TTY detection
+  // (pc.isColorSupported, derived from the real process this test runs
+  // in). Assert both directions unconditionally: whatever the ambient
+  // real environment's auto-detected verdict happens to be here, at
+  // least one of these two assertions would fail if colors.ts fell back
+  // to picocolors' default-detected formatters (e.g. `pc.red`) instead
+  // of the enabled-gated instance from `pc.createColors(enabled)`.
+  it('enabled=true yields ANSI regardless of the ambient real environment', () => {
+    expect(createColors(true).error('x')).toMatch(ANSI_PATTERN);
+  });
+
+  it('enabled=false yields no ANSI regardless of the ambient real environment', () => {
+    expect(createColors(false).error('x')).toBe('x');
   });
 });
 

@@ -1,9 +1,10 @@
-// Color surface (D-026, supersedes D-016(3)): node:util styleText wrapped
-// behind semantic helpers, zero dependencies. Enablement is computed HERE
-// (per D-018(2) precedence: --no-color flag > NO_COLOR > FORCE_COLOR >
-// stream isTTY) from injected inputs, and styleText is called with
-// validateStream: false so the decision stays deterministic in tests.
-import { styleText } from 'node:util';
+// Color surface (D-038, supersedes D-026): picocolors' createColors(enabled)
+// wrapped behind semantic helpers. Enablement is computed HERE (per D-018(2)
+// precedence: --no-color flag > NO_COLOR > FORCE_COLOR > stream isTTY) from
+// injected inputs, and passed explicitly into createColors, which fully
+// overrides picocolors' own module-load env/argv/TTY detection (verified in
+// D-038) so the gate stays authoritative and deterministic in tests.
+import pc from 'picocolors';
 
 /** Inputs for the color-enablement gate; all injected for testability. */
 export interface ColorGate {
@@ -18,8 +19,9 @@ export interface ColorGate {
 
 /**
  * enabled = !--no-color && !NO_COLOR && (FORCE_COLOR || isTTY)
- * (D-026/D-018(2)). NO_COLOR/FORCE_COLOR follow the informal spec: any
- * non-empty value counts; FORCE_COLOR='0' disables rather than forces.
+ * (D-018(2), gate shape retained by D-038). NO_COLOR/FORCE_COLOR follow the
+ * informal spec: any non-empty value counts; FORCE_COLOR='0' disables
+ * rather than forces.
  */
 export function colorEnabled(gate: ColorGate): boolean {
   if (gate.noColorFlag) {
@@ -46,14 +48,11 @@ export interface Colors {
 
 /** Build the semantic helpers; identity functions when disabled. */
 export function createColors(enabled: boolean): Colors {
-  const paint =
-    (format: Parameters<typeof styleText>[0]) =>
-    (text: string): string =>
-      enabled ? styleText(format, text, { validateStream: false }) : text;
+  const paint = pc.createColors(enabled);
   return {
-    error: paint('red'),
-    warn: paint('yellow'),
-    success: paint('green'),
-    dim: paint('dim'),
+    error: paint.red,
+    warn: paint.yellow,
+    success: paint.green,
+    dim: paint.dim,
   };
 }

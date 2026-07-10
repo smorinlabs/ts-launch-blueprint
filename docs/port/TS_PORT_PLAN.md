@@ -19,6 +19,7 @@ Conventions used below:
 - Runtime deps end-state (D-016 as amended by D-026): `commander`, `cli-table3`,
   `yocto-spinner`, `@inquirer/prompts`, `clipboardy`, plus `smol-toml`, `zod`
   (D-017). Color via `node:util` styleText (D-026) — no color dependency.
+  (D-026's styleText choice superseded by D-038: `picocolors` runtime dep.)
 - "Source parity check" = behavior compared against the Python source at pinned
   SHA `4828f8596b2332d74fbcff932ebab6f0030febd5`.
 
@@ -133,7 +134,8 @@ Conventions used below:
    DI `runCli(argv, deps) → Promise<number>`, exitOverride mapping usage→2,
    showSuggestionAfterError, D-016), `src/lib/logger.ts` (leveled stderr
    logger, -v repeatable/-q per cli-standards R4, D-018), `src/lib/colors.ts`
-   (styleText wrapper gated on --no-color/NO_COLOR/FORCE_COLOR/TTY, D-026),
+   (styleText wrapper gated on --no-color/NO_COLOR/FORCE_COLOR/TTY, D-026;
+   superseded by D-038's picocolors wrapper, same gate),
    `src/lib/xdg-paths.ts` (D-017(3)), `src/lib/config.ts` (TOML via smol-toml,
    zod v4 schema, precedence flag > TS_PROJECTS_TOKEN > config file; 0600
    write + POSIX loose-permissions warning; actionable multi-remedy
