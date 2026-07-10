@@ -64,7 +64,7 @@ release flow.
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Check the version the built CLI reports
 just build

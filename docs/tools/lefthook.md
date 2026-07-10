@@ -8,7 +8,7 @@ required, configured entirely in [`lefthook.yml`](../../lefthook.yml).
 
 ## Installation
 
-Hooks are activated automatically: `npm install` runs the package.json
+Hooks are activated automatically: `pnpm install` runs the package.json
 `prepare` script (`lefthook install`). To (re)install them explicitly and wire
 up the commit-message template in one step:
 
@@ -60,7 +60,7 @@ just setup-hooks
 
 `just pre-commit-run` (alias `just pc`) runs `format-check`, `lint`,
 `typecheck`, and `test` on **all** files — the same underlying gates as the
-hooks, without needing a commit. CI runs this too (`npx lefthook run
+hooks, without needing a commit. CI runs this too (`pnpm exec lefthook run
 pre-commit --all-files`) so the committed hook discipline is exercised on
 every push, not just locally.
 

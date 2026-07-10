@@ -35,7 +35,7 @@ YAML-based issue forms:
    unexpected behavior. Collects severity, priority, reproduction
    steps, expected vs. actual behavior, and the output of
    `just debug-info` (the dependency-free Justfile recipe that dumps
-   OS, Node/npm/git/just versions, and declared `package.json`
+   OS, Node/pnpm/npm/git/just versions, and declared `package.json`
    dependencies).
 2. **Feature Request** (`01-feature-request.yml`) — for suggesting new
    features or enhancements, including a proposal/research-needed

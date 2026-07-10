@@ -7,7 +7,7 @@ Oxlint and Oxfmt are the high-performance linter and code formatter used in this
 - 🚀 **Very Fast**: Written in Rust, both tools process this codebase near-instantly, the same performance argument that motivated Ruff's adoption in the source project.
 - 🛠 **Split, focused tools**: Oxlint handles linting (correctness/suspicious categories, security-adjacent rules, per-file overrides); Oxfmt handles formatting, including import sorting and JSON/YAML/Markdown — one formatter for every config format, rather than a formatter per file type.
 - ⚙ **Customizable**: `.oxlintrc.json` and `.oxfmtrc.json` let the project select categories/rules and formatting style precisely.
-- 🔗 **Easy integration**: Wired into [lefthook](../../lefthook.yml) pre-commit hooks, CI, and `npx` — no separate binary install.
+- 🔗 **Easy integration**: Wired into [lefthook](../../lefthook.yml) pre-commit hooks, CI, and `pnpm` — no separate binary install.
 - 🔄 **Automated fixes**: `oxlint --fix` and `oxfmt` (without `--check`) both auto-correct.
 
 **Cons**:
@@ -48,8 +48,8 @@ Oxfmt also formats JSON, YAML, and Markdown — the source project's `taplo` (TO
 Run it with:
 
 ```bash
-npx oxfmt            # write fixes
-npx oxfmt --check    # CI-parity check, no writes
+pnpm exec oxfmt            # write fixes
+pnpm exec oxfmt --check    # CI-parity check, no writes
 ```
 
 or via [`just`](justfiles.md):
@@ -154,13 +154,13 @@ Some of these rules aren't in the enabled categories yet; they're pinned `"off"`
 
 ### Best practice recommendation
 
-- Run `just lint` (or `npx oxlint`) locally before pushing; `just lint-fix` (`npx oxlint --fix`) applies safe autofixes.
+- Run `just lint` (or `pnpm exec oxlint`) locally before pushing; `just lint-fix` (`pnpm exec oxlint --fix`) applies safe autofixes.
 - Run `just format` before committing; the pre-commit hook also runs it on staged files and re-stages fixes automatically.
 - Treat `.oxlintrc.json`'s `overrides` as the only place test-specific relaxations belong — don't loosen the global `categories`/`rules` to accommodate test code.
 
 ### Troubleshooting
 
-- **Lint failing on files you didn't touch**: `no-unused-vars` and `eqeqeq` run repo-wide, not just on staged files, when invoked directly (`npx oxlint`); the pre-commit hook only lints staged files (`npx oxlint {staged_files}`).
+- **Lint failing on files you didn't touch**: `no-unused-vars` and `eqeqeq` run repo-wide, not just on staged files, when invoked directly (`pnpm exec oxlint`); the pre-commit hook only lints staged files (`pnpm exec oxlint {staged_files}`).
 - **Formatter and linter disagreeing**: they shouldn't — `printWidth`/`singleQuote`/etc. are formatting-only concerns owned by `.oxfmtrc.json`; if a lint rule appears to fight the formatter's output, check whether the rule belongs in `.oxlintrc.json` at all.
 - **A file that should be ignored is still being linted/formatted**: check both `.oxlintrc.json`'s `ignorePatterns` and `.oxfmtrc.json`'s `ignorePatterns` — they're separate lists (lint vs. format), and [`lefthook.yml`](../../lefthook.yml)'s hook `exclude` globs must mirror both.
 

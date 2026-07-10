@@ -16,7 +16,8 @@ ts-launch-blueprint/
 ├── .github/                        # GitHub Actions workflows, issue/PR templates
 ├── Justfile                        # Command surface (build/test/lint/release/...)
 ├── Makefile                        # Bootstrap: check-deps / install-node / install-just
-└── package.json                    # npm manifest (scripts, dependencies, bin, exports)
+├── package.json                    # npm manifest (scripts, dependencies, bin, exports)
+└── pnpm-lock.yaml                  # pnpm lockfile (fast, reproducible installs)
 ```
 
 ## Detailed Layout
@@ -88,7 +89,7 @@ ts-launch-blueprint/
 ├── LICENSE
 ├── Makefile                         # Dependency bootstrap (see docs/tools/makefiles.md)
 ├── package.json                     # npm manifest
-├── package-lock.json
+├── pnpm-lock.yaml                   # pnpm lockfile
 ├── README.md                        # Project overview and navigation hub
 ├── release-please-config.json       # release-please changelog/bump configuration
 ├── tsconfig.json                    # TypeScript compiler configuration (typecheck-only)

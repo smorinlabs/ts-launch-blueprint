@@ -33,7 +33,7 @@ npm install -g ts-launch-blueprint
 ```bash
 git clone https://github.com/smorinlabs/ts-launch-blueprint.git
 cd ts-launch-blueprint
-npm install
+pnpm install
 just build
 ```
 

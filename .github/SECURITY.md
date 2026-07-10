@@ -15,7 +15,7 @@
 - Required code reviews
 - Dependency review on pull requests (`.github/workflows/dependency-review.yml`)
 - Manual, environment-gated SCA scan with OSV-Scanner (`.github/workflows/manual-pr-security-scan.yml`)
-- `npm audit` scaffold in CI (commented; uncomment to enable an always-on SCA gate)
+- `pnpm audit` scaffold in CI (commented; uncomment to enable an always-on SCA gate)
 - Secure development practices
 
 ## Reporting Vulnerabilities

@@ -44,13 +44,13 @@ never wraps development tasks itself.
 ### 3. Install Dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
 This installs both runtime dependencies (`commander`, `@inquirer/prompts`,
 `zod`, `smol-toml`, etc.) and dev dependencies (`typescript`, `tsdown`,
 `oxlint`, `vitest`, `lefthook`, ...), and generates/updates
-`package-lock.json`. `npm install` also runs the `prepare` script
+`pnpm-lock.yaml`. `pnpm install` also runs the `prepare` script
 (`lefthook install`), which activates the git hooks — but see the next
 step to fully wire the commit-message template too.
 
@@ -136,16 +136,16 @@ just coverage     # vitest run --coverage (95/95/90/95 thresholds)
 
 | Task              | Recipe              | Underlying command                     |
 | ----------------- | ------------------- | -------------------------------------- |
-| Install deps      | `npm install`       | —                                      |
-| Setup git hooks   | `just setup-hooks`  | `npx lefthook install`                 |
-| Format            | `just format`       | `npx oxfmt`                            |
-| Format check      | `just format-check` | `npx oxfmt --check`                    |
-| Lint              | `just lint`         | `npx oxlint`                           |
-| Type check        | `just typecheck`    | `npm run typecheck` (`tsc --noEmit`)   |
-| Test              | `just test`         | `npx vitest run`                       |
-| Coverage          | `just coverage`     | `npm run test:coverage`                |
+| Install deps      | `pnpm install`      | —                                      |
+| Setup git hooks   | `just setup-hooks`  | `pnpm exec lefthook install`           |
+| Format            | `just format`       | `pnpm exec oxfmt`                      |
+| Format check      | `just format-check` | `pnpm exec oxfmt --check`              |
+| Lint              | `just lint`         | `pnpm exec oxlint`                     |
+| Type check        | `just typecheck`    | `pnpm run typecheck` (`tsc --noEmit`)  |
+| Test              | `just test`         | `pnpm exec vitest run`                 |
+| Coverage          | `just coverage`     | `pnpm run test:coverage`               |
 | All quality gates | `just all`          | format-check + lint + typecheck + test |
-| Build             | `just build`        | `npm run build` (tsdown)               |
+| Build             | `just build`        | `pnpm run build` (tsdown)              |
 | Run built CLI     | `just run [args]`   | `node dist/cli.js [args]`              |
 | Docs link check   | `just docs-check`   | `node scripts/check-links.mjs`         |
 | Full CI mirror    | `just ci`           | install + gates + build + hook suite   |

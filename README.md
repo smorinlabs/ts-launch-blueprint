@@ -58,7 +58,7 @@ cd ts-launch-blueprint
 # update package.json's name/bin/repository fields to match.
 
 make check      # verify the foundational tools (just, node) are installed
-npm install     # install dependencies (also installs git hooks via lefthook)
+pnpm install    # install dependencies (also installs git hooks via lefthook)
 just setup-hooks
 just all        # every quality gate: format-check, lint, typecheck, test
 ```
@@ -95,8 +95,8 @@ recipe below has a one-line doc comment above it in the file, and `just
 
 | Recipe                                      | Purpose                                                               |
 | ------------------------------------------- | --------------------------------------------------------------------- |
-| `just check-deps` (`c`)                     | Verify required tools (`just`, `node`) are installed                  |
-| `just install`                              | Install dependencies (generates/updates `package-lock.json`)          |
+| `just check-deps` (`c`)                     | Verify required tools (`just`, `node`, `pnpm`) are installed          |
+| `just install`                              | Install dependencies (generates/updates `pnpm-lock.yaml`)             |
 | `just build` (`b`)                          | Bundle CLI + library to `dist/` with tsdown                           |
 | `just typecheck` (`tc`)                     | `tsc --noEmit`                                                        |
 | `just test` (`t`)                           | Run tests with Vitest                                                 |
@@ -115,7 +115,7 @@ recipe below has a one-line doc comment above it in the file, and `just
 
 ### Git hooks
 
-`npm install` activates the [lefthook](https://lefthook.dev) git hooks via
+`pnpm install` activates the [lefthook](https://lefthook.dev) git hooks via
 the `prepare` script. To (re)install them and wire the commit-message
 template:
 
@@ -136,7 +136,7 @@ GitHub-Flavored Markdown, no generated site:
 - [About](./docs/about/index.md) — philosophy and full feature list
 - [Tutorials](./docs/tutorials/index.md) — guided full-project-setup walkthrough
 - [Tasks](./docs/tasks/index.md) — how-to guides (dependencies, type checking, CI/CD, debugging, contributing code)
-- [Tools](./docs/tools/index.md) — what each tool does and why it was chosen (TypeScript, Vitest, Oxlint, npm, lefthook, GitHub Actions, VS Code, Justfiles, Makefiles, CLA Assistant)
+- [Tools](./docs/tools/index.md) — what each tool does and why it was chosen (TypeScript, Vitest, Oxlint, pnpm, lefthook, GitHub Actions, VS Code, Justfiles, Makefiles, CLA Assistant)
 - [Reference](./docs/reference/index.md) — CLI reference, configuration files, project structure, versioning
 - [Contributing](./docs/contributing/index.md) — how to contribute, CLA process, Code of Conduct
 - [GitHub Templates](./docs/github-templates.md) — issue/PR template guide

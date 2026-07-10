@@ -4,10 +4,10 @@ Vitest is the test runner used across recent org TypeScript projects, replacing 
 
 ## Installation
 
-Vitest is a devDependency; it's installed along with everything else via [npm](npm.md):
+Vitest is a devDependency; it's installed along with everything else via [pnpm](pnpm.md):
 
 ```bash
-npm install
+pnpm install
 ```
 
 ## Basic Usage
@@ -41,7 +41,7 @@ npm install
 3. **Run tests**:
 
    ```bash
-   npx vitest run
+   pnpm exec vitest run
    ```
 
    or via [`just`](justfiles.md):
@@ -105,7 +105,7 @@ Tests are organized into tiers of increasing realism, mirroring (and, for the CL
 ```bash
 just test              # unit + in-process + e2e + repo-hygiene tiers, no coverage
 just coverage           # same, with coverage thresholds enforced
-npx vitest run tests/e2e.test.ts   # run a single tier directly
+pnpm exec vitest run tests/e2e.test.ts   # run a single tier directly
 ```
 
 ## Mocking and test seams

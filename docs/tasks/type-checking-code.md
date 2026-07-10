@@ -8,13 +8,13 @@ checker — see [Why just one checker?](#why-just-one-checker) below.
 ## Setting Up tsc
 
 TypeScript is already a pinned `devDependency`
-([`package.json`](../../package.json)), so `npm install` is all the setup
+([`package.json`](../../package.json)), so `pnpm install` is all the setup
 required. There is nothing to install globally.
 
 1. **Install dependencies** (if you haven't already):
 
    ```bash
-   npm install
+   pnpm install
    ```
 
 2. **Configure**: the compiler options live in
@@ -25,7 +25,7 @@ required. There is nothing to install globally.
 3. **Run tsc**:
 
    ```bash
-   npx tsc --noEmit
+   pnpm exec tsc --noEmit
    ```
 
    or, via the project's command surface:

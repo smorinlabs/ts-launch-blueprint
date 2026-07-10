@@ -38,7 +38,7 @@ To help us diagnose the issue quickly, please include system information generat
 2.  This command collects relevant system details (OS, tool versions, installed packages) and copies them to your clipboard (on most systems).
 3.  Paste the complete output into the "System Information" section of the bug report form on GitHub.
 
-If the command fails, please manually provide your OS, Node.js version, tool versions (`npm`, `oxlint`, `git`, `just`), and project package versions (`npm ls`).
+If the command fails, please manually provide your OS, Node.js version, tool versions (`pnpm`, `oxlint`, `git`, `just`), and project package versions (`pnpm list`).
 
 - Any relevant logs or screenshots
 
@@ -59,9 +59,9 @@ To submit a pull request, follow these steps:
 3. Set up your development environment:
    ```bash
    make check        # verify node/just are installed
-   npm install        # install dependencies
-   just setup-hooks   # install git hooks + commit-message template
-   just all           # run the full quality-gate suite (format-check, lint, typecheck, test)
+   pnpm install      # install dependencies
+   just setup-hooks  # install git hooks + commit-message template
+   just all          # run the full quality-gate suite (format-check, lint, typecheck, test)
    ```
 4. Make your changes
 5. Commit your changes with a clear and descriptive commit message

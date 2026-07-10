@@ -27,10 +27,12 @@ packaging, and repo-hygiene scaffolding a serious npm package needs.
 
 ### Package Management
 
-- **npm**: package manager (bundled with Node); lockfile `package-lock.json`
-  is committed
+- **pnpm 10**: package manager (D-035; bootstrapped once via `make
+install-pnpm`, not bundled with Node — it self-manages to the version
+  pinned in `package.json`'s `packageManager` field via `.npmrc`); lockfile
+  `pnpm-lock.yaml` is committed
 - Node version: requires Node.js 24 or higher (`.nvmrc`, `engines`,
-  `devEngines` all agree; a meta-test enforces it)
+  `devEngines.runtime` all agree; a meta-test enforces it)
 
 ### Build System
 

@@ -36,19 +36,20 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
-          cache: npm
+          cache: 'pnpm'
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
       - run: just format-check
       - run: just lint
       - run: just typecheck
       - run: just test
       - run: just docs-check
       - run: just build
-      - run: npx lefthook run pre-commit --all-files
+      - run: pnpm exec lefthook run pre-commit --all-files
 ```
 
 The other six workflows follow the same shape (deny-all baseline `permissions`, least-privilege per-job grants, `actions/checkout` with `persist-credentials: false`) but are scoped to a single concern each: static analysis (`codeql.yml`), dependency vulnerability review on PRs (`dependency-review.yml`), a manual environment-gated deep security scan (`manual-pr-security-scan.yml`), the Conventional-Commits-driven release PR (`release-please.yml`), the tag-triggered npm publish (`publish.yml`), and the weekly contributors-list bot PR (`update-contributors.yml`). See [Using CI/CD](../tasks/using-ci-cd.md) for what each one does.
@@ -76,9 +77,9 @@ Every workflow declares an explicit top-level `permissions:` block:
 
 ## Best Practices
 
-- **Keep It Simple**: start small and expand as needed — the commented-out scaffolding in `ci.yml` (Codecov upload, `npm audit`) is deliberately left as uncomment-to-enable rather than wired in by default.
+- **Keep It Simple**: start small and expand as needed — the commented-out scaffolding in `ci.yml` (Codecov upload, `pnpm audit`) is deliberately left as uncomment-to-enable rather than wired in by default.
 - **Use Matrix Builds**: test across the Node.js Active-LTS floor and the next Current release (`['24.x', '26.x']`).
-- **Cache Dependencies**: `actions/setup-node`'s built-in `cache: npm`, keyed to the committed `package-lock.json`, needs no separate `actions/cache` step.
+- **Cache Dependencies**: `pnpm/action-setup` (pinned before `actions/setup-node`) with `actions/setup-node`'s `cache: 'pnpm'`, keyed to the committed `pnpm-lock.yaml`, needs no separate `actions/cache` step.
 - **Fail Fast, But Not Across the Matrix**: `fail-fast: false` so a failure on one Node version doesn't hide results from the other.
 - **Monitor Regularly**: `just release-status` and `just pack-check` (see [the release runbook](../maintainers-release.md)) surface drift between `package.json`, the release-please manifest, and the latest tag.
 

@@ -4,13 +4,13 @@ See AGENTS.md for the full project charter (canonical AI-context hub).
 
 ## Project Commands
 
-- Setup: `just install` (or `npm install`; installs git hooks via prepare)
-- Format: `just format` (or `npx oxfmt`)
-- Format check: `just format-check` (or `npx oxfmt --check`)
-- Lint: `just lint` (or `npx oxlint`); autofix: `just lint-fix`
-- Type check: `just typecheck` (or `npx tsc --noEmit`)
+- Setup: `just install` (or `pnpm install`; installs git hooks via prepare)
+- Format: `just format` (or `pnpm exec oxfmt`)
+- Format check: `just format-check` (or `pnpm exec oxfmt --check`)
+- Lint: `just lint` (or `pnpm exec oxlint`); autofix: `just lint-fix`
+- Type check: `just typecheck` (or `pnpm exec tsc --noEmit`)
 - Test all: `just test`
-- Test single: `npx vitest run tests/version.test.ts -t 'test name'`
+- Test single: `pnpm exec vitest run tests/version.test.ts -t 'test name'`
 - All checks: `just all` (format-check, lint, typecheck, test)
 - Hook suite on all files: `just pre-commit-run`
 - Install hooks + commit template: `just setup-hooks`
@@ -28,6 +28,7 @@ See AGENTS.md for the full project charter (canonical AI-context hub).
 
 ## Developer Environment
 
-- Node: >= 24 required (`.nvmrc`); package manager: npm
+- Node: >= 24 required (`.nvmrc`); package manager: pnpm 10 (D-035; `pnpm
+install`, `pnpm exec`, `pnpm-lock.yaml`)
 - IDE: VS Code with the oxc extension; editor TypeScript pinned to the
   workspace version via `.vscode/settings.json`

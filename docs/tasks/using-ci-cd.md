@@ -28,18 +28,19 @@ The main quality gate. Runs on:
 Steps:
 
 1. Checkout (`actions/checkout@v7`, `persist-credentials: false`)
-2. `actions/setup-node@v6` with `cache: npm` keyed to `package-lock.json`
-3. Install `just` (`extractions/setup-just`, SHA-pinned)
-4. `npm ci`
-5. `just format-check`
-6. `just lint`
-7. `just typecheck`
-8. `just test`
-9. `just docs-check`
-10. `just build`
-11. `npx lefthook run pre-commit --all-files` — dual enforcement: the same gates that ran as named steps above are re-run through the committed hook suite, so the pre-commit discipline itself is exercised in CI, not just the individual recipes.
+2. `pnpm/action-setup@v6` with version `10.34.3` (SHA-pinned)
+3. `actions/setup-node@v6` with `cache: 'pnpm'` keyed to `pnpm-lock.yaml`
+4. Install `just` (`extractions/setup-just`, SHA-pinned)
+5. `pnpm install --frozen-lockfile`
+6. `just format-check`
+7. `just lint`
+8. `just typecheck`
+9. `just test`
+10. `just docs-check`
+11. `just build`
+12. `pnpm exec lefthook run pre-commit --all-files` — dual enforcement: the same gates that ran as named steps above are re-run through the committed hook suite, so the pre-commit discipline itself is exercised in CI, not just the individual recipes.
 
-Commented-but-documented scaffolding (uncomment to enable): a Codecov upload step, and an always-on `npm audit --audit-level=high` SCA step gated to same-repo pull requests (never runs against a fork, where secrets/attack surface differ).
+Commented-but-documented scaffolding (uncomment to enable): a Codecov upload step, and an always-on `pnpm audit --audit-level high` SCA step gated to same-repo pull requests (never runs against a fork, where secrets/attack surface differ).
 
 ### CodeQL Advanced (`codeql.yml`)
 
@@ -47,7 +48,7 @@ Static analysis via GitHub's CodeQL, ported near-verbatim from the source with t
 
 ### Dependency review (`dependency-review.yml`)
 
-Runs on every pull request targeting `main`; scans `package-lock.json` for known-vulnerable dependency versions introduced by the PR and posts a summary comment (`comment-summary-in-pr: always`). Uses `actions/dependency-review-action`, pinned to a full commit SHA (see [pinning policy](../tools/github-actions.md#action-pinning-policy) — this action publishes no floating major tag, so a `@v5` ref would not resolve).
+Runs on every pull request targeting `main`; scans `pnpm-lock.yaml` for known-vulnerable dependency versions introduced by the PR and posts a summary comment (`comment-summary-in-pr: always`). Uses `actions/dependency-review-action`, pinned to a full commit SHA (see [pinning policy](../tools/github-actions.md#action-pinning-policy) — this action publishes no floating major tag, so a `@v5` ref would not resolve).
 
 ### Manual PR Security Review (`manual-pr-security-scan.yml`)
 
@@ -73,14 +74,14 @@ Weekly (Mondays 06:17 UTC) plus manual dispatch. Runs [`smorinlabs/contributors-
 The named CI steps map 1:1 to `just` recipes, so you can reproduce the whole CI job locally:
 
 ```bash
-just install         # npm install
+just install         # pnpm install
 just format-check     # oxfmt --check
 just lint             # oxlint
 just typecheck        # tsc --noEmit
 just test             # vitest run
 just docs-check        # node scripts/check-links.mjs
 just build             # tsdown build
-npx lefthook run pre-commit --all-files
+pnpm exec lefthook run pre-commit --all-files
 ```
 
 Or run the equivalent composite recipe:
@@ -101,6 +102,6 @@ just ci
   ```yaml
   - name: Audit dependencies (SCA)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    run: npm audit --audit-level=high
+    run: pnpm audit --audit-level high
   ```
-- **Cache is already handled** by `actions/setup-node`'s built-in `cache: npm`, keyed to `package-lock.json` — no manual `actions/cache` step is needed.
+- **Cache is already handled** by `actions/setup-node`'s built-in `cache: 'pnpm'`, keyed to `pnpm-lock.yaml` — no manual `actions/cache` step is needed.
