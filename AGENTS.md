@@ -53,6 +53,9 @@ install-pnpm`, not bundled with Node — it self-manages to the version
   - `just lint-fix`: run the linter with autofixes
   - `just typecheck`: run type checking (tsc --noEmit)
   - `just test`: run tests (Vitest)
+  - `just test-bun`: OPTIONAL/ADVISORY — run non-e2e tiers under Bun (D-036;
+    no-op if bun absent). Never `bun install` (pnpm-only lockfile), never bare
+    `bun test` (Vitest drives via `bun run vitest`); e2e stays Node-only.
   - `just all`: run all checks (format-check, lint, typecheck, test)
   - `just pre-commit-run`: run the full hook suite on all files (CI mirror)
   - `just setup-hooks`: install git hooks + commit-message template

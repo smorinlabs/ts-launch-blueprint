@@ -305,6 +305,40 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
   });
 });
 
+describe('Bun advisory dev/test lane (D-036)', () => {
+  const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
+  const ciRaw = readFileSync(join(WORKFLOW_DIR, 'ci.yml'), 'utf8');
+  const ci = parse(ciRaw) as {
+    jobs: Record<string, { 'continue-on-error'?: boolean }>;
+  };
+
+  it('ci.yml defines a bun-lane job that is advisory (continue-on-error: true)', () => {
+    expect(ci.jobs['bun-lane']).toBeDefined();
+    // Advisory-only: it must never gate a PR (Bun tracks Node v23 parity, one
+    // major behind the >=24 floor).
+    expect(ci.jobs['bun-lane']!['continue-on-error']).toBe(true);
+  });
+
+  it('ci.yml SHA-pins oven-sh/setup-bun with a version comment (D-022(9))', () => {
+    const line = ciRaw
+      .split('\n')
+      .find((l) => l.includes('oven-sh/setup-bun@') && !l.trimStart().startsWith('#'));
+    expect(line).toBeDefined();
+    expect(line).toMatch(/oven-sh\/setup-bun@[0-9a-f]{40}\s*#\s*v\d/);
+  });
+
+  it("ci.yml pins bun-version to exactly '1.3.14' (D-036)", () => {
+    expect(ciRaw).toMatch(/bun-version:\s*1\.3\.14\s*$/m);
+  });
+
+  it('Justfile has a test-bun recipe that runs Vitest under Bun and excludes e2e', () => {
+    const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8');
+    expect(justfile).toMatch(/^test-bun:/m);
+    // Vitest is the driver (never bare `bun test`); e2e tier stays Node-only.
+    expect(justfile).toContain('bun run vitest run --exclude tests/e2e.test.ts');
+  });
+});
+
 describe('release, versioning & packaging (S5: D-021, D-012)', () => {
   const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
   const readWorkflow = (file: string): string => readFileSync(join(WORKFLOW_DIR, file), 'utf8');

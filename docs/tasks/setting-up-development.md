@@ -60,6 +60,33 @@ See [Managing Dependencies](managing-dependencies.md) for adding, updating,
 and auditing packages, and [Type Checking Code](type-checking-code.md) for
 the `tsc` gate in detail.
 
+## Bun lane (optional)
+
+[Bun](https://bun.sh) is supported as an **optional, advisory** dev/test
+runtime only (D-036). It runs the non-e2e Vitest tiers under Bun as a
+forward-compatibility signal — Bun tracks Node v23 parity, one major behind
+this template's `>=24` floor — so it is never a required gate. The published
+package and its `engines` are unchanged; consumers still run Node.
+
+```bash
+just test-bun   # bun run vitest run --exclude tests/e2e.test.ts
+```
+
+If `bun` is not installed the recipe prints install guidance and exits 0. In
+CI the advisory `bun-lane` job (`continue-on-error: true`) runs the same
+command against Bun 1.3.14.
+
+Three hard rules keep the lane safe:
+
+1. **Never `bun install`.** Installs stay pnpm-only; `bun install` would fork
+   a `bun.lock` and drift from the committed `pnpm-lock.yaml`.
+2. **Never bare `bun test`.** That invokes Bun's own test runner; Vitest must
+   always be the driver, via `bun run vitest`.
+3. **The e2e tier stays Node-only.** `tests/e2e.test.ts` spawns
+   `process.execPath` to assert the published Node signal contract
+   (SIGINT→130 / SIGTERM→143); under Bun it would exercise Bun's signal
+   emulation instead, so it is excluded from this lane.
+
 ### Git Hooks (lefthook)
 
 `pnpm install` already activates the [lefthook](https://lefthook.dev) git

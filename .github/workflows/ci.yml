@@ -126,3 +126,63 @@ jobs:
 
       # Publish job — owned by the release topic (release-please publish.yml,
       # D-022(13)); intentionally not defined here.
+
+  # ADVISORY, NON-GATING Bun dev/test lane (D-036). `continue-on-error: true`
+  # means this job can never block a PR or push: Bun tracks Node v23 parity —
+  # one major behind this template's engines.node >=24 floor — so it is a
+  # forward-compatibility signal, not a required gate. Three hard rules mirror
+  # the local `just test-bun` recipe: installs stay pnpm-only (never
+  # `bun install`, which would fork a bun.lock and drift from pnpm-lock.yaml);
+  # the runner is Vitest driven by `bun run vitest` (never bare `bun test`,
+  # which invokes Bun's own runner); tests/e2e.test.ts is excluded because it
+  # spawns process.execPath to assert the published Node signal contract
+  # (SIGINT->130/SIGTERM->143), which under Bun would exercise Bun's signal
+  # emulation instead. The published package + engines are unchanged.
+  bun-lane:
+    name: bun-lane (advisory, non-gating)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      # Read-only checkout; nothing here writes.
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # No push here; drop the persisted token (zizmor artipacked).
+          persist-credentials: false
+
+      # pnpm on PATH before setup-node so cache:'pnpm' finds the store (D-035).
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 10.34.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+
+      # Third-party action → full-SHA pin + version comment (D-022(9)).
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+
+      # Third-party action → full-SHA pin + version comment (D-022(9)); pinned
+      # to the exact Bun release this lane is verified against (D-036).
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      # Installs stay pnpm-only — never `bun install` (would fork a bun.lock).
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (Node)
+        run: just build
+
+      # Vitest is the runner (never bare `bun test`); e2e stays Node-only.
+      - name: Test under Bun (non-e2e tiers)
+        run: bun run vitest run --exclude tests/e2e.test.ts
