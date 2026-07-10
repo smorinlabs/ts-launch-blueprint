@@ -486,3 +486,11 @@ their planned tiers.
 - §11 completeness critic (independent, Opus): PASS — no unported, unomitted, or undocumented source file or feature.
 - §6 escalations: none required — no registry contact, no force-push, no settings changes, no deletion of non-port files; nothing was pushed to the remote (publishing the branch is left to the user).
 - User approvals: waived throughout per the recorded 2026-07-06 instruction; this log and TS_PORT_DECISIONS.md are the review trail.
+
+---
+
+## 2026-07-10 — Post-port swap: picocolors (D-038) — merged
+
+- **Trigger**: user technology-selection review (artifact form output pasted 2026-07-10), verified by spike wf_b15b5505-bd8. Executor: Sonnet; validator: Sonnet (D-034 routing).
+- **Change**: src/lib/colors.ts now wraps picocolors 1.1.1 createColors(enabled) instead of node:util styleText; public API unchanged (zero call-site changes); the repo's --no-color/NO_COLOR/FORCE_COLOR/TTY gate remains authoritative (createColors' explicit boolean overrides picocolors' env auto-detection — proven by 2 new falsification tests + behavioral probes: FORCE_COLOR=1 piped shows ANSI, +--no-color strips it). D-026 references annotated as superseded, not rewritten.
+- **Result**: Gate PASS (Fable). 176/176 tests; branch swap/picocolors commit b890790, merged --no-ff.
