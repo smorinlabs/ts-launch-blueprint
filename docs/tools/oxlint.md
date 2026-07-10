@@ -61,7 +61,7 @@ just format-check    # alias: just fc
 ### Lint rule selection
 
 ```jsonc
-// .oxlintrc.json
+// .oxlintrc.json (abridged — see .oxlintrc.json for the authoritative config)
 {
   "categories": {
     "correctness": "error",

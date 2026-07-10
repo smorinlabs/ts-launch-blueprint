@@ -14,8 +14,8 @@ To install all dependencies and generate/refresh the lockfile:
 npm install
 ```
 
-`just install` (alias `just i`) runs `just check-deps` first and then this
-same command — it is the recommended entry point on a fresh clone.
+`just install` runs `just check-deps` first and then this same command — it
+is the recommended entry point on a fresh clone.
 
 In CI, and anywhere a byte-for-byte reproducible install matters, use
 `npm ci` instead: it installs strictly from `package-lock.json` and fails

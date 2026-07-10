@@ -46,6 +46,7 @@ jobs:
       - run: just lint
       - run: just typecheck
       - run: just test
+      - run: just docs-check
       - run: just build
       - run: npx lefthook run pre-commit --all-files
 ```

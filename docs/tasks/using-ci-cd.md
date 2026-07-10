@@ -35,8 +35,9 @@ Steps:
 6. `just lint`
 7. `just typecheck`
 8. `just test`
-9. `just build`
-10. `npx lefthook run pre-commit --all-files` — dual enforcement: the same gates that ran as named steps above are re-run through the committed hook suite, so the pre-commit discipline itself is exercised in CI, not just the individual recipes.
+9. `just docs-check`
+10. `just build`
+11. `npx lefthook run pre-commit --all-files` — dual enforcement: the same gates that ran as named steps above are re-run through the committed hook suite, so the pre-commit discipline itself is exercised in CI, not just the individual recipes.
 
 Commented-but-documented scaffolding (uncomment to enable): a Codecov upload step, and an always-on `npm audit --audit-level=high` SCA step gated to same-repo pull requests (never runs against a fork, where secrets/attack surface differ).
 
@@ -77,6 +78,7 @@ just format-check     # oxfmt --check
 just lint             # oxlint
 just typecheck        # tsc --noEmit
 just test             # vitest run
+just docs-check        # node scripts/check-links.mjs
 just build             # tsdown build
 npx lefthook run pre-commit --all-files
 ```
