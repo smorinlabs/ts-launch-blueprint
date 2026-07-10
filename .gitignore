@@ -33,3 +33,7 @@ npm-debug.log*
 .env
 .env.*
 !.env.example
+
+# Local Claude Code session settings (machine-specific; untracked copies
+# must never trip oxfmt format-check — see .oxfmtrc.json ignorePatterns)
+.claude/settings.local.json

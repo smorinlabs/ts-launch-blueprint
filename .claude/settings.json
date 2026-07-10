@@ -1,6 +1,6 @@
 {
   "companyAnnouncements": [
-    "ts-launch-blueprint: a production-ready TypeScript project template ported from py-launch-blueprint, shipping the ts-projects example CLI plus full quality gates. Commands: just all (format-check, lint, typecheck, test), just pre-commit-run (hook suite on all files), just check-deps (toolchain check), just debug-info (environment report), just setup-hooks (git hooks + commit template). See AGENTS.md for the project charter and the Justfile for all recipes."
+    "ts-launch-blueprint: a production-ready TypeScript project template ported from py-launch-blueprint, shipping the ts-projects example CLI plus full quality gates. Commands: just all (format-check, lint, typecheck, test), just check-deps (toolchain check), just debug-info (environment report), just docs-check (README/docs link check), just pack-check (validate the packaged npm distribution), just pre-commit-run (hook suite on all files), just setup-hooks (git hooks + commit template). See AGENTS.md for the project charter, docs/port/ for the port process record, and the Justfile for all recipes."
   ],
   "enabledPlugins": {
     "typescript-lsp@claude-plugins-official": true,

@@ -29,10 +29,11 @@ Unlike the Python source project's 88-column (Black-default) line length, this p
   "endOfLine": "lf",
   "sortImports": true,
   "ignorePatterns": [
-    "TS_PORT_*.md",
-    "TS_EXISTING_REPO_REVIEW.md",
-    "goal.md",
-    "typescript_port_process_prompt.md"
+    "docs/port/TS_PORT_*.md",
+    "docs/port/TS_EXISTING_REPO_REVIEW.md",
+    "docs/port/goal.md",
+    "docs/port/typescript_port_process_prompt.md",
+    ".claude/settings.local.json"
   ]
 }
 ```

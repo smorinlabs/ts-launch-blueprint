@@ -23,10 +23,11 @@ pre-commit:
     - name: format
       glob: '*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,md}'
       exclude:
-        - 'TS_PORT_*.md'
-        - 'TS_EXISTING_REPO_REVIEW.md'
-        - 'goal.md'
-        - 'typescript_port_process_prompt.md'
+        - 'docs/port/TS_PORT_*.md'
+        - 'docs/port/TS_EXISTING_REPO_REVIEW.md'
+        - 'docs/port/goal.md'
+        - 'docs/port/typescript_port_process_prompt.md'
+        - '.claude/settings.local.json'
       run: npx oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
     # Reject staged files larger than 500KB (pre-commit's

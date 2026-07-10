@@ -3,7 +3,7 @@
 # Drives both the `just contributors` recipe and the
 # .github/workflows/update-contributors.yml bot-PR workflow — a single
 # implementation, fixing the source Python repo's divergent script-vs-recipe
-# defect (TS_PORT_INDEX.md "Contributors automation" entry).
+# defect (docs/port/TS_PORT_INDEX.md "Contributors automation" entry).
 classifier: path
 output_file: CONTRIBUTORS.md
 state_file: .contributors.jsonl

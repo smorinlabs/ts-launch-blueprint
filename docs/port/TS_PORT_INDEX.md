@@ -55,7 +55,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Identical file — codes of conduct are language-agnostic. Keep the `[INSERT CONTACT]` placeholder since this is a template repo.
 - **Open questions**: none
 - **Validation strategy**: Confirm GitHub's Community Standards page (repo Insights → Community) detects the code of conduct; visual review that no py-launch-blueprint references remain.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/CONTRIBUTING.md`
 - **Target path**: `.github/CONTRIBUTING.md`
@@ -67,7 +67,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same file with tool list swapped to the TS toolchain (Node/package-manager/linter/typechecker versions, e.g. `node`, `pnpm`/`npm`, chosen linter, `tsc`); keep `just debug-info` if the justfile is ported; update project name, repo URLs, and docs paths to the ts-launch-blueprint equivalents; fix or fill the empty Conventional Commits format section.
 - **Open questions**: Whether the CLA workflow (docs/cla files + CLA Assistant) is being carried into ts-launch-blueprint at all — links must not dangle; what the ported `debug-info` recipe will report (depends on final TS tool selection); whether to fill in the truncated Conventional Commits format block (recommended — appears to be an upstream omission).
 - **Validation strategy**: Link check (all relative links resolve in the new repo); run the ported `just debug-info` and confirm the described behavior matches; GitHub Community Standards page detects CONTRIBUTING.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/FUNDING.yml`
 - **Target path**: `.github/FUNDING.yml`
@@ -79,7 +79,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Identical file; same owner (`smorin`) unless the new repo has a different sponsor target.
 - **Open questions**: none
 - **Validation strategy**: Confirm the Sponsor button renders on the ts-launch-blueprint repo page.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/ISSUE_TEMPLATE/01-feature-request.yml`
 - **Target path**: `.github/ISSUE_TEMPLATE/01-feature-request.yml`
@@ -91,7 +91,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same issue-form YAML (GitHub-native, language-agnostic) with "Sphinx" replaced by the TS docs tool chosen for the port; keep pre-commit/CI criteria wording aligned with the ported hook/CI stack; keep or drop the CLA line to match the CONTRIBUTING.md decision.
 - **Open questions**: Name of the docs tool replacing Sphinx (deferred to the research phase — TypeDoc/Docusaurus/Starlight are candidates but selection is out of scope here).
 - **Validation strategy**: YAML lint; open a draft issue on GitHub and confirm the form renders with all fields, labels, and required validations.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/ISSUE_TEMPLATE/02-documentation-request.yml`
 - **Target path**: `.github/ISSUE_TEMPLATE/02-documentation-request.yml`
@@ -103,7 +103,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Identical file; GitHub issue forms are ecosystem-agnostic.
 - **Open questions**: none
 - **Validation strategy**: YAML lint; open a draft issue on GitHub and confirm rendering and required-field validation.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/ISSUE_TEMPLATE/03-bug-report.yml`
 - **Target path**: `.github/ISSUE_TEMPLATE/03-bug-report.yml`
@@ -115,7 +115,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same issue-form YAML with placeholders rewritten for the TS stack (`npm install`/`pnpm add`, Node version, versions of the chosen package manager/linter/`tsc`/`just`); depends on the ported `just debug-info` recipe emitting the equivalent report.
 - **Open questions**: Final tool names in the sample debug-info output block (depends on toolchain selection in the research phase).
 - **Validation strategy**: YAML lint; render the form on GitHub; cross-check that placeholder sample output matches what the ported `just debug-info` actually prints.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/ISSUE_TEMPLATE/config.yml`
 - **Target path**: `.github/ISSUE_TEMPLATE/config.yml`
@@ -127,7 +127,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Identical file with the Discussions URL updated to `smorin/ts-launch-blueprint` (requires enabling Discussions on the new repo); Discord invite likely reused as-is.
 - **Open questions**: Will GitHub Discussions be enabled on ts-launch-blueprint, and does the same Discord invite serve both templates?
 - **Validation strategy**: Open the "New issue" chooser on GitHub — blank-issue option absent, both contact links present and resolving (no 404s).
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/SECURITY.md`
 - **Target path**: `.github/SECURITY.md`
@@ -139,7 +139,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same file nearly verbatim — CodeQL supports JS/TS and Dependabot supports npm; adjust the supported-versions table to the TS template's actual versioning, and ensure the referenced controls exist in the ported repo (CodeQL workflow with `javascript-typescript` language, `dependabot.yml` with `npm` ecosystem).
 - **Open questions**: Initial supported-version range for ts-launch-blueprint (it starts pre-1.0, so the "1.0.x supported" table is aspirational as-is).
 - **Validation strategy**: GitHub Security tab shows the policy; verify private vulnerability reporting is enabled on the repo; cross-check every claimed control against an actually-ported artifact (CodeQL workflow, dependabot.yml, branch protection).
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/pull_request_template.md`
 - **Target path**: `.github/pull_request_template.md`
@@ -151,7 +151,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same markdown template with the checklist commands swapped for the TS stack (e.g. `vitest --coverage`/`node --test` for coverage, oxlint/chosen linter for style, the chosen TS docs tool instead of Sphinx, TSDoc instead of docstrings); keep the `just`-recipe indirection so the template survives tool swaps; fix the orphaned `-->` while porting. Note `flake8` here is inconsistent with the source repo's own ruff usage — port to the actually-chosen linter, not a literal translation.
 - **Open questions**: Final names of the TS test-coverage, lint, and docs commands (pending toolchain research); whether ts-launch-blueprint wants separate PR templates per PR type (this one is explicitly "Feature Pull Request").
 - **Validation strategy**: Open a draft PR on GitHub and confirm the template auto-populates; run each command quoted in the checklist against the ported justfile to confirm they exist.
-- **Status**: Indexed
+- **Status**: Verified
 
 ## Group: github-workflows
 
@@ -169,7 +169,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same GitHub Actions workflow shape; the generation tool is unchosen. Candidates: Changesets (`@changesets/action`), `git-cliff`, `conventional-changelog`/`release-please`. Choice interacts with release.yml versioning strategy.
 - **Open questions**: The source workflow has no generation step — was a tool ever wired in, or should the TS port design changelog generation from scratch? Should changelog generation be merged into the release workflow (e.g., Changesets handles both)?
 - **Validation strategy**: Trigger via `workflow_dispatch` on a test branch/repo and confirm a CHANGELOG is produced/updated; `actionlint` for workflow syntax.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `.github/workflows/ci.yaml`
 - **Target path**: .github/workflows/ci.yaml
@@ -181,7 +181,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same workflow shape with `actions/setup-node` and a Node version matrix (e.g., 20.x/22.x); package-manager install with lockfile caching; typecheck via `tsc --noEmit`; lint via the chosen linter (goal.md indicates oxc/Oxlint direction); keep `just` recipes as the CI/local parity layer and keep taplo if TOML configs survive the port; git-hook parity step via the chosen hook manager (husky/lefthook/pre-commit — TBD in tool-selection phase).
 - **Open questions**: Package manager (npm/pnpm/bun) and Node matrix versions; final linter/typechecker/test-runner picks; whether a test-execution step should be added (the Python CI oddly lacks one); whether taplo remains relevant in a TS repo.
 - **Validation strategy**: `actionlint` on the workflow; open a test PR in the TS repo and confirm all jobs run and fail correctly when a lint/type error is introduced; confirm CI steps invoke the same `just` recipes available locally.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/workflows/codeql.yml`
 - **Target path**: .github/workflows/codeql.yml
@@ -193,7 +193,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Identical file with the matrix entry changed to `language: javascript-typescript`, `build-mode: none`. No tool substitution needed — CodeQL natively supports TS.
 - **Open questions**: none
 - **Validation strategy**: Push to the TS repo and confirm the CodeQL run completes and results appear under Security > Code scanning; `actionlint` for syntax.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/workflows/dependency-review.yml`
 - **Target path**: .github/workflows/dependency-review.yml
@@ -205,7 +205,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: The exact same file; it works unchanged once the TS repo has a lockfile the dependency graph understands. Optionally enable `fail-on-severity` in the port.
 - **Open questions**: none
 - **Validation strategy**: Open a test PR adding a package with a known advisory and confirm the action comments/flags it; confirm the summary comment appears on a benign dependency PR.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/workflows/manual-pr-security-scan.yml`
 - **Target path**: .github/workflows/manual-pr-security-scan.yml
@@ -217,7 +217,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Keep the dispatch-inputs + environment + comment-back skeleton; replace the scanner. Candidates: `npm audit` (built-in, no key), `osv-scanner`, Snyk, Socket.dev — selection deferred to the research phase. Fix the missing step `id` so outputs actually flow into the comment.
 - **Open questions**: Which Node vulnerability scanner (and whether an API key/secret is acceptable for a template repo); whether this workflow is still needed given dependency-review.yml + CodeQL cover overlapping ground; carry forward or drop the `security-review` environment requirement (needs repo settings, not just the file).
 - **Validation strategy**: Dispatch the workflow against a test PR containing a known-vulnerable dependency; verify the scan runs, the PASS/FAIL status is correct, and the comment contains real scanner output (regression test for the missing-`id` bug).
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `.github/workflows/release.yml`
 - **Target path**: .github/workflows/release.yml
@@ -229,7 +229,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same tag-triggered workflow with setup-node; build via the chosen bundler/`npm pack`; version guard becomes comparing the tag against `node -p "require('./package.json').version"`. If Changesets/release-please is adopted (see changelog.yml), this workflow may merge into that flow. Publishing (npm registry, provenance/OIDC) remains opt-in, mirroring the Python repo's choice not to publish.
 - **Open questions**: Whether the TS template should actually publish to npm (with `--provenance`) or keep build+verify only; interaction with the changelog/release tooling decision.
 - **Validation strategy**: Push a `v*` tag matching package.json and confirm success; push a deliberately mismatched tag and confirm the job fails with the mismatch message.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.github/workflows/update-contributors.yml`
 - **Target path**: .github/workflows/update-contributors.yml
@@ -241,7 +241,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same workflow with setup-node running the ported script (e.g., `node scripts/update-contributors.mjs` or a tsx-run TS script — path must match wherever the script lands in the scripts-group port); `peter-evans/create-pull-request` is language-agnostic and stays. Bump action versions to current majors while porting.
 - **Open questions**: Ported script's final path/runner (couples to the scripts group's indexing); whether running on `pull_request` (not just push/dispatch) is intended — on PRs it would attempt branch pushes with the PR's ref semantics and fails on forks; the manual branch checkout/push step partially duplicates what create-pull-request handles itself and may be simplifiable.
 - **Validation strategy**: `workflow_dispatch` in the TS repo after a commit from a new author; confirm CONTRIBUTORS.md regenerates and a bot PR appears on branch `update-contributors`; confirm no PR is opened when there are no changes.
-- **Status**: Indexed
+- **Status**: Verified
 
 ## Group: root-configs
 
@@ -259,7 +259,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: A `.gitignore` with Node equivalents: `node_modules/`, `dist/`, `coverage/`, `*.tsbuildinfo`, tool caches (e.g. `.eslintcache`/`.oxlint` cache dirs as applicable), `.env`, `.DS_Store`; decide the analogous lockfile policy (`package-lock.json`/`pnpm-lock.yaml`) and document it the same way.
 - **Open questions**: Whether the TS template keeps the "ignore the lockfile" stance (Node convention is usually to commit lockfiles); exact cache entries depend on final tool choices.
 - **Validation strategy**: `git status` after a full install + build + test + docs run shows a clean tree; `git check-ignore` spot-checks for `node_modules`, build output, and `.env`.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.gitlint`
 - **Target path**: n/a (replaced; likely `commitlint.config.*` or equivalent)
@@ -271,7 +271,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: commitlint with `@commitlint/config-conventional` (config file + hook integration via the chosen git-hook manager); must replicate the same allowed-type list and 50/72 length rules.
 - **Open questions**: Whether commit-lint enforcement runs via husky/lefthook/pre-commit and/or CI — depends on the hook-manager decision (see `.pre-commit-config.yaml`).
 - **Validation strategy**: Feed known-good and known-bad commit messages (wrong type, >50-char title, >72-char body line) to the linter and assert pass/fail matches the Python repo's behavior.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.gitmessage`
 - **Target path**: `.gitmessage`
@@ -283,7 +283,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same file, unchanged; optionally reconcile its type list with the fuller list in `.gitlint`/commitlint (this file omits `ci`, `build`, `perf`).
 - **Open questions**: Whether to sync the type list with the enforcement config while porting (a pre-existing inconsistency in the source repo).
 - **Validation strategy**: `git config commit.template .gitmessage` then `git commit` shows the template; manual inspection.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.pre-commit-config.yaml`
 - **Target path**: Needs research (candidates: keep `.pre-commit-config.yaml`, or `lefthook.yml`, or husky + lint-staged config)
@@ -295,7 +295,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Hook contents map cleanly (mypy→`tsc --noEmit`; ruff check/format→oxlint/Biome/ESLint+Prettier per later tool research; pytest→vitest/node test runner; check-yaml/toml/eof/whitespace/large-files have prettier- or pre-commit-hooks-based equivalents). The hook *manager* is the open choice: pre-commit works fine in Node repos, but husky+lint-staged and lefthook are the native idioms.
 - **Open questions**: Which hook manager (pre-commit vs husky+lint-staged vs lefthook); whether running the full test suite on every commit is kept (cost/benefit in Node); which lint/format tools the research phase selects; equivalent of the generated-version-file exclusion.
 - **Validation strategy**: Install hooks in a fresh clone, attempt commits with a type error, a lint violation, an unformatted file, and a failing test — each must be blocked; a clean commit must pass.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `.python-version`
 - **Target path**: `.nvmrc` or `.node-version` (plus `engines` in `package.json`)
@@ -307,7 +307,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: `.nvmrc` / `.node-version` for version managers, `"engines": { "node": ">=X" }` in `package.json`, and matching `target`/`lib` in `tsconfig.json` — preserving the source repo's discipline of keeping all version declarations consistent.
 - **Open questions**: Which Node version to pin and which pin-file convention (nvm vs fnm vs volta) — a later research/decision item, though the pattern itself is settled.
 - **Validation strategy**: Version manager auto-selects the pinned Node in a fresh shell; `npm install` fails (or warns per config) on an out-of-range Node via `engines`; CI uses the same version.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.readthedocs.yaml`
 - **Target path**: Needs research (may be n/a if docs move off Read the Docs)
@@ -319,7 +319,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Unresolved: Read the Docs does support Node-based builds via `build.commands`, but the idiomatic TS choices are TypeDoc, Docusaurus, VitePress, or Starlight, typically deployed to GitHub Pages/Netlify/Vercel. The docs-platform decision drives whether any `.readthedocs.yaml` exists at all.
 - **Open questions**: Docs generator and hosting platform for the TS template; whether pdf/epub outputs are a requirement worth preserving; fate of the whole `docs/` toolchain (owned by another index group).
 - **Validation strategy**: Once the platform is chosen: a clean docs build from a fresh clone succeeds locally and on the hosting service; published site renders the ported content.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `.taplo.toml`
 - **Target path**: Needs research (`.taplo.toml` if TOML files survive the port; otherwise omitted)
@@ -331,7 +331,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Keep `.taplo.toml` only if the TS repo retains TOML files (e.g. `cog.toml` if cocogitto is carried over, `lefthook`-adjacent configs, Rust-tool configs like `oxlint`'s if TOML-based); otherwise the intent transfers to formatting whatever config formats remain (JSON via Prettier/Biome, YAML via yamlfmt/Prettier).
 - **Open questions**: Whether any TOML files exist in the final TS repo — fully dependent on the release-tooling and linter decisions made in the research phase. Cross-reference: this entry and `docs/source/tools/taplo.md` must be resolved together in the research phase — config kept ⇒ the taplo doc page is kept and adapted; config dropped ⇒ the doc is omitted.
 - **Validation strategy**: If kept: `taplo format --check --config .taplo.toml` passes in CI/hooks on all tracked TOML files. If omitted: confirm no `*.toml` files are tracked.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `.yamlfmt`
 - **Target path**: `.yamlfmt`
@@ -343,7 +343,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same file with Python-specific excludes dropped and Node ones kept/added (`node_modules/**`, `coverage/**`, `dist/**`). Alternative: consolidate YAML formatting under Prettier if the research phase picks it for other formats — one open trade-off, not a blocker for a direct port.
 - **Open questions**: Whether the TS template consolidates YAML formatting into its main formatter (Prettier) instead of a dedicated yamlfmt binary; whether a yamllint counterpart is carried over (referenced by comment but not present in this group).
 - **Validation strategy**: `yamlfmt -conf .yamlfmt -lint` (dry-run) passes on all tracked YAML in CI/hooks; formatting a deliberately mangled workflow file produces the expected canonical output.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `cog.toml`
 - **Target path**: `cog.toml`
@@ -355,7 +355,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Keep cocogitto with the repository URL updated to ts-launch-blueprint (minimal change), or switch to a Node-native release stack (changesets, release-please, semantic-release) — the versioning/release-tooling decision in the research phase should confirm which; the section mapping and skip rules must be preserved either way.
 - **Open questions**: Whether release automation stays on cocogitto or moves to a Node-native tool — coupled to how the TS repo derives versions (source repo derives from git tags via hatch-vcs).
 - **Validation strategy**: Generate a changelog against a small synthetic commit history containing each type plus an unconventional commit and a `chore(release)` commit; assert grouping, filtering, and skip behavior match the source config.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `pyproject.toml`
 - **Target path**: Split across `package.json`, `tsconfig.json`, linter config (tool TBD), test-runner config, and build config
@@ -367,7 +367,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: `package.json` (name, description, license, author, `bin` for the CLI entry point, deps/devDeps mirroring the dev/docs split, `engines`); `tsconfig.json` (`strict: true` plus extras like `noUncheckedIndexedAccess`, `noUnusedLocals/Parameters`, `exactOptionalPropertyTypes` to match the mypy/pyright bar); linter config for the ruff rule intent incl. security rules (tool TBD in research phase — repo notes mention oxc/Oxlint); test-runner config (vitest/node:test, TBD); build/bundler config (tsup/tsc, TBD); versioning-from-git story (TBD, coupled to `cog.toml`). Runtime dep intents map to: click→commander/clipanion/yargs, questionary→prompts/@inquirer, python-dotenv→dotenv, thefuzz→fuse.js/fuzzysort (note: thefuzz + python-Levenshtein are declared runtime deps but thefuzz is never imported anywhere in the source — fuzzy search is advertised but unimplemented, so this mapping is a decision point (implement or drop), not a straight port), pyperclip→clipboardy, requests→built-in fetch/undici, rich→chalk/picocolors/ink — candidates only; selection is research-phase work.
 - **Open questions**: Package manager (npm/pnpm/bun); linter/formatter/test/build tool selection; how to replicate git-tag-driven dynamic versioning in Node; whether a docs dependency group has a meaningful analog; exact per-path lint-relaxation mechanism for tests.
 - **Validation strategy**: Fresh-clone `install → typecheck → lint → test → build → run CLI --help` all succeed; the CLI is invocable via the `bin` name; strictness verified by confirming a deliberately untyped/unsafe snippet fails typecheck and lint the same way it does in the Python repo.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `pyrightconfig.json`
 - **Target path**: n/a (merged into `tsconfig.json`)
@@ -379,7 +379,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Collapses (together with `[tool.mypy]` from `pyproject.toml`) into a single `tsconfig.json`: `strict: true`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `forceConsistentCasingInFileNames` — in TS the compiler and the editor language service read the same file, so the dual-checker redundancy disappears by design. Unused-code and unnecessary-condition checks beyond tsc's reach map to lint rules.
 - **Open questions**: Which unused/unnecessary-code diagnostics belong in `tsconfig` vs the linter (e.g. typescript-eslint's `no-unnecessary-condition` analogs) — depends on linter selection.
 - **Validation strategy**: Snippets exercising each ported diagnostic (unused variable, missing return, unchecked index, private-ish usage) fail `tsc --noEmit` or lint as intended; editor (VS Code) shows the same errors live.
-- **Status**: Indexed
+- **Status**: Verified
 
 ## Group: editor-ai-configs
 
@@ -397,7 +397,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same file format and location — Cursor `.mdc` rules are language-agnostic. Copy verbatim; only ensure generated examples reference the TS toolchain.
 - **Open questions**: none
 - **Validation strategy**: Open the ts-launch-blueprint repo in Cursor and confirm the rule loads for files under `docs/`; write one sample doc and check the assistant enforces the required sections.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.cursor/rules/projectenv.mdc`
 - **Target path**: `.cursor/rules/projectenv.mdc`
@@ -409,7 +409,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same file; the cross-reference pattern carries over unchanged. If the TS repo renames or restructures `.windsurfrules`, update the `@` reference accordingly.
 - **Open questions**: Should the TS repo keep the `.windsurfrules` file as the canonical conventions doc, or promote CLAUDE.md/AGENTS.md to that role with Cursor/Windsurf files pointing at it? (Decision affects only the reference target, not the pattern.)
 - **Validation strategy**: Open the repo in Cursor and verify the rule is active on every file and that the referenced files resolve.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.vscode/extensions.json`
 - **Target path**: `.vscode/extensions.json`
@@ -421,7 +421,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same file; keep the 8 cross-platform entries (gitlens, spell checker, coderabbit, GitHub PR, GH Actions, YAML, Claude Code, arguably TOML) and swap the Python four for TS equivalents — candidates depend on the chosen toolchain: `oxc.oxc-vscode` (if Oxlint), `dbaeumer.vscode-eslint`, `biomejs.biome`, `esbenp.prettier-vscode`; built-in TS language features may make a Pylance analogue unnecessary.
 - **Open questions**: Which lint/format extension to recommend is downstream of the linter/formatter tool selection (oxc/Oxlint vs Biome vs ESLint+Prettier) decided in the research phase.
 - **Validation strategy**: Open the TS repo in VS Code and confirm the recommendations prompt lists only extensions that exist on the marketplace and match the final toolchain; no recommendation for a tool the repo does not use.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.vscode/launch.json`
 - **Target path**: `.vscode/launch.json`
@@ -433,7 +433,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: `.vscode/launch.json` with `type: "node"` configurations targeting the TS CLI entry (e.g. `src/cli.ts` via `tsx`/`ts-node` `runtimeArgs`, or the built `dist/` output), preserving the pattern of a no-args config plus an args config mirroring the ported CLI's flags. Exact `runtimeExecutable`/source-map settings depend on the chosen runner/build tool.
 - **Open questions**: Depends on the TS runtime/loader choice (tsx vs ts-node vs compiled output vs bun) and the ported CLI's actual entry path and flag names.
 - **Validation strategy**: In VS Code, run both launch configs with a breakpoint set in the CLI entry module; breakpoint must bind (source maps working) and the args variant must pass its flags through.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.windsurf/rules/justfile-rules.md`
 - **Target path**: `.windsurf/rules/justfile-rules.md`
@@ -445,7 +445,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same file and rules; rewrite the example recipes to invoke the TS toolchain (e.g. the ported `just format` using the chosen formatter, a `{{package_name}}`-style variable) once tools are selected. Assumes the TS repo also keeps `just` as its task runner (consistent with `.windsurfrules` conventions being carried forward).
 - **Open questions**: Confirm `just` remains the task runner in ts-launch-blueprint (vs npm scripts only); example commands await formatter/linter selection.
 - **Validation strategy**: Edit the TS repo's Justfile in Windsurf and confirm the rule triggers and the assistant preserves grouping/comments/spacing; example recipes in the rule must match real recipes in the ported Justfile.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `.windsurfrules`
 - **Target path**: `.windsurfrules`
@@ -457,7 +457,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same file (`.windsurfrules`) rewritten section-by-section for the TS stack: package manager (pnpm/npm/bun — TBD), build/versioning (tsup/tsc + changesets or git-derived version — TBD), quality tools (oxc/Oxlint or Biome/ESLint, formatter, tsc typecheck, vitest, lefthook/husky), docs stack (TypeDoc/Starlight/VitePress — TBD), and the TS equivalents of the CLI deps (e.g. commander/clipanion for click, @inquirer/prompts for questionary, dotenv, fuzzy-match lib, clipboardy for pyperclip, fetch/undici for requests, chalk/ink for rich). Keep the Justfile-is-command-surface / Makefile-is-bootstrap-only rule verbatim.
 - **Open questions**: Every named tool/dependency mapping is a research-phase decision; this file must be rewritten last, after toolchain and dependency selections, since it documents them.
 - **Validation strategy**: Cross-check every command and tool named in the rewritten file against the actual Justfile recipes and package.json of ts-launch-blueprint — zero references to tools not present in the repo.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `CLAUDE.md`
 - **Target path**: `CLAUDE.md`
@@ -469,7 +469,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: `CLAUDE.md` at repo root with the same three-section shape: `just` recipes plus raw TS fallbacks (package-manager install, formatter, linter, `tsc --noEmit`, test-all and single-test e.g. `vitest run path -t "name"` — pending tool selection); style section translated (line length per chosen formatter, `strict: true` tsconfig, import ordering, naming conventions per linter, explicit error handling, no hardcoded credentials); environment section with Node version, package manager, and the final VS Code extension list.
 - **Open questions**: Concrete commands and style numbers depend on the research-phase toolchain choices; must be written to match the final Justfile exactly (keep `.windsurfrules`, `CLAUDE.md`, and Justfile mutually consistent).
 - **Validation strategy**: Execute every command listed in the ported CLAUDE.md verbatim in a fresh clone and confirm each succeeds; diff its command list against the Justfile to catch drift.
-- **Status**: Indexed
+- **Status**: Verified
 
 ## Group: root-docs-build
 
@@ -487,7 +487,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same file and same marker-comment pattern. Keep Cocogitto-driven generation if cog is retained for the TS repo; alternatives in the Node ecosystem include the all-contributors CLI/bot. Contents must be reset (the listed people are py-launch-blueprint contributors, not ts-launch-blueprint contributors).
 - **Open questions**: Whether the TS repo keeps Cocogitto (external Rust binary) or switches to a Node-native contributor tool — depends on the repo-wide changelog/versioning tool decision.
 - **Validation strategy**: Run the contributor-update recipe (e.g., `just update-contributors` or the cog-driven workflow) in the new repo and confirm the list between markers regenerates from ts-launch-blueprint git history; verify links (CONTRIBUTING.md) resolve.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `EXAMPLECLI.md`
 - **Target path**: `EXAMPLECLI.md`
@@ -499,7 +499,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same document restructured for the ported TS example CLI: npm registry install (`npm install -g` / `npx`), source install via the chosen package manager, `node`/`tsx` direct invocation, renamed binary and env var. The documented behaviors (precedence chain, formats, exit codes) should be preserved as the spec the TS CLI implements.
 - **Open questions**: Final binary/package name and env-var name for the TS example CLI; whether config lives at `~/.config/<name>/.env` on Node too (XDG-style path is portable, so likely yes).
 - **Validation strategy**: Every command shown in the doc is executed against the ported CLI and produces the documented behavior; exit codes asserted in the test suite so the doc's table stays truthful.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `Justfile`
 - **Target path**: `Justfile`
@@ -511,7 +511,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Keep `just` as the runner (language-agnostic; explicitly a template selling point) and keep the group/alias/color/check-deps structure, but rewrite recipe bodies for the TS toolchain: package-manager install, TS formatter/linter, `tsc` (or chosen typechecker), TS test runner, TS docs tool, npm-based clean paths. Cross-cutting recipes port nearly as-is: cog/conventional-commit recipes, `update-contributors`, `pr-to-testrepo`/`create-test-pr` workflows, `debug-info` skeleton, taplo/yamlfmt recipes (fewer TOML files in a TS repo — may shrink). The broken `build` recipe TODO should be fixed, not ported.
 - **Open questions**: Which TS tools fill each recipe body (formatter/linter — e.g., Biome vs ESLint+Prettier vs oxlint; test runner — e.g., Vitest vs node:test; docs generator; package manager — npm/pnpm) is deferred to the tool-selection research phase; whether taplo/go/yamlfmt remain required deps in check-deps for a TS repo; whether legacy pip-equivalent recipes have any TS analog worth keeping (probably drop).
 - **Validation strategy**: `just --list` succeeds; every ported recipe runs green on a fresh clone (`just check-deps`, `just install-dev`, `just check`, `just dev`); recipe/alias/group inventory diffed against this index to confirm intent coverage; destructive workflow recipes smoke-tested against a scratch repo.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `Makefile`
 - **Target path**: `Makefile`
@@ -523,7 +523,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same Makefile pattern with uv swapped for the Node-side bootstrap dependency: check/install targets for just plus Node.js and/or the chosen package manager (e.g., a version manager like fnm/volta, or corepack-enabled pnpm). Structure, check-table output, help target, and set-path helper copy nearly verbatim. Note `SHELL := /bin/zsh` and `.zshenv` writes are macOS-centric — worth reconsidering (bash fallback) but that is a pre-existing trait, not a port blocker.
 - **Open questions**: Which Node bootstrap tool replaces uv in `check`/`install-*` (depends on the package-manager decision from the research phase); whether to keep zsh as the hardcoded shell.
 - **Validation strategy**: On a machine (or container) without the tools, `make check` exits 1 listing each missing dep with its install target; after `make install-*-force`, `make check` passes and `~/.zshenv` contains exactly one PATH entry per tool; `make help` lists all `##`-annotated targets.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `README.md`
 - **Target path**: `README.md`
@@ -535,7 +535,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Rewrite as the ts-launch-blueprint README preserving structure and category taxonomy (Dev Tools / Project Structure / Docs / Testing & QA / GitHub Integration / IDE / AI / Communication) and the one-line-justification style, substituting each Python tool with its selected TS counterpart once the research phase decides them (e.g., package.json/tsconfig for pyproject, tsc for mypy, chosen linter for ruff, chosen test runner for pytest). Cross-platform items (make/just, pre-commit, cog, GitHub templates, CodeQL, CLA, VS Code, Cursor/Windsurf/Claude configs, Slack) carry over with minimal edits. Needs a new logo asset and updated docs-hosting links.
 - **Open questions**: Final TS tool roster (blocks the feature-list rewrite); docs hosting for the TS repo (Read the Docs supports non-Python but TS projects often use other hosts); new project name/badge/logo assets.
 - **Validation strategy**: Every tool named in the rewritten README exists in the repo's config and CI; every relative link and image path resolves; feature list cross-checked against the final index so no ported capability is undocumented and nothing claimed is missing.
-- **Status**: Indexed
+- **Status**: Verified
 
 ## Group: assets-docs-infra
 
@@ -553,7 +553,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same pattern — `assets/images/logos/ts_launch_blueprint_logo_100x100.png` — but with newly created ts-launch-blueprint artwork. The directory convention ports; the binary does not.
 - **Open questions**: Who produces the new logo artwork, and in which sizes (mirror 100/150/1024 set?).
 - **Validation strategy**: Visual check that new logo files exist at the analogous paths and are referenced correctly from README/docs; no broken image links in rendered docs.
-- **Status**: Indexed
+- **Status**: Verified (omitted per plan/D-ref)
 
 ### `assets/images/logos/py_launch_blueprint_logo_1024x1024.png`
 - **Target path**: n/a (omitted)
@@ -565,7 +565,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: New `assets/images/logos/ts_launch_blueprint_logo_1024x1024.png` with fresh artwork; same multi-resolution convention.
 - **Open questions**: Same as 100x100 — new artwork production and size set.
 - **Validation strategy**: File exists at analogous path; smaller variants visually consistent with the master.
-- **Status**: Indexed
+- **Status**: Verified (omitted per plan/D-ref)
 
 ### `assets/images/logos/py_launch_blueprint_logo_150x150.png`
 - **Target path**: n/a (omitted)
@@ -577,7 +577,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: New `assets/images/logos/ts_launch_blueprint_logo_150x150.png` with fresh artwork.
 - **Open questions**: Same as other logo variants.
 - **Validation strategy**: File exists at analogous path; renders correctly wherever referenced.
-- **Status**: Indexed
+- **Status**: Verified (omitted per plan/D-ref)
 
 ### `docs/Makefile`
 - **Target path**: replaced by docs scripts in `package.json` and/or `justfile` recipes (exact form depends on docs generator — TBD)
@@ -589,7 +589,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Docs-generator CLI scripts, e.g. `docs:dev` / `docs:build` in `package.json` (or `just docs-dev` / `just docs-build`) using the chosen tool's built-in dev server (VitePress `vitepress dev`/`build`, Docusaurus `docusaurus start`/`build`, Astro Starlight `astro dev`/`build`, possibly TypeDoc for API reference). Hot reload comes free with all candidates. Tool not yet selected.
 - **Open questions**: Which docs generator will ts-launch-blueprint adopt? Should docs commands live in the root justfile (matching the py repo's just-first workflow) or in package.json scripts, or both?
 - **Validation strategy**: After tool selection: `docs build` command produces a static site with zero errors; dev-server command serves docs with live reload; commands are runnable from a fresh clone after dependency install.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `docs/source/_static/py_launch_blueprint_logo_100x100.png`
 - **Target path**: n/a (omitted)
@@ -601,7 +601,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: The chosen docs generator's public/static assets directory (e.g. VitePress `docs/public/`, Docusaurus `static/`), holding the new TS logo; configured as the site logo in the generator's theme config.
 - **Open questions**: Whether the TS repo should reference one canonical logo location instead of duplicating the binary (some generators can serve from a shared assets dir).
 - **Validation strategy**: Built docs site displays the new logo in the theme header/sidebar; no 404s for image assets.
-- **Status**: Indexed
+- **Status**: Verified (omitted per plan/D-ref)
 
 ### `docs/source/_templates/base.html`
 - **Target path**: docs theme customization in the chosen generator (e.g. theme/layout config or slot override — TBD)
@@ -613,7 +613,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Whatever the chosen docs generator uses for per-page titles: VitePress `titleTemplate` + homepage frontmatter `title`, Docusaurus `title`/`titleDelimiter` config, Starlight per-page frontmatter. Most candidates achieve this via config, not template override — this file likely collapses into one or two config lines rather than a template file.
 - **Open questions**: Docs generator choice; exact homepage title string for ts-launch-blueprint (mirror the "Production-Ready ... Template with Integrated Best Practices" tagline); whether license headers on docs-site config files are still wanted.
 - **Validation strategy**: Built homepage's `<title>` equals the chosen marketing string; interior pages render "Page Title - Site Title"; check via view-source or a link/meta checker on the built site.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `docs/source/conf.py`
 - **Target path**: docs generator config (e.g. `docs/.vitepress/config.ts`, `docusaurus.config.ts`, or `astro.config.mjs` — TBD)
@@ -625,7 +625,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Config file of the chosen generator. Feature mapping to preserve: Markdown-first authoring (native in all candidates); autodoc/viewcode/typehints → TypeDoc (possibly typedoc-plugin-markdown integrated into the site); copybutton → built into VitePress/Docusaurus code blocks; theme + logo + GitHub footer/social links → generator theme config; intersphinx → plain links or generator-specific cross-ref plugins (weakest mapping, may be dropped). Candidates: VitePress, Docusaurus, Astro Starlight (+ TypeDoc for API reference).
 - **Open questions**: Docs generator selection (primary open decision for this whole group); whether API-reference generation from TSDoc comments is in scope for the template; Read the Docs vs GitHub Pages/Netlify hosting (py repo deploys to Read the Docs, which has weaker Node support — hosting choice interacts with tool choice).
 - **Validation strategy**: Built site has: Markdown pages rendering, working logo, GitHub link in footer/nav, copy buttons on code blocks, and (if in scope) generated API reference from a sample typed module; docs build is wired into CI.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `docs/source/index.md`
 - **Target path**: docs homepage of the chosen generator (e.g. `docs/index.md`; final layout TBD)
@@ -637,7 +637,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same-role homepage rewritten for the TS stack: tool names swapped for their chosen TS counterparts (e.g. oxc/Oxlint or Biome/ESLint, tsc, npm/pnpm, Vitest — per the port's tool decisions), quick start updated to the TS repo's make/just commands, example-CLI section rewritten for the ported CLI, badges repointed at ts-launch-blueprint (and Tests badge fixed), MyST directives converted to the chosen generator's syntax (frontmatter hero, sidebar config instead of toctree).
 - **Open questions**: Docs generator (affects toctree/figure syntax and homepage format); final TS toolchain names to advertise (depends on other groups' research); whether ReadTheDocs/Discord links carry over.
 - **Validation strategy**: Rendered homepage displays logo/badges correctly, every internal nav link resolves, quick-start commands are copy-paste runnable against the finished TS repo, and the feature list is audited to only claim features the TS repo actually has.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/docs.md`
 - **Target path**: docs contributor guide in the TS docs tree (e.g. `docs/docs.md` or `docs/contributing/documentation.md`; TBD)
@@ -649,7 +649,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same guide rewritten for the chosen generator: dev loop (`docs:dev` script), page registration (sidebar config or file-based routing), cross-references (relative Markdown links or generator anchors), assets (public/ dir), admonitions (VitePress/Docusaurus container syntax `::: tip`), logo config, troubleshooting. Structure and section list carry over almost 1:1; every command and syntax example changes.
 - **Open questions**: Docs generator choice drives all rewritten mechanics; none otherwise.
 - **Validation strategy**: Follow the rewritten guide literally on a fresh clone: add a test page, cross-link it, add an image, run the dev server — every step must work as written.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/github-templates.md`
 - **Target path**: same-role page in TS docs tree (e.g. `docs/github-templates.md`)
@@ -661,7 +661,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same Markdown page, nearly verbatim: update project name references, keep in sync with whatever issue/PR templates the TS repo's `.github/` actually ships (indexed by another group), and adjust the PR-template path mention if the TS repo places it under `.github/` rather than repo root (the text says "repository root", verify against the actual ported location).
 - **Open questions**: None beyond staying consistent with the ported `.github/` templates themselves.
 - **Validation strategy**: Cross-check every template filename and path mentioned in the page against the TS repo's actual `.github/` contents; link checker for the four external GitHub docs URLs.
-- **Status**: Indexed
+- **Status**: Verified
 
 ## Group: docs-about-contributing
 
@@ -677,7 +677,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same page with the tool list rewritten for the chosen TS stack (e.g. tsc strict mode, oxc/Oxlint per repo goal.md, chosen package manager, Node LTS support, Vitest or similar). Exact names depend on the tool-selection research phase.
 - **Open questions**: Final TS tool choices (linter/formatter, package manager, test runner) and the docs framework (Sphinx/MyST vs a JS-native docs tool) are decided in a later phase; this page must be rewritten after those decisions.
 - **Validation strategy**: Docs build succeeds; every tool named on the page actually exists in the ported repo's config; link check passes.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/about/index.md`
 - **Target path**: docs/source/about/index.md (or the equivalent section index in the chosen docs tool)
@@ -689,7 +689,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same content with navigation expressed in the chosen docs framework's idiom (Sphinx toctree if Sphinx is kept; sidebar config in VitePress/Docusaurus/Starlight otherwise) and renamed to Ts Launch Blueprint.
 - **Open questions**: Which docs framework the TS repo adopts (decided in research phase) determines how the toctree is expressed.
 - **Validation strategy**: Docs build succeeds and the About section renders with working nav links to philosophy and features pages.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/about/philosophy.md`
 - **Target path**: docs/source/about/philosophy.md
@@ -701,7 +701,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Near-verbatim copy with "Python" → "TypeScript" and project name swapped; the philosophy transfers wholesale.
 - **Open questions**: none
 - **Validation strategy**: Proofread for stale Python references; docs build and link check pass.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/contributing/CODE_OF_CONDUCT.md`
 - **Target path**: docs/source/contributing/CODE_OF_CONDUCT.md
@@ -713,7 +713,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Identical file; language-agnostic. Note the `[INSERT CONTACT]` placeholder should be preserved as a template placeholder (or filled) deliberately, not accidentally shipped.
 - **Open questions**: Whether the TS template fills the reporting contact or keeps it as a documented placeholder for downstream users.
 - **Validation strategy**: File present, referenced from contributing index, attribution link resolves.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/contributing/cla/cla-setup-guide.md`
 - **Target path**: docs/source/contributing/cla/cla-setup-guide.md
@@ -725,7 +725,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Identical file; the CLA Assistant workflow is language-agnostic.
 - **Open questions**: none
 - **Validation strategy**: Link check on cla-assistant.io/GitHub URLs; if the TS repo actually enables CLA Assistant, run the guide's own test procedure.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/contributing/cla/corporate_cla.md`
 - **Target path**: docs/source/contributing/cla/corporate_cla.md
@@ -737,7 +737,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Identical file.
 - **Open questions**: none
 - **Validation strategy**: File present and linked from cla_faq and contributing index; text unmodified from source (diff check).
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/contributing/cla/individual_cla.md`
 - **Target path**: docs/source/contributing/cla/individual_cla.md
@@ -749,7 +749,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Identical file.
 - **Open questions**: none
 - **Validation strategy**: File present and linked from cla_faq and contributing index; text unmodified from source (diff check).
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/contributing/cla_faq.md`
 - **Target path**: docs/source/contributing/cla_faq.md
@@ -761,7 +761,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Identical file; keep the relative links intact if the cla/ directory structure is preserved.
 - **Open questions**: none
 - **Validation strategy**: Docs link check confirms the two relative CLA links resolve.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/contributing/index.md`
 - **Target path**: docs/source/contributing/index.md
@@ -773,7 +773,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same guide with project name/URLs updated, cross-reference guidance rewritten for the chosen docs framework, the `../tasks/contributing_code.md` link kept only if that page is ported, and the COG/`just contributors` section kept if the TS repo retains Cocogitto (it can) or rewritten for whatever contributor-tracking mechanism is chosen.
 - **Open questions**: Does the TS repo keep Sphinx/MyST or switch docs frameworks (affects toctree and `:doc:`/`:ref:` instructions)? Does it retain Cocogitto + just for contributor tracking? Both are research-phase decisions.
 - **Validation strategy**: Docs build and link check (especially the cross-section link to tasks/contributing_code.md); if COG is kept, run the contributors recipe and confirm CONTRIBUTORS.md updates.
-- **Status**: Indexed
+- **Status**: Verified
 
 ## Group: docs-reference-tasks
 
@@ -789,7 +789,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same doc structure documenting the TS repo's task runner surface (Justfile recipes and/or package.json scripts wrapping the chosen TS toolchain); rewrite each command's payload; drop the pip-variant section (no dual-package-manager analog unless the TS repo keeps one).
 - **Open questions**: Whether the TS repo keeps `just` as the runner or uses package.json scripts only; final recipe list depends on toolchain choices (test runner, linter, docs tool) made in the research phase.
 - **Validation strategy**: After the TS Justfile/scripts exist, run every documented command verbatim and confirm it succeeds; doc build passes with no broken cross-references.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/reference/configuration_files.md`
 - **Target path**: docs/source/reference/configuration_files.md
@@ -801,7 +801,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Rewrite entries for the TS repo's config set — package.json, tsconfig.json, linter/formatter config (e.g. oxlint/Biome/ESLint config per later tool selection), git-hook manager config (pre-commit vs husky/lefthook TBD), cog.toml likely carried over as-is; update GitHub links to the ts-launch-blueprint repo.
 - **Open questions**: Final config-file inventory depends on toolchain research (linter, formatter, hook manager, docs tool).
 - **Validation strategy**: Cross-check the doc against the actual root of the TS repo — every config file present is documented and every documented file exists; links resolve.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/reference/index.md`
 - **Target path**: docs/source/reference/index.md
@@ -813,7 +813,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Equivalent section index/nav entry in the chosen TS docs tool (e.g. sidebar config in VitePress/Docusaurus/Starlight, or kept as MyST if Sphinx is retained); same four child pages.
 - **Open questions**: Docs generator for the TS repo is undecided (research phase); nav mechanism follows from that.
 - **Validation strategy**: Docs site builds; Reference section renders with all four child pages reachable from the index.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/reference/project_structure.md`
 - **Target path**: docs/source/reference/project_structure.md
@@ -825,7 +825,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same doc regenerated from the actual ts-launch-blueprint tree once it exists (src/, tests/, package.json, tsconfig.json, node version pin, etc.); keep the cross-platform entries (GitHub templates, CODE_OF_CONDUCT, SECURITY, Justfile, cog.toml).
 - **Open questions**: Final TS tree depends on nearly every other porting decision; this doc should be written late, after the structure stabilizes.
 - **Validation strategy**: Diff the documented tree against `git ls-files`-derived actual structure of the TS repo; every path in the doc exists and is described accurately.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/reference/versioning.md`
 - **Target path**: docs/source/reference/versioning.md
@@ -837,7 +837,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Uncertain — candidates for tag-driven versioning in Node include changesets, semantic-release, or a lightweight git-describe script stamping package.json at build/release time; npm has no PEP 440 local-version analog (semver prerelease/build metadata differ). Tool selection deferred to research phase; the doc then gets rewritten around the chosen mechanism while preserving the tag-is-truth + CI-validation intent.
 - **Open questions**: Which release/versioning tool the TS template adopts; whether dev builds get version metadata at all; how the CI tag-vs-package validation gate is implemented for package.json.
 - **Validation strategy**: After tooling is chosen: tag a test release in a scratch clone, run the documented commands verbatim, confirm the release workflow's version-validation step passes/fails as documented.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `docs/source/tasks/contributing_code.md`
 - **Target path**: docs/source/tasks/contributing_code.md
@@ -849,7 +849,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same guide with TS substitutions — style rules restated for the chosen linter/formatter config, install step becomes the Node package-manager install, Sphinx cross-ref guidance becomes the chosen docs tool's link syntax; Conventional Commits, CLA, review process, and Cocogitto contributor tracking carry over unchanged.
 - **Open questions**: Exact style-rule list depends on linter/formatter selection (goal.md mentions oxc/Oxlint); security-linting analog to bandit for TS is unselected.
 - **Validation strategy**: Follow the guide end-to-end on a fresh clone (install, test, commit with hook enforcement); `just contributors` (or equivalent) regenerates CONTRIBUTORS.md; all internal doc links resolve.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tasks/debugging_configuration.md`
 - **Target path**: docs/source/tasks/debugging_configuration.md
@@ -861,7 +861,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same doc with launch.json examples using the `node` debug type (or tsx/ts-node runtime args, per chosen dev-run strategy) pointing at the TS CLI entry point, one plain and one with-args configuration.
 - **Open questions**: How the TS entry point is executed in dev (tsx, ts-node, compiled dist) determines the launch config shape.
 - **Validation strategy**: Open the TS repo in VS Code, run both documented configurations, hit a breakpoint in the entry module.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tasks/index.md`
 - **Target path**: docs/source/tasks/index.md
@@ -873,7 +873,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Section index/sidebar entry in the chosen TS docs tool listing the same six ported task pages.
 - **Open questions**: Docs generator choice (same open question as reference/index.md).
 - **Validation strategy**: Docs build succeeds; all six task pages reachable from the section index.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tasks/managing_dependencies.md`
 - **Target path**: docs/source/tasks/managing_dependencies.md
@@ -885,7 +885,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Rewritten "Managing Dependencies" guide around the chosen Node package manager (npm/pnpm/bun — selection pending): install, add/remove/update (`pnpm add/remove/update` or equivalents), dev vs prod dependencies replacing extras, automatic lockfile replacing manual freeze; the dual uv/pip structure likely collapses to a single manager.
 - **Open questions**: Which package manager the template standardizes on; whether a secondary/fallback manager path is kept at all.
 - **Validation strategy**: Execute every documented command verbatim on a fresh clone; lockfile behavior matches the doc's claims.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tasks/setting_up_development.md`
 - **Target path**: docs/source/tasks/setting_up_development.md
@@ -897,7 +897,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same doc shape: keep `make check` preflight (retargeted to node/npm/just etc.), Node version pin (.nvmrc or package.json engines) replacing .python-version, single package-manager install path, format/lint/typecheck/test/coverage commands from the chosen TS toolchain, running the CLI binary, hook setup, and a template-customization section (package name in package.json, Node versions in CI matrix).
 - **Open questions**: Node version-pinning convention (.nvmrc vs engines vs volta) and whether dual setup paths are kept; toolchain commands pending research.
 - **Validation strategy**: Fresh-clone walkthrough: `make check` then every setup command in order on a clean machine/container; CLI `--version` works at the end.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tasks/type_checking_code.md`
 - **Target path**: docs/source/tasks/type_checking_code.md
@@ -909,7 +909,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Rewritten guide around `tsc --noEmit` with a strict tsconfig (strict, noUncheckedIndexedAccess, etc.): the dual-checker concept collapses since types are native to TS; best-practices section maps to avoiding `any`, using interfaces/type aliases (TypedDict analog), `@ts-expect-error` over `@ts-ignore` for suppression, and `@types/<pkg>` DefinitelyTyped packages as the stub analog; checking specific files maps to tsc project references or file args.
 - **Open questions**: Exact strictness flag set for the template tsconfig; whether an additional checker/lint layer (typescript-eslint type-aware rules or oxlint equivalents) supplements tsc.
 - **Validation strategy**: Run every documented command; introduce a deliberate type error and confirm the documented workflow catches it and the documented suppression syntax silences it.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tasks/using_ci_cd.md`
 - **Target path**: docs/source/tasks/using_ci_cd.md
@@ -921,7 +921,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same doc rewritten for the TS workflow: actions/setup-node (with built-in dependency caching) or the chosen PM's setup action, Node LTS version matrix, install + typecheck (tsc) + lint + test steps, customization examples for extending the matrix and adding a security/audit step (e.g. `npm audit` or a TS security scanner — TBD).
 - **Open questions**: Node version matrix policy; CI toolchain commands pending linter/test-runner selection; bandit-equivalent security scan choice.
 - **Validation strategy**: The documented YAML matches the actual workflow file byte-for-byte (or is generated from it); a test PR exercises the workflow and all documented jobs pass.
-- **Status**: Indexed
+- **Status**: Verified
 
 ## Group: docs-tools
 
@@ -941,7 +941,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Same tool — CLA Assistant is GitHub-level and language-agnostic. Update project name, repo links, and relative CLA paths for the TS repo.
 - **Open questions**: Whether the TS template will actually carry CLA docs/integration, and where the CLA markdown files live in the new docs layout.
 - **Validation strategy**: Link-check the page (relative links to CLA docs and CONTRIBUTING resolve); confirm referenced paths exist in the TS repo; if CLA integration is enabled, open a test PR to observe the bot check.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tools/github_actions.md`
 - **Target path**: docs/source/tools/github_actions.md
@@ -953,7 +953,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Same page concept with a Node workflow example: `actions/setup-node` (or setup for the chosen package manager), Node LTS version matrix, install via chosen package manager, run typecheck (`tsc --noEmit`) and the chosen linter. Exact commands depend on Phase-research tool picks (package manager, linter).
 - **Open questions**: Final CI tool commands depend on unresolved package-manager/linter/test-runner selections; whether the TS repo's actual workflow files will match the doc example (source repo's doc example should be treated as illustrative, not authoritative — verify against actual `.github/workflows/` when porting).
 - **Validation strategy**: Diff the doc's example workflow against the TS repo's real `.github/workflows/` files; run the workflow in CI and confirm steps match the documented ones.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tools/index.md`
 - **Target path**: docs/source/tools/index.md
@@ -965,7 +965,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Equivalent section index in the chosen docs framework, listing the TS toolchain pages (type checker, linter/formatter, test runner, package manager, plus retained cross-platform pages: GitHub Actions, VS Code, Makefiles, Justfiles, pre-commit-equivalent, CLA Assistant, YAML formatting).
 - **Open questions**: Docs framework (Sphinx/MyST vs Node-native) determines whether a toctree-equivalent is needed; final page list depends on tool-selection research.
 - **Validation strategy**: Docs build succeeds with no missing-page/orphan warnings; every tools page in the directory is linked from the index; link checker passes.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tools/justfiles.md`
 - **Target path**: docs/source/tools/justfiles.md
@@ -977,7 +977,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Keep `just` (language-agnostic command runner) and this page; rewrite the recipe list to match the TS Justfile (setup, format, lint, typecheck, test, check, build, clean, etc.). The `-pip` variant concept likely has no TS analogue (package-manager scripts vs direct binaries in `node_modules/.bin` is the nearest parallel) and may be dropped.
 - **Open questions**: Whether the TS repo keeps just as primary runner vs package.json scripts (or both, with just delegating); final recipe names.
 - **Validation strategy**: Every recipe named in the doc exists in the TS repo's Justfile (`just --list` diff against the doc); each documented command runs successfully in a fresh clone.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tools/makefiles.md`
 - **Target path**: docs/source/tools/makefiles.md
@@ -989,7 +989,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Keep the page and the bootstrap-Makefile pattern; replace uv install targets with the chosen Node toolchain bootstrap (e.g., check for node/package manager, install just). The Sphinx docs/Makefile section is dropped or replaced per the docs-framework decision.
 - **Open questions**: Which tools the TS root Makefile bootstraps (node version manager? pnpm/bun? just only?) — depends on tool-selection research.
 - **Validation strategy**: Each documented make target exists and behaves as described on a clean machine (`make check` reports missing tools; force installs succeed); doc/Makefile drift check.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tools/mypy.md`
 - **Target path**: docs/source/tools/typescript.md (or tsc.md — a type-checking page for the TS toolchain)
@@ -1001,7 +1001,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: `tsc --noEmit` with `"strict": true` in tsconfig.json is the unambiguous equivalent; the strictness discussion maps to `noImplicitAny`/`strict`-family flags; editor feedback comes from VS Code's built-in TypeScript language server (no separate tool needed — the CI-vs-editor duality collapses); ignore mechanisms map to `// @ts-expect-error`; type stubs map to `@types/*` packages from DefinitelyTyped.
 - **Open questions**: Whether the TS repo also adopts a faster checker frontend (e.g., tsgo) alongside tsc; exact tsconfig strictness flag set — defer to research phase.
 - **Validation strategy**: Documented tsconfig flags match the repo's actual tsconfig.json; documented commands (`tsc --noEmit` or just typecheck) run clean; code examples in the page compile.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tools/precommit_hooks.md`
 - **Target path**: docs/source/tools/precommit_hooks.md (name TBD by hook-manager choice)
@@ -1013,7 +1013,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Undecided between (a) keeping the pre-commit framework (works fine for non-Python repos; language-agnostic hooks carry over directly, swap mypy/ruff hooks for tsc/linter hooks) and (b) Node-native hook managers (husky + lint-staged, lefthook). Tool selection belongs to the research phase; the doc will be rewritten around whichever manager is chosen, preserving the same hook intents (YAML/JSON validity, EOF/whitespace hygiene, large-file guard, typecheck, lint).
 - **Open questions**: Hook manager choice (pre-commit vs husky/lint-staged vs lefthook); whether typecheck runs at commit time or is CI-only in the TS repo (tsc on staged files is awkward).
 - **Validation strategy**: Doc's hook list matches the actual hook config file; make a commit violating each documented rule and confirm the hook blocks it.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `docs/source/tools/pytest.md`
 - **Target path**: docs/source/tools/<test-runner>.md (name TBD, e.g., vitest.md)
@@ -1025,7 +1025,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Equivalent doc page for the chosen TS test runner. Candidates: Vitest, node:test (built-in), Jest. All support discovery conventions (`*.test.ts`), config file, setup/teardown analogues to fixtures, and parametrized tests (`test.each`); the page's intent (conventions + config + best practices + troubleshooting) ports directly once the runner is chosen.
 - **Open questions**: Which test runner — defer to research phase (Vitest vs node:test vs Jest trade-offs: speed, TS-native support, ecosystem).
 - **Validation strategy**: Documented commands and config match the repo's actual test setup; example tests from the doc run and pass; `just test` exercises the documented flow.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `docs/source/tools/ruff.md`
 - **Target path**: docs/source/tools/<linter>.md (name TBD, e.g., oxlint.md or biome.md)
@@ -1037,7 +1037,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Equivalent doc for the chosen JS/TS linter+formatter. Candidates: oxc/Oxlint (repo's goal.md leans this way per commit history), Biome (closest philosophical match — one fast Rust tool replacing ESLint+Prettier), or ESLint + Prettier (incumbent). The line-length discussion maps to formatter printWidth conventions (80/100/120).
 - **Open questions**: Linter/formatter selection (oxlint vs Biome vs ESLint+Prettier, and whether lint and format are one tool or two) — research phase; chosen printWidth standard.
 - **Validation strategy**: Documented config matches the repo's actual linter config file; `just lint` / `just format` run the documented tool; deliberately misformatted sample is caught.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `docs/source/tools/taplo.md`
 - **Target path**: n/a (omitted)
@@ -1049,7 +1049,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Omit: a TS/Node template's config surface is JSON (package.json, tsconfig.json) and YAML, not TOML, so there is nothing for Taplo to format. The intent (config files are format-enforced) transfers to the JSON/YAML formatting story (covered by the chosen formatter and the yamlfmt page). Reinstate Taplo only if the final TS repo actually carries TOML files (e.g., lefthook.toml, wrangler.toml).
 - **Open questions**: Confirm at plan time that the final TS file inventory contains no TOML; if it does, flip this to Copy then modify. Cross-reference: this entry and `.taplo.toml` must be resolved together in the research phase — config kept ⇒ this doc page is kept and adapted; config dropped ⇒ this doc is omitted.
 - **Validation strategy**: Completeness audit confirms the omission is recorded as deliberate in TS_PORT_INDEX.md; final-repo file scan shows no unformatted TOML.
-- **Status**: Indexed
+- **Status**: Verified (omitted per plan/D-ref)
 
 ### `docs/source/tools/uv.md`
 - **Target path**: docs/source/tools/<package-manager>.md (name TBD, e.g., pnpm.md)
@@ -1061,7 +1061,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Equivalent doc for the chosen Node package manager. Candidates: pnpm (speed/strictness, closest uv analogue), npm (zero-install baseline), bun, yarn. Concepts map directly: install deps (`<pm> install`), add/remove (`<pm> add/remove`), lockfile (package-lock.json/pnpm-lock.yaml), bootstrap via make target.
 - **Open questions**: Package manager selection — research phase; whether Node version pinning (`.nvmrc`/`engines`/volta) is documented here or in a separate page.
 - **Validation strategy**: Every documented command runs successfully against the TS repo; lockfile behavior matches the description; make install targets align with makefiles.md.
-- **Status**: Needs research
+- **Status**: Verified
 
 ### `docs/source/tools/vs_code.md`
 - **Target path**: docs/source/tools/vs_code.md
@@ -1073,7 +1073,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Same page structure; swap the extension list for the TS toolchain: built-in TypeScript support plus the chosen linter/formatter extension (dbaeumer.vscode-eslint, biomejs.biome, or oxc.oxc-vscode — tracks the linter decision), test-runner extension (e.g., vitest.explorer — tracks the runner decision), retain YAML, GitLens, Code Spell Checker; drop TOML extension with Taplo. Keep the CLI install block pattern and mirror into `.vscode/extensions.json`.
 - **Open questions**: Final extension list is downstream of linter/formatter/test-runner selections.
 - **Validation strategy**: Doc list matches `.vscode/extensions.json` exactly; each extension ID resolves on the marketplace; `code --install-extension` block runs clean.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tools/yaml_lint.md`
 - **Target path**: docs/source/tools/yaml_lint.md (consider renaming to yamlfmt.md for accuracy)
@@ -1085,7 +1085,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Keep yamlfmt and this page largely as-is (YAML formatting matters just as much in a TS repo with GitHub Actions); update the hook-integration section to whichever hook manager the TS repo adopts; rewrite the "No Node.js Required" framing; fill the empty `.yamlfmt` config section; fix the yamllint/yamlfmt naming conflation. Alternative if consolidating tools: Prettier/Biome can format YAML — fold into the formatter page instead.
 - **Open questions**: Keep standalone yamlfmt vs fold YAML formatting into the main formatter (depends on linter/formatter research); hook-manager dependency (see precommit_hooks.md).
 - **Validation strategy**: Documented just recipes exist and run; hook config matches the doc; a misformatted YAML file is caught at commit; `.yamlfmt` referenced in the doc exists in the repo.
-- **Status**: Indexed
+- **Status**: Verified
 
 ## Group: docs-tutorials
 
@@ -1099,7 +1099,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Same tutorial rewritten for the TS stack once tools are selected: Node LTS + package manager (pnpm/npm), `just` recipes retained, package.json instead of pyproject.toml, chosen linter/formatter (e.g. oxc/Oxlint per repo direction, or Biome/ESLint+Prettier), `tsc` for typechecking, chosen test runner (Vitest/node:test), git hooks equivalent (lefthook/husky or retained pre-commit), VS Code extensions for the chosen tools, TS style guidelines (line length, strict tsconfig, import sorting, no hardcoded credentials).
 - **Open questions**: Final command table and style-guideline section depend on tool selections made in the later research phase (package manager, linter/formatter, test runner, git-hook manager, docs generator); repo clone URL for ts-launch-blueprint; whether `just` recipe names (`check`, `test`, `format`, `lint`, `pre-commit-run`, `setup`, `typecheck`) are carried over verbatim (recommended for parity).
 - **Validation strategy**: Manual walkthrough: execute every command in the ported tutorial verbatim on a clean clone and confirm each succeeds and matches the described output; cross-check that every command named in the doc exists in the TS repo's justfile/package.json scripts; verify all relative doc links resolve in the built docs site.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `docs/source/tutorials/index.md`
 - **Target path**: docs/source/tutorials/index.md (or the chosen docs generator's section-index/sidebar mechanism, e.g. a VitePress sidebar entry or Docusaurus category)
@@ -1111,7 +1111,7 @@ Note applying to the whole group: these pages are Sphinx/MyST markdown under `do
 - **TS/Node equivalent**: Prose copies over with "Py Launch Blueprint"/Python wording updated; the toctree becomes the chosen docs generator's navigation mechanism (VitePress sidebar config, Docusaurus `sidebars` category / `_category_.json`, or Starlight sidebar entry). Candidates for the docs generator: VitePress, Docusaurus, Astro Starlight — selection pending.
 - **Open questions**: Which docs-site generator ts-launch-blueprint adopts (decided at the docs-toolchain level, not per-page); whether section indexes remain standalone pages or are replaced by sidebar-only navigation in that tool.
 - **Validation strategy**: Build the docs site and confirm the Tutorials section renders with the tutorial page reachable from its navigation entry; link checker passes on the section.
-- **Status**: Indexed
+- **Status**: Verified
 
 ## Group: python-src-tests
 
@@ -1129,7 +1129,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: `src/index.ts` that re-exports the CLI/library API; version read from `package.json` (e.g. `createRequire`/`JSON` import of `package.json`, or an injected constant at build time). The `bin` field in `package.json` replaces the console-script entry point.
 - **Open questions**: Whether the TS template reads version from `package.json` at runtime or bakes it in at build time (interacts with bundler choice, decided in research phase).
 - **Validation strategy**: `<cli> --version` prints the `package.json` version; importing the package root exposes the documented API; unit test asserting version output matches `package.json`.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `py_launch_blueprint/_version.py`
 - **Target path**: n/a (superseded by `package.json` `version` field)
@@ -1141,7 +1141,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: `package.json` `version` is the canonical source in Node. Git-tag-driven versioning, if kept as a discipline, maps to release tooling (candidates: `changesets`, `semantic-release`, plain `npm version` + tags) — selection belongs to the release-workflow research item.
 - **Open questions**: Whether the TS template wants setuptools-scm-style "version from git" automation or standard `package.json` versioning; depends on release tooling chosen later.
 - **Validation strategy**: Version reported by `--version` and by `npm pkg get version` agree; release workflow bumps/tags produce a consistent version.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `py_launch_blueprint/projects.py`
 - **Target path**: `src/projects.ts` (or `src/cli.ts` + `src/client.ts` + `src/config.ts` if the TS template prefers module-per-concern; keep as one file to mirror the template's deliberately small footprint unless research phase decides otherwise)
@@ -1153,7 +1153,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: A TS CLI with the same behaviors. Candidate libraries (final selection is a research-phase decision): CLI parsing — commander/clipanion/citty/yargs; interactive multi-select — @clack/prompts/@inquirer/prompts; styled output + spinner + table — picocolors/chalk + ora + cli-table3 (or @clack alone); HTTP — built-in `fetch`/undici; env file — Node 20+ `--env-file`/`process.loadEnvFile` or dotenv; clipboard — clipboardy.
 - **Open questions**: Library choices above; whether to split into multiple modules; whether the fictional "Py API" demo domain is renamed (e.g. "Ts API"/`TS_TOKEN` env var, `~/.config/ts-cli/`) — naming decision affects tests and docs repo-wide.
 - **Validation strategy**: Port the three test suites (api/cli/config) and keep behavior parity: exit codes, config precedence, `--format` outputs, `--version`, workspace filtering, clipboard and file output paths; plus lint/typecheck with no suppressions.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `scripts/update_contributors.py`
 - **Target path**: `scripts/update-contributors.ts` (run via tsx/node) or `scripts/update-contributors.mjs`
@@ -1165,7 +1165,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Small Node script using `child_process.execFileSync("git", ...)` + string/regex replacement between the same HTML comment markers; the S603-style suppression maps to whatever security lint the TS repo adopts (e.g. eslint-plugin-security or oxlint rule) if triggered.
 - **Open questions**: Script runtime convention for the TS repo (plain .mjs vs tsx-run .ts) — pick consistently with other repo scripts in the research phase.
 - **Validation strategy**: Run against the repo; verify CONTRIBUTORS.md region is rewritten idempotently (second run = no diff), names sorted and unique, content outside markers untouched.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `tests/__init__.py`
 - **Target path**: n/a (omitted)
@@ -1177,7 +1177,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: None needed — TS test runners (vitest/jest/node:test) discover `*.test.ts` files by glob; no package-marker file exists in Node. The license-header discipline is carried by the header-check tooling indexed elsewhere.
 - **Open questions**: none
 - **Validation strategy**: Test runner discovers and runs all test files without any marker file.
-- **Status**: Indexed
+- **Status**: Verified (omitted per plan/D-ref)
 
 ### `tests/test_api.py`
 - **Target path**: `tests/api.test.ts` (naming convention subject to chosen test runner)
@@ -1189,7 +1189,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same coverage in the chosen TS runner. Mocking candidates depend on HTTP choice: undici `MockAgent`, msw, nock, or vi.mock/fetch-mock. Test runner candidates: vitest, node:test, jest (selection in research phase).
 - **Open questions**: Test runner and HTTP-mocking library pairing (must match the HTTP client chosen for `projects.ts`).
 - **Validation strategy**: Ported suite passes in CI with no network access; mutation check — breaking header setup or error translation in the client fails a test.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `tests/test_cli.py`
 - **Target path**: `tests/cli.test.ts`
@@ -1201,7 +1201,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Depends on CLI framework: in-process invocation (e.g. commander `parseAsync` with injected streams, clipanion `Cli.run`) or subprocess invocation via execa against the built binary; prompt and clipboard mocked via the runner's mock facility. There is no universal `CliRunner` analog in Node — the harness pattern must be designed alongside the CLI framework choice.
 - **Open questions**: In-process vs subprocess CLI test harness; how progress-spinner output is suppressed/stripped in tests (the Python test regex-strips the "Fetching projects" line — a `CI`/non-TTY guard in the TS CLI may be cleaner).
 - **Validation strategy**: Ported suite passes headlessly in CI (no TTY); exit-code assertions preserved (0/1); output-format assertions preserved.
-- **Status**: Indexed
+- **Status**: Verified
 
 ### `tests/test_config.py`
 - **Target path**: `tests/config.test.ts`
@@ -1213,7 +1213,7 @@ Source repo: /Users/stevemorin/c/py-launch-blueprint @ 4828f8596b2332d74fbcff932
 - **TS/Node equivalent**: Same suite in the chosen runner; env isolation via runner facilities (e.g. vitest `vi.stubEnv`/manual save-restore of `process.env`); temp dirs via `fs.mkdtemp`. Note: dotenv's default of not overriding existing `process.env` matches python-dotenv, but Node's `--env-file` differs — the precedence test guards this behavior.
 - **Open questions**: none beyond the shared test-runner/env-loading choices already flagged.
 - **Validation strategy**: Ported suite passes; deliberately inverting precedence in the config loader fails the precedence test.
-- **Status**: Indexed
+- **Status**: Verified
 
 ---
 
