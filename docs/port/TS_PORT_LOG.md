@@ -466,3 +466,23 @@ their planned tiers.
 - **Validation**: fidelity validators read every source/target pair and re-verified claims against repo files; mechanical validator: 37/37 manifest files, index-page link coverage complete, 0 broken links (191 checked), MyST grep clean. Attempt 1 → REWORK on 5 blocking truth defects (false `just i` alias; docs-check step missing from using-ci-cd + github-actions descriptions; two underscore links in CONTRIBUTING.md) + 2 minors (unfulfilled vs-code cross-promise; "verbatim" oxlint block relabeled abridged). All fixed in 4148d1e; Haiku spot-check re-verified 6/6 + docs-check 0 broken + 45 hygiene tests + actionlint clean.
 - **Deviations (accepted)**: debugging-configuration.md deliberately pivots from editor-breakpoint content to CLI config-resolution debugging (signposted; editor debugging lives in vs-code.md — the source page's intent split across the two).
 - **Result**: Gate PASS (Fable). 174/174 tests; docs-check 0/191 broken.
+
+## 2026-07-09 — Slice S7: final polish + relocation — merged
+
+- **Phase or slice**: S7 (branch `slice/s7-polish`, commits f005b2c, 8b41152, 23de1be). Executor: Sonnet; final panel per D-034: Opus completeness critic + Sonnet final-gates validator.
+- **Decision or change**: all 9 port artifacts relocated to docs/port/ with a README (D-006; root clean); every reference to the old paths repointed (.oxfmtrc/lefthook excludes, docs, README, .contributors.yml, meta-test mirror); TS_PORT_INDEX.md statuses advanced 93/93 → Verified (6 as "Verified (omitted per plan/D-ref)"); .claude/settings.local.json ignore coverage; companyAnnouncements updated.
+- **Validation**: final-gates validator (Sonnet) re-ran the FULL suite from a clean install: npm ci → just build → just all (174/174), coverage 98.63/92.76/98.36/98.62 vs 95/95/90/95 with real denominators, docs-check 0/192 broken across 49 files, pack-check 6/6 stages, actionlint clean over 7 workflows, hook suite green, release-status consistent, behavioral smoke (version/help/exit-2/exit-4) — PASS, 0 findings. Completeness critic (Opus, §11): file sweep 93/93 mapped with 20+ targets opened (zero stubs), D-005 exclusions confirmed absent, all documented omissions verified with D-refs, 8/8 feature areas delivered, domain-spec 12-item Expected Final Output verified, 10+ decisions checked as implemented — ONE blocking finding: the S2 gate record was missing from this log (its append had been short-circuited by a failed merge-commit hook on 2026-07-08). Restored retroactively in 23de1be with honest provenance; critic re-verified against git history and superseded its FAIL with **PASS**.
+- **Result**: Gate PASS (Fable), merged --no-ff.
+
+---
+
+## 2026-07-09 — PORT COMPLETE (goal.md §11 definition of done)
+
+- All four planning artifacts committed with cross-validation evidence and passing Fable gate verdicts (Phases 0-5 records above).
+- All 9 implementation slices (S1, S2, S3a, S3b, S4, S5, S6a, S6b, S7) implemented on their own branches (D-004) and merged to main only after passing gates; every rework cycle documented.
+- Build, lint, typecheck, tests, coverage, docs-check, pack-check, actionlint, hook suite: all green from a clean install (final-gates validator, above).
+- TS_PORT_DECISIONS.md: D-001–D-034, append-only, every decision cited by the work that implements it; supersessions as new entries.
+- Port artifacts relocated to docs/port/ (D-006).
+- §11 completeness critic (independent, Opus): PASS — no unported, unomitted, or undocumented source file or feature.
+- §6 escalations: none required — no registry contact, no force-push, no settings changes, no deletion of non-port files; nothing was pushed to the remote (publishing the branch is left to the user).
+- User approvals: waived throughout per the recorded 2026-07-06 instruction; this log and TS_PORT_DECISIONS.md are the review trail.
