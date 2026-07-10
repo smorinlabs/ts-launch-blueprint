@@ -51,12 +51,19 @@ jobs:
           # No job here pushes; drop the persisted token (zizmor artipacked).
           persist-credentials: false
 
+      # pnpm before setup-node so cache:'pnpm' finds the store (D-035).
+      # Third-party action → full-SHA pin + version comment (D-022(9)).
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 10.34.3
+
       - name: Set up Node.js 24
         uses: actions/setup-node@v6
         with:
           # Node 24 bundles npm >= 11 (Trusted Publishing needs >= 11.5.1).
           node-version: '24.x'
-          cache: npm
+          cache: 'pnpm'
 
       # Third-party action → full-SHA pin + version comment (D-022(9)); kept
       # fresh by the Dependabot github-actions ecosystem.
@@ -86,16 +93,19 @@ jobs:
           fi
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Quality gates (just all)
         run: just all
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       # Local-only integrity check: `--dry-run` never contacts the registry.
       # Asserts the tarball contains ONLY dist/** plus the root whitelist.
+      # Uses the npm CLI (bundled with Node 24): `pnpm pack --json` returns a
+      # single object and runs the prepare script, whereas `npm pack` yields the
+      # array shape this assertion parses and honours --ignore-scripts (D-035).
       - name: Assert packed file list (dist + package.json/README/LICENSE/CHANGELOG)
         run: |-
           set -euo pipefail
@@ -146,6 +156,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # pnpm before setup-node so cache:'pnpm' finds the store (D-035).
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 10.34.3
+
       - name: Set up Node.js 24
         uses: actions/setup-node@v6
         with:
@@ -155,17 +171,21 @@ jobs:
           # `npm install -g npm@latest` step before publishing.
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
-          cache: npm
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
-      # No publish secret: authenticated by the id-token OIDC exchange above.
-      # Provenance attestations are generated automatically for public repos
-      # under Trusted Publishing. This step is inert until a trusted publisher
-      # for this package is configured on npmjs.com.
+      # Install/build run under pnpm, but the publish itself uses the npm CLI
+      # (D-035): pnpm 10's `pnpm publish` OIDC delegation has an unresolved
+      # Trusted-Publishing field-failure report (pnpm#9812), so plain
+      # `npm publish` — Node 24's bundled npm >= 11.5.1 meets the floor — is the
+      # reliable OIDC path. No publish secret: authenticated by the id-token
+      # OIDC exchange above. Provenance attestations are generated automatically
+      # for public repos under Trusted Publishing. This step is inert until a
+      # trusted publisher for this package is configured on npmjs.com.
       - name: Publish to npm (Trusted Publishing / OIDC)
         run: npm publish

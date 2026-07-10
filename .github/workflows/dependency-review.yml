@@ -21,9 +21,9 @@
 #
 # This Action scans dependency manifest files that change as part of a Pull
 # Request, surfacing known-vulnerable versions of the packages declared or
-# updated in the PR. `package-lock.json` is native to the GitHub dependency
-# graph (D-011(1)), so this carries over from the Python source unchanged apart
-# from the v4 -> v5 bump.
+# updated in the PR. `pnpm-lock.yaml` is read by the GitHub dependency graph
+# (pnpm's ecosystem id stays `npm`; D-035), so this carries over from the
+# Python source unchanged apart from the v4 -> v5 bump.
 #
 # Source repository: https://github.com/actions/dependency-review-action
 # Public documentation: https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review#dependency-review-enforcement

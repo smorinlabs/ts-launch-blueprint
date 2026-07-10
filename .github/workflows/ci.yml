@@ -57,13 +57,21 @@ jobs:
           # No job here pushes; drop the persisted token (zizmor artipacked).
           persist-credentials: false
 
+      # pnpm MUST be on PATH before setup-node so its cache:'pnpm' can find the
+      # store (D-035). Third-party action → full-SHA pin + version comment
+      # (D-022(9)); kept fresh by the Dependabot github-actions ecosystem.
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 10.34.3
+
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
-          # setup-node's built-in cache keyed to the committed package-lock.json
-          # (D-022(3); npm per D-011(1)).
-          cache: npm
+          # setup-node's built-in cache keyed to the committed pnpm-lock.yaml
+          # (D-022(3); pnpm per D-035).
+          cache: 'pnpm'
 
       # Third-party action → full-SHA pin + version comment (D-022(9));
       # kept fresh by the Dependabot github-actions ecosystem.
@@ -71,7 +79,7 @@ jobs:
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       # --- Direct quality gates as named just recipes (source per-check steps) ---
       - name: Check formatting
@@ -95,7 +103,7 @@ jobs:
       # --- Dual enforcement: re-run the WHOLE hook suite on all files, mirroring
       #     the source's `just pre-commit-run` step (D-022(1)). ---
       - name: Run pre-commit hook suite (all files)
-        run: npx lefthook run pre-commit --all-files
+        run: pnpm exec lefthook run pre-commit --all-files
 
       # ============================================================
       # Commented scaffolding — uncomment-to-enable (executable docs),
@@ -114,7 +122,7 @@ jobs:
       # differ). Uncomment to enforce:
       # - name: Audit dependencies (SCA)
       #   if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-      #   run: npm audit --audit-level=high
+      #   run: pnpm audit --audit-level high
 
       # Publish job — owned by the release topic (release-please publish.yml,
       # D-022(13)); intentionally not defined here.
