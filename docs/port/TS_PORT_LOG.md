@@ -502,3 +502,16 @@ their planned tiers.
 - **Validation**: both validators clean-roomed (rm -rf node_modules → pnpm 10.34.3 self-managed download with hash verify → frozen install → just all 182/182 → pack-check → docs-check 0/197 → actionlint → hook suite → just ci). Action SHA re-verified against GitHub. Every remaining "npm" reference judged legitimate (npm publish/pack, consumer installs, environment name, dependabot ecosystem id). 0 blocking; minors: cosmetic npm warnings on pnpm-only .npmrc keys; docs' "Corepack not used" framing noted as environment-dependent (corepack shims still honor the pin).
 - **Known risk (accepted, monitored)**: open dependabot-core parser bug for some lockfileVersion 9.0 files (fix PR #15367 open).
 - **Result**: Gate PASS (Fable). Branch swap/pnpm (5 commits eb755e0..63659a9), merged --no-ff.
+
+## 2026-07-10 — Post-port swap: Bun advisory dev/test lane (D-036) — merged
+
+- **Trigger**: user selection review + scope answer (dev/test only). Executor: Opus; validator: Sonnet (D-034).
+- **Change**: just test-bun (bun run vitest run --exclude tests/e2e.test.ts; print-first guidance + exit 0 when bun absent); advisory bun-lane CI job (continue-on-error, setup-bun @0c5077e5 # v2.2.0 SHA-verified, bun-version 1.3.14 exact, installs via pnpm — never bun install); 4 meta-tests; the three hard rules documented in setting-up-development.md/README/AGENTS.md (no bun install, no bare bun test, e2e stays Node-only — it spawns process.execPath and must pin Node's signal contract). Published package + engines untouched.
+- **Validation**: validator re-ran just all (186/186 Node) and just test-bun (178/178 under Bun, e2e genuinely excluded), verified the setup-bun SHA against GitHub, confirmed no lockfile/engines drift and no bun.lock artifact. Deviation accepted: executor's local evidence ran Bun 1.2.20 (machine install) vs the 1.3.14 CI pin — no diff content depends on newer-Bun behavior; CI enforces the pin.
+- **Result**: Gate PASS (Fable). Branch swap/bun-dev commit 65e33fc, merged --no-ff.
+
+---
+
+## 2026-07-10 — Technology-swap batch complete
+
+User selection review (4 requested changes): picocolors ✅ merged (D-038); pnpm 10 ✅ merged (D-035); Bun ✅ merged as the scoped dev/test lane (D-036, full-runtime variant rejected — would break npm consumers); TypeScript 7 ⏸ DEFERRED with standing approval (D-037 — GA since 2026-07-08 but tsdown's published releases reject TS7 peers and failed dts generation; adopt when the next tsdown release ships the merged fix). Final state on main: 186/186 tests, clean-room pnpm install verified twice, all gates green.
