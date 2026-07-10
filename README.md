@@ -7,7 +7,7 @@ A batteries-included TypeScript project template — CLI + library — with a
 strong developer-experience, CI, release, and open-source-readiness
 baseline. It is the TypeScript port of
 [py-launch-blueprint](https://github.com/smorinlabs/py-launch-blueprint),
-built in tested vertical slices (see `TS_PORT_PLAN.md`).
+built in tested vertical slices (see `docs/port/TS_PORT_PLAN.md`).
 
 Zero-config development environment with type safety built in: clone it,
 rename a few seam variables, and you have a linted, formatted,

@@ -26,9 +26,11 @@ just setup-hooks
   `end-of-file-fixer`, `trailing-whitespace`, and the parse-validity intent of
   `check-yaml`/`check-toml` for every format Oxfmt formats (see
   [Code, JSON, YAML & Markdown formatting](formatting.md)). Port-process
-  artifacts (`TS_PORT_*.md`, `TS_EXISTING_REPO_REVIEW.md`, `goal.md`,
-  `typescript_port_process_prompt.md`) are excluded — they cross-reference each
-  other by line number, so reformatting would corrupt those references.
+  artifacts (`docs/port/TS_PORT_*.md`, `docs/port/TS_EXISTING_REPO_REVIEW.md`,
+  `docs/port/goal.md`, `docs/port/typescript_port_process_prompt.md`) are
+  excluded — they cross-reference each other by line number, so reformatting
+  would corrupt those references. `.claude/settings.local.json` (untracked
+  local session settings) is excluded too.
 - **`check-large-files`** — a dependency-free POSIX shell job that rejects any
   staged file over 500KB, the equivalent of pre-commit's
   `check-added-large-files`.

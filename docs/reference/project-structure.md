@@ -35,14 +35,14 @@ ts-launch-blueprint/
 ├── docs/                            # Flattened CommonMark documentation tree (D-023)
 │   ├── about/                       # Project context and philosophy
 │   ├── contributing/                # Contribution guidelines, incl. cla/ (CLA docs)
+│   ├── port/                        # Port process records (D-006; see docs/port/README.md)
 │   ├── reference/                   # Technical references (this page's directory)
 │   ├── tasks/                       # Step-by-step workflows
 │   ├── tools/                       # Technical tooling reference (one page per tool)
 │   ├── tutorials/                   # Guided learning paths
 │   ├── docs.md                      # Docs-about-docs
 │   ├── github-templates.md          # GitHub issue/PR template reference
-│   ├── maintainers-release.md       # Release runbook (one-time setup + routine flow)
-│   └── port-parity-s3b.md           # Source-vs-port CLI behavior parity table
+│   └── maintainers-release.md       # Release runbook (one-time setup + routine flow)
 ├── src/                             # Source code for the ts-projects CLI + library
 │   ├── commands/
 │   │   └── projects.ts              # The `projects` command (default command)

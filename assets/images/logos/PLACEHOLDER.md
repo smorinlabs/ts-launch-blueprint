@@ -8,7 +8,8 @@ Those three PNGs are **not carried over** in this port: they are
 Python-branded artwork (a `py`-themed logo) that would misrepresent this
 TypeScript template. Carrying them as-is was rejected; a new
 `ts-launch-blueprint`-branded logo is deliberate future work, tracked in
-`TS_PORT_PLAN.md` (Slice S6b) and `TS_PORT_INDEX.md`'s omission notes.
+`docs/port/TS_PORT_PLAN.md` (Slice S6b) and `docs/port/TS_PORT_INDEX.md`'s
+omission notes.
 
 ## What belongs here once it exists
 

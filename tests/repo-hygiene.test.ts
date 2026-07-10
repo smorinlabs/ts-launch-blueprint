@@ -75,9 +75,9 @@ describe('lefthook configuration (D-020(6))', () => {
 
   // Regression: oxfmt exits 2 (and oxlint exits 1) when EVERY path passed to
   // it is ignore-listed, which used to fail commits staging only port
-  // artifacts (e.g. TS_PORT_LOG.md). The jobs' lefthook `exclude` lists must
-  // mirror the tools' ignorePatterns so excluded files never reach the tools
-  // and lefthook skips when no staged files remain.
+  // artifacts (e.g. docs/port/TS_PORT_LOG.md). The jobs' lefthook `exclude`
+  // lists must mirror the tools' ignorePatterns so excluded files never
+  // reach the tools and lefthook skips when no staged files remain.
   it('format/lint excludes mirror the tools ignorePatterns', () => {
     // Both configs are JSONC with full-line comments only.
     const readJsonc = (file: string): { ignorePatterns: string[] } => {

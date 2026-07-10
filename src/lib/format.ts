@@ -6,7 +6,7 @@
 //   json -> {"projects": [...]} wrapper, 2-space indent
 //   csv  -> literal `id,name` header, one `id,name` row per project
 //   text -> newline-joined project IDs (not names — shell composability)
-// Deliberate divergence (documented in docs/port-parity-s3b.md): the
+// Deliberate divergence (documented in docs/port/port-parity-s3b.md): the
 // source's CSV was naive-by-design (no escaping, projects.py:287-289);
 // the port applies minimal RFC 4180 quoting, which is byte-identical
 // unless a value contains a comma, quote, or newline.
