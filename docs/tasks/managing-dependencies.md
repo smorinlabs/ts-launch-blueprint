@@ -1,9 +1,11 @@
-# Managing Dependencies with npm
+# Managing Dependencies with pnpm
 
-[npm](https://docs.npmjs.com/) is the package manager for this project — it
-ships with Node.js itself, so there is no separate tool to install
-(D-011(1)). Node.js >=24 is required (also pinned in
-[`.nvmrc`](../../.nvmrc) and `engines`/`devEngines` in
+[pnpm](https://pnpm.io/) is the package manager for this project (D-035).
+Unlike npm it does not ship with Node.js, so it needs a one-time bootstrap
+(`make install-pnpm` prints the options); after that it self-manages to the
+exact pinned version via the `packageManager` field and
+[`.npmrc`](../../.npmrc). Node.js >=24 is required (also pinned in
+[`.nvmrc`](../../.nvmrc) and `engines`/`devEngines.runtime` in
 [`package.json`](../../package.json)).
 
 ## Installing Dependencies
@@ -11,31 +13,32 @@ ships with Node.js itself, so there is no separate tool to install
 To install all dependencies and generate/refresh the lockfile:
 
 ```sh
-npm install
+pnpm install
 ```
 
 `just install` runs `just check-deps` first and then this same command — it
 is the recommended entry point on a fresh clone.
 
 In CI, and anywhere a byte-for-byte reproducible install matters, use
-`npm ci` instead: it installs strictly from `package-lock.json` and fails
-fast if the lockfile and `package.json` have drifted apart.
+`pnpm install --frozen-lockfile` instead: it installs strictly from
+`pnpm-lock.yaml` and fails fast if the lockfile and `package.json` have
+drifted apart.
 
 ## Adding a Dependency
 
 ```sh
-npm install <package-name>              # runtime dependency
-npm install --save-dev <package-name>   # development-only dependency
+pnpm add <package-name>        # runtime dependency
+pnpm add -D <package-name>     # development-only dependency
 ```
 
-Both commands update `package.json` and `package-lock.json` together —
+Both commands update `package.json` and `pnpm-lock.yaml` together —
 always commit the two files as a pair.
 
 ## Development Tools
 
 The project's quality gates are exposed as `just` recipes (thin wrappers
-around npm scripts / `npx`, so they always run the exact versions pinned in
-`package-lock.json`):
+around pnpm scripts / `pnpm exec`, so they always run the exact versions
+pinned in `pnpm-lock.yaml`):
 
 ```sh
 just format         # oxfmt --write (+ sortImports)
@@ -55,9 +58,9 @@ detail, [Oxlint](../tools/oxlint.md) for linting, and
 ## Updating & Removing Packages
 
 ```sh
-npm update                    # update all dependencies within their declared ranges
-npm update <package-name>     # update a specific package
-npm uninstall <package-name>  # remove a package
+pnpm update                    # update all dependencies within their declared ranges
+pnpm update <package-name>     # update a specific package
+pnpm remove <package-name>     # remove a package
 ```
 
 To see which installed packages have newer versions available beyond their
@@ -65,32 +68,32 @@ declared semver range (i.e. a version bump you'd need to edit
 `package.json` for):
 
 ```sh
-npm outdated
+pnpm outdated
 ```
 
 ## Auditing for Vulnerabilities
 
 ```sh
-npm audit             # report known vulnerabilities in the dependency tree
-npm audit fix         # apply non-breaking fixes automatically
+pnpm audit             # report known vulnerabilities in the dependency tree
+pnpm audit --fix       # apply non-breaking fixes automatically
 ```
 
-`npm audit` is advisory here — it is not wired into a `just` recipe or CI
+`pnpm audit` is advisory here — it is not wired into a `just` recipe or CI
 gate. Automated vulnerability response for this repo is Dependabot-driven
-(next section) plus the CodeQL workflow; `npm audit` remains available for
+(next section) plus the CodeQL workflow; `pnpm audit` remains available for
 an ad hoc check before a release.
 
 ## Lockfile Policy
 
-`package-lock.json` **is committed** to the repository (D-011(5)) — see the
-note at the top of [`.gitignore`](../../.gitignore). This is a deliberate
-inversion of the Python source, which `.gitignore`d `uv.lock` with a
-"remove if you want to pin versions" comment: npm's tooling (`npm ci`, the
-GitHub dependency graph, `dependency-review-action`, npm Trusted
-Publishing) is designed around a committed lockfile, and every other
-TypeScript repo in the org commits one too. Do not add
-`package-lock.json` to `.gitignore`, and do not run `npm install` with
-`--no-package-lock` for a change you intend to commit.
+`pnpm-lock.yaml` **is committed** to the repository (D-035, amending
+D-011(5)) — see the note at the top of [`.gitignore`](../../.gitignore).
+This is a deliberate inversion of the Python source, which `.gitignore`d
+`uv.lock` with a "remove if you want to pin versions" comment: the Node
+tooling (`pnpm install --frozen-lockfile`, the GitHub dependency graph,
+`dependency-review-action`, npm Trusted Publishing at release) is designed
+around a committed lockfile, and every other TypeScript repo in the org
+commits one too. Do not add `pnpm-lock.yaml` to `.gitignore`, and do not
+run `pnpm install --no-lockfile` for a change you intend to commit.
 
 ## Automated Dependency Updates (Dependabot)
 
@@ -98,7 +101,8 @@ TypeScript repo in the org commits one too. Do not add
 ecosystems current on a weekly schedule:
 
 - `npm` — runtime and dev dependencies declared in `package.json` /
-  `package-lock.json`.
+  `pnpm-lock.yaml`. Dependabot's ecosystem id for pnpm is still `npm`; it
+  reads the pnpm lockfile.
 - `github-actions` — the SHA-pinned third-party actions used by the
   workflows in `.github/workflows/`.
 

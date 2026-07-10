@@ -20,9 +20,10 @@
 
 - **Node.js 24+ Support**: targets the current Active LTS floor, tested in CI
   against both the LTS (`24.x`) and Current (`26.x`) release lines.
-- **Dependency Management**: uses `npm` (with `package-lock.json`) for fast,
-  reproducible installs; `devEngines`/`engines` enforce the Node and
-  package-manager floor.
+- **Dependency Management**: uses `pnpm` (with `pnpm-lock.yaml`) for fast,
+  reproducible installs; `engines` enforces the Node floor, and `packageManager`
+  field with `.npmrc` (`managePackageManagerVersions` / `packageManagerStrict` /
+  `packageManagerStrictVersion`) enforce pnpm version compliance.
 - **CI/CD Ready**: includes GitHub Actions workflows for quality gates (lint,
   format, typecheck, test, build), CodeQL security analysis, dependency
   review on pull requests, and a manual OSV-based PR security scan.
@@ -53,7 +54,7 @@
 - **Git Hooks**: [lefthook](../tools/lefthook.md) formats and lints staged
   files and type-checks the repo before each commit, and checks commit
   messages against Conventional Commits — installed automatically by
-  `npm install`.
+  `pnpm install`.
 - **Open Source Ready**: a Code of Conduct, issue/PR templates, a
   Contributor License Agreement flow via [CLA Assistant](../tools/cla-assistant.md),
   and an automated `CONTRIBUTORS.md` are included out of the box.

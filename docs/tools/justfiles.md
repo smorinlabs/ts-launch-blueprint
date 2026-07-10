@@ -54,15 +54,15 @@ just build
 just run
 ```
 
-When dependencies are installed, you can also use direct commands through npm and npx:
+When dependencies are installed, you can also use direct commands through pnpm:
 
 ```bash
-npx oxfmt              # Run formatter directly
-npx oxlint             # Run linter directly
-npm run typecheck      # Run type checker directly
-npx vitest run         # Run tests directly with Vitest
+pnpm exec oxfmt        # Run formatter directly
+pnpm exec oxlint       # Run linter directly
+pnpm run typecheck     # Run type checker directly
+pnpm exec vitest run   # Run tests directly with Vitest
 ```
 
-The Justfile standardizes common development tasks and provides a consistent interface for npm and npx command execution.
+The Justfile standardizes common development tasks and provides a consistent interface for pnpm command execution.
 
 For a full list of available commands, run `just --list` or refer to the Justfile itself.

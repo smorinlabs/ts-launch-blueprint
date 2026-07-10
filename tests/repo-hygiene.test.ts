@@ -1,7 +1,7 @@
 // Repo-hygiene meta-tests (plan S2 field 7): the quality-gate configs must
 // stay internally consistent, and the formatter gate must actually bite.
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -110,6 +110,29 @@ describe('Node version pin consistency (D-011(3))', () => {
   });
 });
 
+describe('package manager: pnpm 10 (D-035)', () => {
+  it('commits pnpm-lock.yaml and no package-lock.json', () => {
+    expect(existsSync(join(REPO_ROOT, 'pnpm-lock.yaml'))).toBe(true);
+    expect(existsSync(join(REPO_ROOT, 'package-lock.json'))).toBe(false);
+  });
+
+  it('package.json pins pnpm 10 via packageManager and drops the npm devEngines entry', () => {
+    // packageManager: pnpm@10.x with the Corepack integrity suffix.
+    expect(packageJson.packageManager).toMatch(/^pnpm@10\.\d+\.\d+\+sha512\./);
+    // pnpm 10 does not read devEngines for the package manager, so the npm
+    // entry is removed; only the Node runtime floor stays (D-035).
+    expect('packageManager' in packageJson.devEngines).toBe(false);
+    expect(packageJson.devEngines.runtime.name).toBe('node');
+  });
+
+  it('.npmrc turns on pnpm strict package-manager enforcement', () => {
+    const npmrc = readFileSync(join(REPO_ROOT, '.npmrc'), 'utf8');
+    expect(npmrc).toMatch(/^managePackageManagerVersions\s*=\s*true$/m);
+    expect(npmrc).toMatch(/^packageManagerStrict\s*=\s*true$/m);
+    expect(npmrc).toMatch(/^packageManagerStrictVersion\s*=\s*true$/m);
+  });
+});
+
 describe('formatter gate is real (D-014)', () => {
   const oxfmtBin = join(REPO_ROOT, 'node_modules', '.bin', 'oxfmt');
   const configPath = join(REPO_ROOT, '.oxfmtrc.json');
@@ -179,6 +202,34 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
     };
     expect(ci.jobs.ci.strategy.matrix['node-version']).toEqual(['24.x', '26.x']);
   });
+
+  // D-035: the CI + publish workflows install with pnpm — pnpm/action-setup
+  // (SHA-pinned) BEFORE setup-node's cache:'pnpm', then frozen-lockfile.
+  it.each(['ci.yml', 'publish.yml'])(
+    '%s sets up pnpm before setup-node with cache:pnpm + frozen-lockfile (D-035)',
+    (file) => {
+      const raw = readFileSync(join(WORKFLOW_DIR, file), 'utf8');
+      expect(raw).toMatch(/pnpm\/action-setup@[0-9a-f]{40}\s*#\s*v\d/);
+      expect(raw).toContain('version: 10.34.3');
+      expect(raw).toMatch(/cache:\s*'?pnpm'?/);
+      expect(raw).toContain('pnpm install --frozen-lockfile');
+      // pnpm must be on PATH before setup-node so its cache can find the
+      // store. Collect ordering per node-setup job, assert once (the vitest
+      // no-conditional-expect rule forbids expect() inside the loop).
+      const parsed = parse(raw) as {
+        jobs: Record<string, { steps: { uses?: string }[] }>;
+      };
+      const orderingOk: boolean[] = [];
+      for (const job of Object.values(parsed.jobs)) {
+        const uses = job.steps.map((s) => s.uses ?? '');
+        const pnpmIdx = uses.findIndex((u) => u.startsWith('pnpm/action-setup@'));
+        const nodeIdx = uses.findIndex((u) => u.startsWith('actions/setup-node@'));
+        if (nodeIdx !== -1) orderingOk.push(pnpmIdx !== -1 && pnpmIdx < nodeIdx);
+      }
+      expect(orderingOk.length).toBeGreaterThan(0);
+      expect(orderingOk.every(Boolean)).toBe(true);
+    }
+  );
 
   // S6b field 9: docs-check must run in CI, not just locally.
   it('ci.yml runs `just docs-check` as a step (S6b: docs link check in CI)', () => {
@@ -308,6 +359,14 @@ describe('release, versioning & packaging (S5: D-021, D-012)', () => {
 
   it('publish.yml never references NPM_TOKEN (Trusted Publishing only, D-021(5))', () => {
     expect(readWorkflow('publish.yml')).not.toContain('NPM_TOKEN');
+  });
+
+  it('publish.yml publishes with the npm CLI, not pnpm (D-035)', () => {
+    // pnpm install/build, but `npm publish` for reliable OIDC Trusted
+    // Publishing (pnpm 10's delegation is unresolved, pnpm#9812).
+    const raw = readWorkflow('publish.yml');
+    expect(raw).toMatch(/run:\s*npm publish/);
+    expect(raw).not.toMatch(/run:\s*pnpm publish/);
   });
 
   it('release-please.yml SHA-pins release-please-action with a version comment (D-022(9))', () => {

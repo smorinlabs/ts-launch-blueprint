@@ -29,7 +29,7 @@ To ensure consistency and maintainability, please follow these code style guidel
 4. **Install Dependencies**: Verify tooling, install dependencies, and wire the git hooks.
    ```bash
    make check        # verify node/just are installed
-   npm install        # install dependencies (also runs the lefthook "prepare" install)
+   pnpm install        # install dependencies (also runs the lefthook "prepare" install)
    just setup-hooks   # install git hooks + commit-message template
    ```
 5. **Make Changes**: Make your changes to the codebase.
@@ -87,7 +87,7 @@ for more information, see the [Contributor License Agreement](../contributing/in
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-If you're filing a bug report, attach the output of `just debug-info` (OS, Node/npm/just versions, installed and declared packages) to the "System Information" section of the issue template — see [Using CI/CD](using-ci-cd.md) and the [issue templates](../github-templates.md) for how that information is used.
+If you're filing a bug report, attach the output of `just debug-info` (OS, Node/pnpm/just versions, installed and declared packages) to the "System Information" section of the issue template — see [Using CI/CD](using-ci-cd.md) and the [issue templates](../github-templates.md) for how that information is used.
 
 ## Contributors
 
@@ -101,7 +101,7 @@ This project uses [contributors-please](https://github.com/smorinlabs/contributo
 To manually update the contributors list:
 
 ```bash
-just contributors
+pnpm dlx contributors-please
 ```
 
 ### How Contributors are Tracked

@@ -20,7 +20,7 @@ This is a deliberate difference from the Python source project, which ran Mypy i
 Run it directly with:
 
 ```bash
-npx tsc --noEmit
+pnpm exec tsc --noEmit
 ```
 
 or via the project's [`just`](justfiles.md) recipe:
@@ -152,7 +152,7 @@ const first: string = items[0];
 
    ```bash
    # Install type declarations for a library that ships its own
-   npm install --save-dev @types/some-legacy-package
+   pnpm add -D @types/some-legacy-package
 
    # For libraries that ship their own .d.ts, no @types package is needed
    ```
@@ -171,7 +171,7 @@ const first: string = items[0];
 3. Type checking only specific files (ad hoc, outside the project config):
 
    ```bash
-   npx tsc --noEmit src/lib/config.ts src/lib/api.ts
+   pnpm exec tsc --noEmit src/lib/config.ts src/lib/api.ts
    ```
 
    Note that this bypasses `tsconfig.json`'s `include`/`compilerOptions`, so it's useful for a quick sanity check but not a substitute for `just typecheck`, which always runs the full, correctly configured program.

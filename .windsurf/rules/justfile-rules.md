@@ -13,7 +13,7 @@ Every recipe is part of a group that already exists in the Just file, and that t
 @typecheck:
     echo "Running type checker..."
     echo "  tsc --noEmit"
-    npm run typecheck
+    pnpm run typecheck
 
 alias tc := typecheck
 
@@ -22,7 +22,7 @@ alias tc := typecheck
 @format:
     echo "Running formatter..."
     echo "  oxfmt --write (+ sortImports)"
-    npx oxfmt
+    pnpm exec oxfmt
 
 alias f := format
 ```

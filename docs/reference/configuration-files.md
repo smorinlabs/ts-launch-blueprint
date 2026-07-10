@@ -89,10 +89,20 @@ read by `ts-projects` at runtime.
 The central manifest: name (`ts-launch-blueprint`), version (bumped
 exclusively by release-please — see
 [Versioning](./versioning.md)), the `ts-projects` bin entry, the ESM
-`exports` map, npm scripts (`build`, `typecheck`, `test`,
-`test:coverage`, `prepare`), dependencies/devDependencies, and the
-`engines`/`devEngines` Node >=24 floor. See
-[package.json](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/package.json).
+`exports` map, package scripts (`build`, `typecheck`, `test`,
+`test:coverage`, `prepare`), dependencies/devDependencies, the
+`packageManager` field pinning pnpm 10 (D-035), and the
+`engines`/`devEngines.runtime` Node >=24 floor. See
+[package.json](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/package.json)
+and [pnpm](../tools/pnpm.md).
+
+### `.npmrc`
+
+pnpm configuration (D-035). pnpm 10 does not read `devEngines` for
+package-manager enforcement, so `managePackageManagerVersions`,
+`packageManagerStrict`, and `packageManagerStrictVersion` here — together
+with the `packageManager` field — pin and verify the exact pnpm version
+(the Corepack replacement). See [pnpm](../tools/pnpm.md).
 
 ### `tsconfig.json`
 

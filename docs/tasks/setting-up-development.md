@@ -17,39 +17,39 @@ guidance.
 ## Setup Development Environment
 
 The project requires Node.js >=24 (also pinned in
-[`.nvmrc`](../../.nvmrc) and `engines`/`devEngines` in
+[`.nvmrc`](../../.nvmrc) and `engines` in
 [`package.json`](../../package.json)). Unlike the Python source, there is
-only one supported package manager: [npm](https://docs.npmjs.com/), which
-ships with Node itself — there is no separate installation step and no
-choice to make (D-011(1)).
+only one supported package manager: [pnpm](https://pnpm.io), which is
+bootstrapped via `make install-pnpm` once — there is no choice to make
+(D-035).
 
-## Using npm
+## Using pnpm
 
 ```bash
-# Install dependencies (also generates/refreshes package-lock.json,
+# Install dependencies (also generates/refreshes pnpm-lock.yaml,
 # and installs the lefthook git hooks via the `prepare` script)
-npm install
+pnpm install
 
 # Format the code
-just format          # or: npx oxfmt
+just format          # or: pnpm exec oxfmt
 
 # Run linter
-just lint            # or: npx oxlint
+just lint            # or: pnpm exec oxlint
 
 # Run type checker
-just typecheck       # or: npx tsc --noEmit
+just typecheck       # or: pnpm exec tsc --noEmit
 
 # Run tests
-just test            # or: npx vitest run
+just test            # or: pnpm exec vitest run
 
 # Run tests with coverage
-just coverage        # or: npm run test:coverage
+just coverage        # or: pnpm run test:coverage
 
 # Run every quality gate together
 just all
 
 # Run the CLI from source (via tsx, no build step)
-npx tsx src/cli.ts --help
+pnpm exec tsx src/cli.ts --help
 
 # Build and run the packaged CLI
 just build
@@ -62,7 +62,7 @@ the `tsc` gate in detail.
 
 ### Git Hooks (lefthook)
 
-`npm install` already activates the [lefthook](https://lefthook.dev) git
+`pnpm install` already activates the [lefthook](https://lefthook.dev) git
 hooks, because `package.json`'s `prepare` script runs `lefthook install`
 automatically. To (re)install the hooks explicitly and also wire the
 commit-message template (`.gitmessage`):
@@ -107,6 +107,7 @@ strings:
 2. **`package.json`**: `name`, `description`, `repository.url`, and the
    `bin` map's key (currently `ts-projects`).
 
-3. **Node.js version floor**: update `.nvmrc` and the `engines`/
-   `devEngines.runtime.version` fields in `package.json` together if you
-   need a different Node floor than `>=24`.
+3. **Node.js version floor**: update `.nvmrc` and the `engines`
+   field in `package.json` together if you need a different Node floor
+   than `>=24`. (The `devEngines.packageManager` entry was removed in favor
+   of the `packageManager` field + `.npmrc` enforcement, D-035.)

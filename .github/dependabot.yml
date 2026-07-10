@@ -37,7 +37,8 @@ updates:
           - 'minor'
           - 'patch'
 
-  # npm runtime + dev dependencies (package.json / package-lock.json).
+  # Runtime + dev dependencies (package.json / pnpm-lock.yaml). Dependabot's
+  # ecosystem id for pnpm is still 'npm' — it reads the pnpm lockfile (D-035).
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:

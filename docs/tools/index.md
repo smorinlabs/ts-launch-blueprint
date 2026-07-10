@@ -8,7 +8,7 @@ Each of these sections contains detailed instructions and best practices to help
 - [Vitest](vitest.md) — Testing framework
 - [Oxlint](oxlint.md) — Linting
 - [Formatting](formatting.md) — Code formatting
-- [npm](npm.md) — Package management and scripts
+- [pnpm](pnpm.md) — Package management and scripts
 - [Lefthook](lefthook.md) — Git hooks
 - [GitHub Actions](github-actions.md) — CI/CD workflows
 - [VS Code](vs-code.md) — Editor configuration

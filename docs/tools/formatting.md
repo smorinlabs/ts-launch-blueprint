@@ -15,8 +15,8 @@ everything — code, JSON, YAML, _and_ Markdown.
 - **Fast**: Oxfmt is built on the [oxc](https://oxc.rs) Rust toolchain.
 - **Pre-commit integration**: runs automatically on staged files via
   [lefthook](lefthook.md), with auto-fixes re-staged.
-- **No extra runtime**: it is an `npm` devDependency already installed by
-  `npm install` — no Go toolchain, no separate binary to manage.
+- **No extra runtime**: it is a `pnpm` devDependency already installed by
+  `pnpm install` — no Go toolchain, no separate binary to manage.
 
 ## Usage
 
@@ -27,7 +27,7 @@ just format
 ```
 
 _Runs `oxfmt` in write mode across the repo, including import sorting (see
-below)._
+below). Equivalent to `pnpm exec oxfmt`._
 
 ### Check formatting without writing (CI-parity gate)
 
@@ -36,7 +36,7 @@ just format-check
 ```
 
 _Runs `oxfmt --check`; exits non-zero if anything is unformatted. This is the
-gate CI and `just pre-commit-run` both use._
+gate CI and `just pre-commit-run` both use. Equivalent to `pnpm exec oxfmt --check`._
 
 ## Configuration
 

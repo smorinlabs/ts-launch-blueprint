@@ -74,7 +74,8 @@ DASH := GRAY + "-" + NC
 check-deps:
     #!/usr/bin/env sh
     if ! command -v node >/dev/null 2>&1; then printf "{{YELLOW}}node is not installed{{NC}}\n RUN {{BLUE}}make install-node{{NC}}\n"; exit 1; fi
-    if ! command -v npm >/dev/null 2>&1; then printf "{{YELLOW}}npm is not installed{{NC}} (it ships with Node)\n RUN {{BLUE}}make install-node{{NC}}\n"; exit 1; fi
+    if ! command -v npm >/dev/null 2>&1; then printf "{{YELLOW}}npm is not installed{{NC}} (it ships with Node; used by pack-check + publish)\n RUN {{BLUE}}make install-node{{NC}}\n"; exit 1; fi
+    if ! command -v pnpm >/dev/null 2>&1; then printf "{{YELLOW}}pnpm is not installed{{NC}} (package manager, D-035)\n RUN {{BLUE}}make install-pnpm{{NC}}\n"; exit 1; fi
     if ! command -v just >/dev/null 2>&1; then printf "{{YELLOW}}just is not installed{{NC}}\n RUN {{BLUE}}make install-just{{NC}}\n"; exit 1; fi
     if ! command -v git >/dev/null 2>&1; then printf "{{YELLOW}}git is not installed{{NC}}\n Install: {{BLUE}}xcode-select --install{{NC}} (macOS) or {{BLUE}}sudo apt install git{{NC}} (Debian/Ubuntu)\n"; exit 1; fi
     echo "All required tools are installed"
@@ -83,15 +84,15 @@ check-deps:
 
 alias c := check-deps
 
-# Install project dependencies (generates/updates package-lock.json)
+# Install project dependencies (generates/updates pnpm-lock.yaml)
 [group('install'), group('quick start')]
 @install: check-deps
-    npm install
+    pnpm install
 
 # Build distributable package (dist/) with tsdown
 [group('build'), group('dev')]
 @build:
-    npm run build
+    pnpm run build
 
 alias b := build
 
@@ -100,7 +101,7 @@ alias b := build
 @format:
     echo "Running formatter..."
     echo "  oxfmt --write (+ sortImports)"
-    npx oxfmt
+    pnpm exec oxfmt
 
 alias f := format
 
@@ -109,7 +110,7 @@ alias f := format
 @format-check:
     echo "Checking formatting..."
     echo "  oxfmt --check"
-    npx oxfmt --check
+    pnpm exec oxfmt --check
 
 alias fc := format-check
 
@@ -118,35 +119,35 @@ alias fc := format-check
 @lint:
     echo "Running linters..."
     echo "  oxlint"
-    npx oxlint
+    pnpm exec oxlint
 
 alias l := lint
 
 # Run linter with autofixes applied
 [group('dev')]
 @lint-fix:
-    npx oxlint --fix
+    pnpm exec oxlint --fix
 
 # Run type checker (tsc --noEmit)
 [group('dev')]
 @typecheck:
     echo "Running type checker..."
     echo "  tsc --noEmit"
-    npm run typecheck
+    pnpm run typecheck
 
 alias tc := typecheck
 
 # Run tests
 [group('test'), group('dev')]
 @test *options:
-    npx vitest run {{options}}
+    pnpm exec vitest run {{options}}
 
 alias t := test
 
 # Run tests with coverage (95/95/90/95 thresholds enforced)
 [group('test')]
 @coverage:
-    npm run test:coverage
+    pnpm run test:coverage
 
 # Run all quality gates (format-check, lint, typecheck, test)
 [group('test'), group('dev'), group('quick start')]
@@ -177,25 +178,25 @@ alias pc := pre-commit-run
 [group('docs')]
 @docs-api:
     #!/usr/bin/env sh
-    if ! npx --no-install typedoc --version >/dev/null 2>&1; then
+    if ! pnpm exec typedoc --version >/dev/null 2>&1; then
         printf "{{YELLOW}}typedoc is not installed{{NC}} (optional, not CI-gated, D-023(4)).\n"
-        printf "Install it first: {{BLUE}}npm install --no-save typedoc typedoc-plugin-markdown{{NC}}\n"
-        printf "Then rerun:       {{BLUE}}just docs-api{{NC}}\n"
+        printf "Run on demand:   {{BLUE}}pnpm dlx typedoc --out docs/reference/api src/lib.ts{{NC}}\n"
+        printf "or add it:       {{BLUE}}pnpm add -D typedoc typedoc-plugin-markdown{{NC}}\n"
         exit 0
     fi
-    npx typedoc --out docs/reference/api src/lib.ts
+    pnpm exec typedoc --out docs/reference/api src/lib.ts
 
 # Run the full CI sequence locally (mirror of .github/workflows/ci.yml).
 # Same order CI runs: install deps, the direct quality gates, build, then the
 # whole hook suite on all files (the source's dual-enforcement parity).
 [group('workflow')]
 @ci: install format-check lint typecheck test build
-    npx lefthook run pre-commit --all-files
+    pnpm exec lefthook run pre-commit --all-files
 
 # Install git hooks (lefthook) and wire the commit-message template
 [group('setup'), group('pre-commit')]
 @setup-hooks:
-    npx lefthook install
+    pnpm exec lefthook install
     git config commit.template .gitmessage
     echo "Hooks installed; commit template wired (.gitmessage)"
 
@@ -216,7 +217,7 @@ alias pc := pre-commit-run
 # `@contributors:` orphan recipe is not carried).
 [group('utilities')]
 @contributors:
-    npx contributors-please render
+    pnpm dlx contributors-please render
 
 # Show release version surface: package.json, manifest, latest tag + drift
 # (D-021(1,2)). Read-only; never touches the registry.
@@ -242,17 +243,21 @@ release-status:
 # Local packaging validation (D-012(7)): build, publint, attw, npm pack
 # --dry-run file-list assertion, then pack + install into a /private/tmp
 # scratch project and smoke-test the bin + ESM lib import. Registry-free:
-# --dry-run and local install never contact npmjs.com.
+# --dry-run and local install never contact npmjs.com. Build/publint/attw
+# run under pnpm; the pack + scratch-install steps deliberately use the npm
+# CLI (bundled with Node) — `pnpm pack --json` emits a single object (not the
+# array shape parsed) and runs prepare, and npm install of the tarball mirrors
+# how a published-to-npm consumer actually installs the package (D-035).
 [group('releases'), group('build')]
 pack-check:
     #!/usr/bin/env sh
     set -eu
     echo "{{CYAN}}[1/6] build{{NC}}"
-    npm run build
+    pnpm run build
     echo "{{CYAN}}[2/6] publint{{NC}}"
-    npx publint
+    pnpm exec publint
     echo "{{CYAN}}[3/6] attw (--profile esm-only: ESM-only package is intentional){{NC}}"
-    npx @arethetypeswrong/cli --pack . --profile esm-only
+    pnpm exec attw --pack . --profile esm-only
     echo "{{CYAN}}[4/6] npm pack --dry-run file-list assertion{{NC}}"
     npm pack --dry-run --json --ignore-scripts > /tmp/ts-pack-dryrun.json
     node -e '
@@ -321,6 +326,7 @@ debug-info:
     echo ""
     echo "### Development Tools"
     if command -v node >/dev/null 2>&1; then echo "node: $(node --version)"; else echo "node: Not Found"; fi
+    if command -v pnpm >/dev/null 2>&1; then echo "pnpm: $(pnpm --version)"; else echo "pnpm: Not Found"; fi
     if command -v npm >/dev/null 2>&1; then echo "npm: $(npm --version)"; else echo "npm: Not Found"; fi
     if command -v git >/dev/null 2>&1; then echo "git: $(git --version)"; else echo "git: Not Found"; fi
     if command -v just >/dev/null 2>&1; then echo "just: $(just --version)"; else echo "just: Not Found"; fi
@@ -330,7 +336,7 @@ debug-info:
     fi
     echo ""
     echo "### Installed Project Packages"
-    if command -v npm >/dev/null 2>&1; then npm ls --depth=0 2>/dev/null || echo "(no node_modules; run 'just install')"; else echo "npm not found, cannot list packages"; fi
+    if command -v pnpm >/dev/null 2>&1; then pnpm list --depth 0 2>/dev/null || echo "(no node_modules; run 'just install')"; else echo "pnpm not found, cannot list packages"; fi
     echo ""
     echo "### Declared Dependencies (package.json)"
     if command -v node >/dev/null 2>&1; then
