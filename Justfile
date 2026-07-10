@@ -185,6 +185,15 @@ alias pc := pre-commit-run
 @version:
     node dist/cli.js --version
 
+# Render CONTRIBUTORS.md from the committed contributor-state ledger
+# (.contributors.jsonl) via the org's contributors-please CLI (D-024(9)).
+# Single implementation shared with .github/workflows/update-contributors.yml —
+# fixes the Python source's divergent recipe-vs-script defect (its malformed
+# `@contributors:` orphan recipe is not carried).
+[group('utilities')]
+@contributors:
+    npx contributors-please render
+
 # Show release version surface: package.json, manifest, latest tag + drift
 # (D-021(1,2)). Read-only; never touches the registry.
 [group('releases')]

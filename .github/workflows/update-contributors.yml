@@ -1,0 +1,83 @@
+# Copyright (c) 2025, Steve Morin
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+# the Software, and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# Automated contributors-list bot PR (D-022(11), D-024(9)).
+#
+# Ports the Python source's bot-PR *pattern* (idempotent branch sync, bot
+# commit identity, PR-not-push, explicit permissions) but replaces both the
+# Python source's contributor-list-generation script AND the separate
+# peter-evans/create-pull-request step with the org's own
+# smorinlabs/contributors-please-action, which performs generation, the
+# branch-sync/commit, and the PR creation/update as a single atomic step in
+# `mode: pull-request` (verified against its README 2026-07: this mode is
+# generative/commit-oriented, not merely a PR-comment reviewer, so it is a
+# faithful single-implementation replacement for the source's two-step
+# script+create-pull-request pipeline).
+#
+# Trigger set is schedule + workflow_dispatch (per plan), which intentionally
+# diverges from the source workflow's literal push/pull_request/workflow_dispatch
+# triggers: neither the source file nor contributors-please-action's own
+# documented usage example runs on a schedule, but a weekly cadence avoids the
+# run-on-every-push noise a push trigger would add on top of the already-heavy
+# CI/CodeQL/dependency-review triggers, while workflow_dispatch keeps the
+# on-demand escape hatch the source relied on.
+#
+# Credentials: `pat` uses the workflow's own GITHUB_TOKEN so the template
+# works out of the box with zero extra setup. Adopters who install the
+# contributors-please GitHub App can additionally set the
+# CONTRIBUTORS_PLEASE_APP_ID / CONTRIBUTORS_PLEASE_PRIVATE_KEY repository
+# secrets — the action prefers App credentials over the PAT fallback whenever
+# both are present, with no workflow change required.
+name: Update Contributors
+
+on:
+  schedule:
+    - cron: '17 6 * * 1' # weekly, Monday 06:17 UTC
+  workflow_dispatch:
+
+# Deny-all baseline (D-022(10)); the job re-grants the least-privilege set
+# contributors-please needs to commit, open, and label a PR.
+permissions: {}
+
+jobs:
+  update-contributors:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Third-party action → full-SHA pin + version comment (D-022(9)); kept
+      # fresh by the Dependabot github-actions ecosystem.
+      - name: Update contributors list
+        uses: smorinlabs/contributors-please-action@3c6dbff9ef21190aa1f63b3c400ed4f0ab404ac1 # v1.3.9
+        with:
+          app-id: ${{ secrets.CONTRIBUTORS_PLEASE_APP_ID }}
+          private-key: ${{ secrets.CONTRIBUTORS_PLEASE_PRIVATE_KEY }}
+          pat: ${{ secrets.GITHUB_TOKEN }}
+          mode: pull-request
+          output-file: CONTRIBUTORS.md
+          state-file: .contributors.jsonl
+          config-file: .contributors.yml
+          bootstrap: 'true'

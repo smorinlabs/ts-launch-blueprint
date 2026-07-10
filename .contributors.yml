@@ -1,0 +1,24 @@
+# contributors-please configuration (D-024(9)).
+#
+# Drives both the `just contributors` recipe and the
+# .github/workflows/update-contributors.yml bot-PR workflow — a single
+# implementation, fixing the source Python repo's divergent script-vs-recipe
+# defect (TS_PORT_INDEX.md "Contributors automation" entry).
+classifier: path
+output_file: CONTRIBUTORS.md
+state_file: .contributors.jsonl
+in_place: true
+in_place_marker_start: '<!-- contributors-please:start -->'
+in_place_marker_end: '<!-- contributors-please:end -->'
+entry_template: '- [{{name}}]({{profile}}) - {{title}} ({{commits}} commits)'
+
+classification:
+  categories:
+    - id: docs
+      label: Documentation Contributor
+      paths:
+        - 'docs/**'
+        - '*.md'
+  default:
+    id: code
+    label: Code Contributor
