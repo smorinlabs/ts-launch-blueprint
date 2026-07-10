@@ -185,6 +185,71 @@ alias pc := pre-commit-run
 @version:
     node dist/cli.js --version
 
+# Show release version surface: package.json, manifest, latest tag + drift
+# (D-021(1,2)). Read-only; never touches the registry.
+[group('releases')]
+release-status:
+    #!/usr/bin/env sh
+    set -eu
+    PKG=$(node -p "require('./package.json').version")
+    MAN=$(node -p "require('./.release-please-manifest.json')['.']")
+    TAG=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+    [ -n "$TAG" ] || TAG="(no v* tag yet)"
+    printf "package.json : %s\n" "$PKG"
+    printf "manifest     : %s\n" "$MAN"
+    printf "latest tag   : %s\n" "$TAG"
+    if [ "$PKG" != "$MAN" ]; then
+        printf "{{YELLOW}}drift: package.json (%s) != manifest (%s){{NC}}\n" "$PKG" "$MAN"
+    elif [ "$TAG" != "v$PKG" ] && [ "$TAG" != "(no v* tag yet)" ]; then
+        printf "{{YELLOW}}drift: latest tag (%s) != v%s — unreleased commits or pending Release PR{{NC}}\n" "$TAG" "$PKG"
+    else
+        printf "{{CHECK}} version surface consistent\n"
+    fi
+
+# Local packaging validation (D-012(7)): build, publint, attw, npm pack
+# --dry-run file-list assertion, then pack + install into a /private/tmp
+# scratch project and smoke-test the bin + ESM lib import. Registry-free:
+# --dry-run and local install never contact npmjs.com.
+[group('releases'), group('build')]
+pack-check:
+    #!/usr/bin/env sh
+    set -eu
+    echo "{{CYAN}}[1/6] build{{NC}}"
+    npm run build
+    echo "{{CYAN}}[2/6] publint{{NC}}"
+    npx publint
+    echo "{{CYAN}}[3/6] attw (--profile esm-only: ESM-only package is intentional){{NC}}"
+    npx @arethetypeswrong/cli --pack . --profile esm-only
+    echo "{{CYAN}}[4/6] npm pack --dry-run file-list assertion{{NC}}"
+    npm pack --dry-run --json --ignore-scripts > /tmp/ts-pack-dryrun.json
+    node -e '
+      const pack = require("/tmp/ts-pack-dryrun.json");
+      const files = pack[0].files.map((f) => f.path);
+      const rootWhitelist = new Set(["package.json", "README.md", "LICENSE", "CHANGELOG.md"]);
+      const bad = files.filter((p) => !p.startsWith("dist/") && !rootWhitelist.has(p));
+      if (bad.length > 0) { console.error("Unexpected packed files:", bad); process.exit(1); }
+      for (const req of ["package.json", "dist/cli.js", "dist/lib.js", "dist/lib.d.ts"]) {
+        if (!files.includes(req)) { console.error("Missing required packed file:", req); process.exit(1); }
+      }
+      console.log("  OK:", files.length, "files (dist/** + root whitelist).");
+    '
+    VERSION=$(node -p "require('./package.json').version")
+    SCRATCH=$(mktemp -d /private/tmp/ts-pack-check.XXXXXX)
+    trap 'rm -rf "$SCRATCH"' EXIT
+    echo "{{CYAN}}[5/6] pack + install tarball into $SCRATCH{{NC}}"
+    TARBALL=$(npm pack --ignore-scripts --pack-destination "$SCRATCH" --json | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));process.stdout.write(d[0].filename)")
+    printf '{"name":"pack-check-scratch","private":true,"type":"module"}\n' > "$SCRATCH/package.json"
+    ( cd "$SCRATCH" && npm install --no-save --no-package-lock "$SCRATCH/$TARBALL" >/dev/null 2>&1 )
+    echo "{{CYAN}}[6/6] smoke: installed bin --version + ESM lib import{{NC}}"
+    BIN_VERSION=$("$SCRATCH/node_modules/.bin/{{command_name}}" --version)
+    EXPECTED="{{command_name}} $VERSION"
+    if [ "$BIN_VERSION" != "$EXPECTED" ]; then
+        printf "{{RED}}bin --version (%s) != expected (%s){{NC}}\n" "$BIN_VERSION" "$EXPECTED"; exit 1
+    fi
+    echo "  bin {{command_name}} --version = $BIN_VERSION"
+    ( cd "$SCRATCH" && node -e 'import("{{ts_package_name}}").then((m) => { if (typeof m.VERSION !== "string") { console.error("ESM import: VERSION missing"); process.exit(1); } console.log("  ESM lib import OK, VERSION=" + m.VERSION); }).catch((e) => { console.error(e); process.exit(1); })' )
+    printf "{{CHECK}} pack-check passed\n"
+
 # Clean up build artifacts, caches, and installed dependencies
 [group('clean')]
 @clean:

@@ -8,8 +8,10 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
+import releasePleaseManifest from '../.release-please-manifest.json' with { type: 'json' };
 import commitlintConfig from '../commitlint.config.mjs';
 import packageJson from '../package.json' with { type: 'json' };
+import releasePleaseConfig from '../release-please-config.json' with { type: 'json' };
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
@@ -239,5 +241,72 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
     const ecosystems = dependabot.updates.map((u) => u['package-ecosystem']);
     expect(ecosystems).toContain('github-actions');
     expect(ecosystems).toContain('npm');
+  });
+});
+
+describe('release, versioning & packaging (S5: D-021, D-012)', () => {
+  const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
+  const readWorkflow = (file: string): string => readFileSync(join(WORKFLOW_DIR, file), 'utf8');
+
+  it('release-please-config changelog-sections types are all commitlint types (D-021(3))', () => {
+    const commitlintTypes = new Set<string>(commitlintConfig.rules['type-enum'][2]);
+    const sections = releasePleaseConfig.packages['.']['changelog-sections'] as {
+      type: string;
+    }[];
+    expect(Array.isArray(sections)).toBe(true);
+    expect(sections.length).toBeGreaterThan(0);
+    const sectionTypes = sections.map((s) => s.type);
+    for (const type of sectionTypes) {
+      expect(commitlintTypes.has(type)).toBe(true);
+    }
+    // Ports cog.toml's taxonomy: feat/fix/perf/docs/test/refactor visible.
+    for (const visible of ['feat', 'fix', 'perf', 'docs', 'test', 'refactor']) {
+      expect(sectionTypes).toContain(visible);
+    }
+  });
+
+  it('release-please uses pre-1.0 bump semantics (D-021(1))', () => {
+    expect(releasePleaseConfig['bump-minor-pre-major']).toBe(true);
+    expect(releasePleaseConfig['bump-patch-for-minor-pre-major']).toBe(true);
+    expect(releasePleaseConfig['release-type']).toBe('node');
+    expect(releasePleaseConfig['include-v-in-tag']).toBe(true);
+  });
+
+  it('manifest version equals package.json version (D-021(1,2))', () => {
+    expect(releasePleaseManifest['.']).toBe(packageJson.version);
+  });
+
+  it('publish.yml gates publish behind a verify job with id-token + npm env (D-012(5))', () => {
+    const publish = parse(readWorkflow('publish.yml')) as {
+      jobs: Record<
+        string,
+        { needs?: string | string[]; environment?: string; permissions?: Record<string, string> }
+      >;
+    };
+    const verifyJob = publish.jobs.verify;
+    const publishJob = publish.jobs.publish;
+    expect(verifyJob).toBeDefined();
+    expect(publishJob).toBeDefined();
+
+    const needs = publishJob!.needs;
+    const needsList = Array.isArray(needs) ? needs : [needs];
+    expect(needsList).toContain('verify');
+
+    expect(publishJob!.environment).toBe('npm');
+    expect(publishJob!.permissions?.['id-token']).toBe('write');
+  });
+
+  it('publish.yml never references NPM_TOKEN (Trusted Publishing only, D-021(5))', () => {
+    expect(readWorkflow('publish.yml')).not.toContain('NPM_TOKEN');
+  });
+
+  it('release-please.yml SHA-pins release-please-action with a version comment (D-022(9))', () => {
+    const line = readWorkflow('release-please.yml')
+      .split('\n')
+      .find(
+        (l) => l.includes('googleapis/release-please-action@') && !l.trimStart().startsWith('#')
+      );
+    expect(line).toBeDefined();
+    expect(line).toMatch(/googleapis\/release-please-action@[0-9a-f]{40}\s*#\s*v\d/);
   });
 });
