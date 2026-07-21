@@ -187,5 +187,17 @@ jobs:
       # OIDC exchange above. Provenance attestations are generated automatically
       # for public repos under Trusted Publishing. This step is inert until a
       # trusted publisher for this package is configured on npmjs.com.
+      # Guard ported from the smorin line: npm publish can auto-correct
+      # package.json and silently drop fields (v0.3.0 there shipped without
+      # its bin entry). Dry-run first; fail hard on any auto-removal.
+      - name: Fail if npm would strip a package.json field
+        run: |
+          set -euo pipefail
+          npm publish --dry-run 2>&1 | tee /tmp/npm-dry-run.log
+          if grep -q 'was invalid and removed' /tmp/npm-dry-run.log; then
+            echo "FAIL: npm would auto-remove a package.json field on publish" >&2
+            exit 1
+          fi
+
       - name: Publish to npm (Trusted Publishing / OIDC)
         run: npm publish

@@ -48,32 +48,29 @@ jobs:
       contents: write
       # Open/update the Release pull request.
       pull-requests: write
+    env:
+      # Surfaced so the app-token step's `if:` can test it (secrets are not
+      # readable in `if:` conditions directly).
+      RP_CLIENT_ID: ${{ secrets.RELEASE_PLEASE_CLIENT_ID }}
     steps:
-      # --- GitHub App token upgrade (recommended for production) -------------
-      # The active `token:` below uses the built-in GITHUB_TOKEN so this
-      # template ships runnable with zero secrets. GITHUB_TOKEN has one hard
-      # limit: pushes it makes (the release tag) CANNOT trigger other
-      # workflows, so merging a Release PR will NOT automatically fire
-      # publish.yml — you would push the tag manually or re-run publish. To
-      # make the tag auto-trigger publish (contributors-please's pattern,
-      # D-021(5)), mint a GitHub App token and pass it as `token:` instead:
-      #
-      #   - name: Mint GitHub App token
-      #     id: app-token
-      #     uses: actions/create-github-app-token@v3
-      #     with:
-      #       app-id: ${{ vars.RELEASE_PLEASE_APP_ID }}
-      #       private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
-      #
-      # then set `token: ${{ steps.app-token.outputs.token }}` on the step
-      # below and drop the GITHUB_TOKEN line.
-      # ----------------------------------------------------------------------
+      # App token (D-021(5)): tags pushed with GITHUB_TOKEN cannot trigger
+      # other workflows, so merging a Release PR would never fire publish.yml.
+      # Mint a short-lived App installation token instead; fallback is the
+      # RELEASE_PLEASE_APP_TOKEN fine-grained PAT. GITHUB_TOKEN is
+      # intentionally NOT a fallback — with neither configured, fail fast.
+      - name: Mint release-please app token
+        id: app-token
+        if: ${{ env.RP_CLIENT_ID != '' }}
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_PLEASE_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
 
       # Third-party action → full-SHA pin + version comment (D-022(9)); kept
       # fresh by the Dependabot github-actions ecosystem.
       - name: Run release-please
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token || secrets.RELEASE_PLEASE_APP_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json

@@ -73,7 +73,9 @@ jobs:
       - name: Update contributors list
         uses: smorinlabs/contributors-please-action@3c6dbff9ef21190aa1f63b3c400ed4f0ab404ac1 # v1.3.9
         with:
-          app-id: ${{ secrets.CONTRIBUTORS_PLEASE_APP_ID }}
+          # The input name is app-id but the value is the App's Client ID
+          # (the action accepts it; repo-secrets provisions *_CLIENT_ID).
+          app-id: ${{ secrets.CONTRIBUTORS_PLEASE_CLIENT_ID }}
           private-key: ${{ secrets.CONTRIBUTORS_PLEASE_PRIVATE_KEY }}
           pat: ${{ secrets.GITHUB_TOKEN }}
           mode: pull-request
