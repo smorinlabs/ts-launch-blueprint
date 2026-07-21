@@ -73,7 +73,10 @@ jobs:
       - name: Assert tag is an ancestor of main (D-021(5))
         run: |-
           set -euo pipefail
-          git fetch --no-tags origin main:refs/remotes/origin/main
+          # No re-fetch: the fetch-depth: 0 checkout above already provides
+          # refs/remotes/origin/main, and persist-credentials: false leaves
+          # git unauthenticated — on a private repo a fetch here dies with
+          # "could not read Username" (v0.1.2's publish failed exactly so).
           if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
             echo "::error::Tag ${GITHUB_REF_NAME} (${GITHUB_SHA}) is not reachable from main."
             exit 1
