@@ -1,6 +1,6 @@
 {
   "name": "ts-launch-blueprint",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "CLI tools for project search and selection - TypeScript port of py-launch-blueprint",
   "keywords": [
     "blueprint",
