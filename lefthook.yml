@@ -28,6 +28,7 @@ pre-commit:
         - 'docs/port/goal.md'
         - 'docs/port/typescript_port_process_prompt.md'
         - '.claude/settings.local.json'
+        - 'CHANGELOG.md'
       run: pnpm exec oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
     # Reject staged files larger than 500KB (pre-commit's
