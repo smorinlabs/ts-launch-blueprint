@@ -59,7 +59,7 @@ jobs:
           version: 10.34.3
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           # Node 24 bundles npm >= 11 (Trusted Publishing needs >= 11.5.1).
           node-version: '24.x'
@@ -163,7 +163,7 @@ jobs:
           version: 10.34.3
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           # Trusted Publishing (OIDC) requires npm CLI >= 11.5.1 and
           # Node >= 22.14.0 on a GitHub-hosted runner. Node 24 bundles a
