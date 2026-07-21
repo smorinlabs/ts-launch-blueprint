@@ -13,7 +13,6 @@ Commit history; new releases are prepended above the previous ones.
 
 ### Bug Fixes
 
-* drop unauthenticated fetch in ancestry check ([3d5bfd6](https://github.com/smorinlabs/ts-launch-blueprint/commit/3d5bfd6a63ec55a516951a594d15d0aa77f82ff5))
 * drop unauthenticated fetch in ancestry check ([2abedc1](https://github.com/smorinlabs/ts-launch-blueprint/commit/2abedc1ebe5e92a98146d9b6c0c92f38971ca4d6))
 
 ## [0.1.2](https://github.com/smorinlabs/ts-launch-blueprint/compare/v0.1.1...v0.1.2) (2026-07-21)
