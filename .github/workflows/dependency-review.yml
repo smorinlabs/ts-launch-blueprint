@@ -27,6 +27,8 @@
 #
 # Source repository: https://github.com/actions/dependency-review-action
 # Public documentation: https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review#dependency-review-enforcement
+# Dependency Review requires GitHub Code Security in private repositories; the
+# job activates automatically on the next PR after the repository becomes public.
 name: 'Dependency review'
 on:
   pull_request:
@@ -46,6 +48,7 @@ permissions:
 
 jobs:
   dependency-review:
+    if: ${{ github.event.repository.private == false }}
     runs-on: ubuntu-latest
     steps:
       - name: 'Checkout repository'

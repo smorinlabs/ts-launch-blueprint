@@ -166,6 +166,7 @@ describe('formatter gate is real (D-014)', () => {
 
 describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
   const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
+  const PUBLIC_REPOSITORY_CONDITION = '${{ github.event.repository.private == false }}';
   const workflowFiles = readdirSync(WORKFLOW_DIR).filter(
     (name) => name.endsWith('.yml') || name.endsWith('.yaml')
   );
@@ -183,6 +184,25 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
     const parsed = parse(readFileSync(join(WORKFLOW_DIR, file), 'utf8'));
     expect(parsed).toBeTypeOf('object');
     expect(parsed).not.toBeNull();
+  });
+
+  it.each([
+    ['codeql.yml', 'analyze'],
+    ['dependency-review.yml', 'dependency-review'],
+  ])('%s skips unavailable GitHub security products in private repositories', (file, job) => {
+    const workflow = parse(readFileSync(join(WORKFLOW_DIR, file), 'utf8')) as {
+      jobs: Record<string, { if?: string }>;
+    };
+
+    expect(workflow.jobs[job]?.if).toBe(PUBLIC_REPOSITORY_CONDITION);
+  });
+
+  it('codeql.yml runs when a private repository becomes public', () => {
+    const workflow = parse(readFileSync(join(WORKFLOW_DIR, 'codeql.yml'), 'utf8')) as {
+      on: Record<string, unknown>;
+    };
+
+    expect(workflow.on).toHaveProperty('public');
   });
 
   it.each(workflowFiles)(
