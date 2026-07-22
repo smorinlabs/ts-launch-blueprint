@@ -200,9 +200,11 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
       jobs: Record<string, { if?: string; needs?: string; steps?: Array<{ run?: string }> }>;
     };
 
-    expect(workflow.jobs['repository-visibility']?.steps?.[0]?.run).toContain(
-      'gh api "repos/${REPOSITORY}"'
-    );
+    const visibilityStep = workflow.jobs['repository-visibility']?.steps?.[0] as
+      | { uses?: string; with?: { script?: string } }
+      | undefined;
+    expect(visibilityStep?.uses).toBe('actions/github-script@v9');
+    expect(visibilityStep?.with?.script).toContain('repository.visibility === "public"');
     expect(workflow.jobs.analyze?.needs).toBe('repository-visibility');
     expect(workflow.jobs.analyze?.if).toBe(CODEQL_PUBLIC_CONDITION);
   });
