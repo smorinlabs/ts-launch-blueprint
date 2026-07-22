@@ -166,7 +166,7 @@ describe('formatter gate is real (D-014)', () => {
 
 describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
   const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
-  const PULL_REQUEST_PUBLIC_CONDITION = '${{ github.event.repository.private == false }}';
+  const PULL_REQUEST_PUBLIC_CONDITION = "${{ github.event.repository.visibility == 'public' }}";
   const CODEQL_PUBLIC_CONDITION = "${{ needs.repository-visibility.outputs.is-public == 'true' }}";
   const workflowFiles = readdirSync(WORKFLOW_DIR).filter(
     (name) => name.endsWith('.yml') || name.endsWith('.yaml')
