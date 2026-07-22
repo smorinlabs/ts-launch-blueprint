@@ -197,12 +197,17 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
 
   it('codeql.yml uses trigger-independent repository visibility', () => {
     const workflow = parse(readFileSync(join(WORKFLOW_DIR, 'codeql.yml'), 'utf8')) as {
-      jobs: Record<string, { if?: string; needs?: string; steps?: Array<{ run?: string }> }>;
+      jobs: Record<
+        string,
+        {
+          if?: string;
+          needs?: string;
+          steps?: Array<{ run?: string; uses?: string; with?: { script?: string } }>;
+        }
+      >;
     };
 
-    const visibilityStep = workflow.jobs['repository-visibility']?.steps?.[0] as
-      | { uses?: string; with?: { script?: string } }
-      | undefined;
+    const visibilityStep = workflow.jobs['repository-visibility']?.steps?.[0];
     expect(visibilityStep?.uses).toBe('actions/github-script@v9');
     expect(visibilityStep?.with?.script).toContain('repository.visibility === "public"');
     expect(workflow.jobs.analyze?.needs).toBe('repository-visibility');
