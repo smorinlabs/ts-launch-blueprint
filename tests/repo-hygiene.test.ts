@@ -166,7 +166,8 @@ describe('formatter gate is real (D-014)', () => {
 
 describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
   const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
-  const PUBLIC_REPOSITORY_CONDITION = '${{ github.event.repository.private == false }}';
+  const PULL_REQUEST_PUBLIC_CONDITION = '${{ github.event.repository.private == false }}';
+  const CODEQL_PUBLIC_CONDITION = "${{ needs.repository-visibility.outputs.is-public == 'true' }}";
   const workflowFiles = readdirSync(WORKFLOW_DIR).filter(
     (name) => name.endsWith('.yml') || name.endsWith('.yaml')
   );
@@ -186,15 +187,24 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
     expect(parsed).not.toBeNull();
   });
 
-  it.each([
-    ['codeql.yml', 'analyze'],
-    ['dependency-review.yml', 'dependency-review'],
-  ])('%s skips unavailable GitHub security products in private repositories', (file, job) => {
-    const workflow = parse(readFileSync(join(WORKFLOW_DIR, file), 'utf8')) as {
+  it('dependency-review.yml skips unavailable products in private repositories', () => {
+    const workflow = parse(readFileSync(join(WORKFLOW_DIR, 'dependency-review.yml'), 'utf8')) as {
       jobs: Record<string, { if?: string }>;
     };
 
-    expect(workflow.jobs[job]?.if).toBe(PUBLIC_REPOSITORY_CONDITION);
+    expect(workflow.jobs['dependency-review']?.if).toBe(PULL_REQUEST_PUBLIC_CONDITION);
+  });
+
+  it('codeql.yml uses trigger-independent repository visibility', () => {
+    const workflow = parse(readFileSync(join(WORKFLOW_DIR, 'codeql.yml'), 'utf8')) as {
+      jobs: Record<string, { if?: string; needs?: string; steps?: Array<{ run?: string }> }>;
+    };
+
+    expect(workflow.jobs['repository-visibility']?.steps?.[0]?.run).toContain(
+      'gh api "repos/${REPOSITORY}"'
+    );
+    expect(workflow.jobs.analyze?.needs).toBe('repository-visibility');
+    expect(workflow.jobs.analyze?.if).toBe(CODEQL_PUBLIC_CONDITION);
   });
 
   it('codeql.yml runs when a private repository becomes public', () => {
