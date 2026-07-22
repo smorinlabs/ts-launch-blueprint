@@ -39,7 +39,9 @@ install-pnpm`, not bundled with Node — it self-manages to the version
 - **tsdown**: bundles `src/cli.ts` + `src/lib.ts` to `dist/` (ESM-only) with
   declarations and sourcemaps
 - Version management: `package.json` is the single version source, bumped only
-  by release-please Release PRs; `src/version.ts` inlines it at build time
+  by release-please Release PRs; `src/version.ts` inlines it at build time.
+  `pnpm-lock.yaml` does not duplicate the root project version, so release PRs
+  need no follow-up lockfile mutation and must remain atomic.
 
 ## Development Workflow
 

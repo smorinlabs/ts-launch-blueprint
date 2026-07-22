@@ -371,6 +371,18 @@ describe('release, versioning & packaging (S5: D-021, D-012)', () => {
     expect(releasePleaseManifest['.']).toBe(packageJson.version);
   });
 
+  it('release PR version surfaces are atomic and need no lockfile repair', () => {
+    const pnpmLock = parse(readFileSync(join(REPO_ROOT, 'pnpm-lock.yaml'), 'utf8')) as {
+      importers: Record<string, Record<string, unknown>>;
+    };
+    expect(pnpmLock.importers['.']).not.toHaveProperty('version');
+
+    const releaseWorkflow = readWorkflow('release-please.yml');
+    expect(releaseWorkflow).not.toMatch(/sync-(?:pnpm|npm|bun)-lock/);
+    expect(releaseWorkflow).not.toMatch(/\bgit push\b/);
+    expect(releaseWorkflow).not.toContain('pnpm install --lockfile-only');
+  });
+
   it('publish.yml gates publish behind a verify job with id-token + npm env (D-012(5))', () => {
     const publish = parse(readWorkflow('publish.yml')) as {
       jobs: Record<
