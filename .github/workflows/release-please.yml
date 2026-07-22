@@ -23,6 +23,11 @@
 # tags `vX.Y.Z`, which is what triggers publish.yml. Versions are therefore
 # NEVER hand-edited — the bot PR owns them (the hatch-vcs "never hand-edit"
 # intent, ported).
+#
+# pnpm-lock.yaml does not encode the root project's own version. The generated
+# release commit is therefore complete as-is: do not add a post-creation lock
+# synchronization commit, which would expose an inconsistent intermediate PR
+# revision to CI and automated reviewers.
 
 name: Release Please
 
