@@ -373,9 +373,11 @@ describe('release, versioning & packaging (S5: D-021, D-012)', () => {
 
   it('release PR version surfaces are atomic and need no lockfile repair', () => {
     const pnpmLock = parse(readFileSync(join(REPO_ROOT, 'pnpm-lock.yaml'), 'utf8')) as {
-      importers: Record<string, Record<string, unknown>>;
+      importers?: Record<string, Record<string, unknown>>;
     };
-    expect(pnpmLock.importers['.']).not.toHaveProperty('version');
+    expect(pnpmLock.importers).toBeDefined();
+    expect(pnpmLock.importers).toHaveProperty('.');
+    expect(pnpmLock.importers?.['.']).not.toHaveProperty('version');
 
     const releaseWorkflow = readWorkflow('release-please.yml');
     expect(releaseWorkflow).not.toMatch(/sync-(?:pnpm|npm|bun)-lock/);
