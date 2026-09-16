@@ -80,7 +80,7 @@ check-deps:
     if ! command -v git >/dev/null 2>&1; then printf "{{YELLOW}}git is not installed{{NC}}\n Install: {{BLUE}}xcode-select --install{{NC}} (macOS) or {{BLUE}}sudo apt install git{{NC}} (Debian/Ubuntu)\n"; exit 1; fi
     echo "All required tools are installed"
     # Optional tools (advisory only; not required to build/test the project):
-    if ! command -v actionlint >/dev/null 2>&1; then printf "{{YELLOW}}(optional) actionlint not installed{{NC}} — lints .github/workflows/; install: {{BLUE}}brew install actionlint{{NC}} or {{BLUE}}go install github.com/rhysd/actionlint/cmd/actionlint@latest{{NC}}\n"; fi
+    if ! command -v actionlint >/dev/null 2>&1 || ! command -v shellcheck >/dev/null 2>&1; then printf "Shell lint tools missing: run just install-shell-tools\n" >&2; exit 1; fi
     if ! command -v bun >/dev/null 2>&1; then printf "{{YELLOW}}(optional) bun not installed{{NC}} — advisory dev/test lane only (D-036), runs 'just test-bun'; install: {{BLUE}}curl -fsSL https://bun.sh/install | bash{{NC}} or {{BLUE}}brew install oven-sh/bun/bun{{NC}}. Do NOT run 'bun install' (keeps the lockfile pnpm-only)\n"; fi
 
 alias c := check-deps
@@ -173,16 +173,16 @@ test-bun:
 @coverage:
     pnpm run test:coverage
 
-# Run all quality gates (format-check, lint, typecheck, test)
+# Run all quality gates, including shell scripts and workflow commands.
 [group('test'), group('dev'), group('quick start')]
-@all: format-check lint typecheck test
+@all: format-check lint check-shell check-workflows typecheck test
 
 alias a := all
 
 # Run the full hook-suite gates on ALL files (CI mirror of the
 # pre-commit/commit-time discipline; source pre-commit-run intent)
 [group('pre-commit')]
-@pre-commit-run: format-check lint typecheck test
+@pre-commit-run: format-check lint check-shell check-workflows typecheck test
 
 alias pc := pre-commit-run
 
@@ -369,3 +369,20 @@ debug-info:
     else
         echo "node not found, cannot read package.json"
     fi
+
+# Install pinned analyzers for standalone scripts and workflow shell commands.
+[group('install')]
+install-shell-tools:
+    bash scripts/install-shellcheck.sh
+    bash scripts/install-actionlint.sh
+
+# Check all tracked shell scripts.
+[group('dev'), group('pre-commit')]
+check-shell:
+    bash scripts/check-shell.sh
+
+# Validate workflows and their Bash/sh commands with ShellCheck enabled.
+[group('dev'), group('pre-commit')]
+check-workflows:
+    command -v shellcheck >/dev/null
+    actionlint

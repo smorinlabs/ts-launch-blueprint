@@ -107,3 +107,11 @@ revert` (`commitlint.config.mjs`, mirrored in `.gitmessage`)
 - Source in `/src` (`cli.ts` bin entry, `lib.ts` public API, `version.ts`)
 - Tests in `/tests` (`*.test.ts`)
 - Build output in `/dist` (gitignored)
+
+## Shell checks
+
+Run `just install-shell-tools` once and put `~/.local/bin` on PATH. It installs
+checksum-verified ShellCheck 0.11.0 and actionlint 1.7.12. `just all` includes
+`just check-shell` for tracked `.sh`/`.bash` files and `just check-workflows`
+for embedded workflow shell commands. Staged checks run through lefthook;
+CI explicitly provisions both analyzers and repeats the checks.
