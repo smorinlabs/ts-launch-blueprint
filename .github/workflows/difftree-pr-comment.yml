@@ -60,7 +60,7 @@ jobs:
       # policy requires reproducible refs — this is the one sanctioned
       # deviation from byte-identity with this template; the fleet drift
       # check ignores it.
-      - uses: smorinlabs/difftree-action@v0
+      - uses: smorinlabs/difftree-action@d898da365a982b08bae4bde7a9324615f51539ce # v0.7.2
         # All inputs are optional. Uncomment to customize:
         # with:
         #   level: 3                  # max tree depth (difftree --level N)

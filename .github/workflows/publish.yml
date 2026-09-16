@@ -98,6 +98,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install shell lint tools
+        run: |
+          just install-shell-tools
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Quality gates (just all)
         run: just all
 

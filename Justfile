@@ -78,16 +78,19 @@ check-deps:
     if ! command -v pnpm >/dev/null 2>&1; then printf "{{YELLOW}}pnpm is not installed{{NC}} (package manager, D-035)\n RUN {{BLUE}}make install-pnpm{{NC}}\n"; exit 1; fi
     if ! command -v just >/dev/null 2>&1; then printf "{{YELLOW}}just is not installed{{NC}}\n RUN {{BLUE}}make install-just{{NC}}\n"; exit 1; fi
     if ! command -v git >/dev/null 2>&1; then printf "{{YELLOW}}git is not installed{{NC}}\n Install: {{BLUE}}xcode-select --install{{NC}} (macOS) or {{BLUE}}sudo apt install git{{NC}} (Debian/Ubuntu)\n"; exit 1; fi
+    if ! command -v actionlint >/dev/null 2>&1 || ! command -v shellcheck >/dev/null 2>&1; then printf "Shell lint tools missing: run just install-shell-tools\n" >&2; exit 1; fi
     echo "All required tools are installed"
     # Optional tools (advisory only; not required to build/test the project):
-    if ! command -v actionlint >/dev/null 2>&1 || ! command -v shellcheck >/dev/null 2>&1; then printf "Shell lint tools missing: run just install-shell-tools\n" >&2; exit 1; fi
     if ! command -v bun >/dev/null 2>&1; then printf "{{YELLOW}}(optional) bun not installed{{NC}} — advisory dev/test lane only (D-036), runs 'just test-bun'; install: {{BLUE}}curl -fsSL https://bun.sh/install | bash{{NC}} or {{BLUE}}brew install oven-sh/bun/bun{{NC}}. Do NOT run 'bun install' (keeps the lockfile pnpm-only)\n"; fi
 
 alias c := check-deps
 
 # Install project dependencies (generates/updates pnpm-lock.yaml)
 [group('install'), group('quick start')]
-@install: check-deps
+@install: install-shell-tools
+    #!/usr/bin/env sh
+    export PATH="$HOME/.local/bin:$PATH"
+    just check-deps
     pnpm install
 
 # Build distributable package (dist/) with tsdown
