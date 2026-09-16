@@ -81,6 +81,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install shell lint tools
+        run: |
+          just install-shell-tools
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Check shell scripts and workflows
+        run: just check-shell check-workflows
+
       # --- Direct quality gates as named just recipes (source per-check steps) ---
       - name: Check formatting
         run: just format-check

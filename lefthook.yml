@@ -9,6 +9,12 @@
 pre-commit:
   parallel: true
   jobs:
+    - name: shellcheck
+      glob: '*.{sh,bash}'
+      run: bash scripts/check-shell.sh {staged_files}
+    - name: actionlint
+      glob: '.github/workflows/*.{yml,yaml}'
+      run: command -v shellcheck >/dev/null && actionlint {staged_files}
     # Formatter on staged files; auto-fixes are re-staged (stage_fixed).
     # Source pre-commit hygiene hooks, mapped (D-020(6)):
     #   delegated to oxfmt (D-014(7)): end-of-file-fixer, trailing-whitespace,
