@@ -35,7 +35,7 @@ just typecheck
 # Run tests
 just test
 
-# Run all quality gates (format-check, lint, typecheck, test)
+# Run all quality gates (format-check, lint, shell/workflow checks, typecheck, test)
 just all
 
 # Check installed package version

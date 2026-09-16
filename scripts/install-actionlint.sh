@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install the pinned workflow analyzer for local checks and CI.
 # Pins an actionlint release; verifies SHA256 against upstream checksums.txt;
-# installs to ~/.local/bin. Idempotent. Mirrors scripts/install-gitleaks.sh.
+# installs to ~/.local/bin. Idempotent.
 #
 # Review pin every 6 months (round-7 cadence for tool installers).
 # CI uses this same installer.
@@ -55,7 +55,11 @@ main() {
     curl -sSfL "${url}/${checksums}" -o "${tmpdir}/${checksums}"
 
     echo "INFO: verifying SHA256"
-    (cd "${tmpdir}" && grep " ${tar}\$" "${checksums}" | shasum -a 256 -c -)
+    if command -v sha256sum >/dev/null 2>&1; then
+        (cd "${tmpdir}" && grep " ${tar}\$" "${checksums}" | sha256sum -c -)
+    else
+        (cd "${tmpdir}" && grep " ${tar}\$" "${checksums}" | shasum -a 256 -c -)
+    fi
 
     echo "INFO: installing to ${INSTALL_DIR}"
     mkdir -p "${INSTALL_DIR}"
