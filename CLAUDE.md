@@ -30,5 +30,6 @@ See AGENTS.md for the full project charter (canonical AI-context hub).
 
 - Node: >= 24 required (`.nvmrc`); package manager: pnpm 10 (D-035; `pnpm
 install`, `pnpm exec`, `pnpm-lock.yaml`)
-- IDE: VS Code with the oxc extension; editor TypeScript pinned to the
-  workspace version via `.vscode/settings.json`
+- IDE: VS Code with the oxc and TypeScript 7 extensions; on first open, accept
+  the TypeScript extension's workspace-version prompt so the native language
+  service uses the package registered by `.vscode/settings.json`

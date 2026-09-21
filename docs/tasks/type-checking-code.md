@@ -7,7 +7,7 @@ checker — see [Why just one checker?](#why-just-one-checker) below.
 
 ## Setting Up tsc
 
-TypeScript is already a pinned `devDependency`
+TypeScript 7 is already a pinned `devDependency`
 ([`package.json`](../../package.json)), so `pnpm install` is all the setup
 required. There is nothing to install globally.
 
@@ -19,7 +19,7 @@ required. There is nothing to install globally.
 
 2. **Configure**: the compiler options live in
    [`tsconfig.json`](../../tsconfig.json) at the repository root — the same
-   file the editor's TypeScript language service reads (see
+   file the native TypeScript 7 editor language service reads (see
    [Why just one checker?](#why-just-one-checker)).
 
 3. **Run tsc**:
@@ -76,20 +76,24 @@ The Python source ran two type checkers — mypy in CI, pyright in the
 editor — because they are different programs that can (and did) disagree.
 In TypeScript, the compiler and the editor's language service are **the
 same engine** reading the **same `tsconfig.json`**, so that dual-checker
-redundancy disappears by design (D-015(2)). The only real drift risk left
-is a version mismatch between the editor's bundled TypeScript and the
-project's pinned one; that is closed by committing a one-key
-[`.vscode/settings.json`](../../.vscode/settings.json):
+redundancy disappears by design (D-015(2)). The only real drift risk left is a
+version mismatch between the editor's bundled TypeScript and the project's
+pinned one. The committed
+[`.vscode/settings.json`](../../.vscode/settings.json) registers the workspace
+package:
 
 ```json
 {
-  "typescript.tsdk": "node_modules/typescript/lib"
+  "js/ts.experimental.useTsgo": true,
+  "js/ts.tsdk.path": "./node_modules/typescript"
 }
 ```
 
-This pins VS Code (and Cursor/Windsurf, which read the same file) to the
-workspace's TypeScript version instead of the editor's bundled copy
-(D-032).
+On first open, trust the workspace and accept the TypeScript 7 extension's
+**Allow** prompt. If you dismissed it, run **TypeScript: Select TypeScript
+Version...** and choose **Use Workspace Version**. This one-time approval pins
+VS Code to the workspace's TypeScript version instead of the extension's
+bundled copy (D-032).
 
 ## Best Practices for Type Checking
 

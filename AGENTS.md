@@ -72,8 +72,10 @@ install-pnpm`, not bundled with Node — it self-manages to the version
 - **Oxfmt**: formatter (exact-pinned beta) — 100 cols, single quotes, semis,
   es5 trailing commas, LF, `sortImports`; also formats JSON/YAML/Markdown
   (`.oxfmtrc.json`)
-- **tsc**: strict type checking (`tsc --noEmit`), strict flag union incl.
-  `isolatedDeclarations` — annotate all exports explicitly
+- **TypeScript 7**: native strict type checking (`tsc --noEmit`), strict flag
+  union incl. `isolatedDeclarations` — annotate all exports explicitly. VS Code
+  uses the recommended TypeScript 7 extension; on first open, accept its
+  workspace-version prompt so it uses the workspace package.
 - **lefthook**: git hooks — pre-commit (staged format with stage_fixed, staged
   lint, full typecheck), commit-msg (commitlint), opt-in pre-push tests
   (`lefthook.yml`)

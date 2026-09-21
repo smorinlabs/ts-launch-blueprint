@@ -1,5 +1,6 @@
 {
   "recommendations": [
+    "TypeScriptTeam.native-preview",
     "oxc.oxc-vscode",
     "tamasfe.even-better-toml",
     "redhat.vscode-yaml",
