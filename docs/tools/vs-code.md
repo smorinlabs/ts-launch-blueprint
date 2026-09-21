@@ -7,7 +7,8 @@ This guide covers the recommended Visual Studio Code (VS Code) extensions, debug
 `.vscode/extensions.json` recommends these 10 extensions:
 
 1. **TypeScript 7** (`TypeScriptTeam.native-preview`)
-   - Activates the native TypeScript 7 language service for the workspace package.
+   - Activates the native TypeScript 7 language service and registers the
+     workspace package, which requires one-time approval on first open.
 2. **oxc** (`oxc.oxc-vscode`)
    - Editor integration for Oxlint and Oxfmt — inline lint diagnostics and format-on-save for the project's actual lint/format toolchain.
 3. **Even Better TOML** (`tamasfe.even-better-toml`)
@@ -75,10 +76,16 @@ Open the Run and Debug view (`Ctrl+Shift+D` / `Cmd+Shift+D`), pick a configurati
 }
 ```
 
-These settings activate the native language service and point it at the
-**workspace's own** TypeScript package. This keeps editor diagnostics aligned
-with `tsc --noEmit` (`just typecheck`) in CI. VS Code 1.126 or newer is required
-by the extension. Personal editor preferences remain uncommitted.
+These settings activate the native language service and register the
+**workspace's own** TypeScript package. On first open, trust the workspace and
+accept the extension's **Allow** prompt. If you dismissed it, run
+**TypeScript: Select TypeScript Version...** and choose **Use Workspace
+Version**. That one-time workspace approval makes the extension restart with
+the registered package, keeping editor diagnostics aligned with `tsc --noEmit`
+(`just typecheck`) in CI. VS Code 1.126 or newer is required by the extension.
+The narrow `public-hoist-pattern` in [`.npmrc`](../../.npmrc) exposes the
+installed native platform package where the extension's cross-platform
+resolver expects it. Personal editor preferences remain uncommitted.
 
 ## Additional Resources
 

@@ -3,11 +3,11 @@
 This project uses a single type checker: `tsc`, the TypeScript compiler, run in `--noEmit` mode.
 
 - **tsc** is used in CI and in git hooks for strict type checking.
-- **The TypeScript 7 VS Code language service** uses the workspace package for real-time feedback during development.
+- **The TypeScript 7 VS Code language service** uses the workspace package for real-time feedback after you approve it on first open.
 
 ### About tsc
 
-[TypeScript](https://www.typescriptlang.org/)'s compiler, `tsc`, is a static type checker that reads type annotations in your source and flags code that doesn't adhere to them, catching errors before they reach runtime. The TypeScript 7 extension and CLI read the same [`tsconfig.json`](../../tsconfig.json) and workspace package. [`.vscode/settings.json`](../../.vscode/settings.json) activates the native service and points it at that package:
+[TypeScript](https://www.typescriptlang.org/)'s compiler, `tsc`, is a static type checker that reads type annotations in your source and flags code that doesn't adhere to them, catching errors before they reach runtime. The TypeScript 7 extension and CLI read the same [`tsconfig.json`](../../tsconfig.json) and workspace package. [`.vscode/settings.json`](../../.vscode/settings.json) activates the native service and registers that package:
 
 ```json
 {
@@ -15,6 +15,11 @@ This project uses a single type checker: `tsc`, the TypeScript compiler, run in 
   "js/ts.tsdk.path": "./node_modules/typescript"
 }
 ```
+
+On first open, trust the workspace and accept the extension's **Allow** prompt.
+If you dismissed it, run **TypeScript: Select TypeScript Version...** and choose
+**Use Workspace Version**. The extension stores this approval for the workspace
+and restarts its language server with the repository's installed compiler.
 
 This is a deliberate difference from the Python source project, which ran Mypy in CI/pre-commit and Pyright/Pylance in the editor as two distinct engines: in TypeScript, the compiler and the language service are one engine, so a dual-checker split would just duplicate work rather than add coverage. The gap that Pyright's editor-only diagnostics used to cover (unused symbols, unnecessary conditions) is covered by Oxlint instead — see [Oxlint & Oxfmt](oxlint.md).
 
@@ -220,6 +225,9 @@ function process(handler: Handler): void {
 This project uses the stable Go-native TypeScript 7 compiler. The command-line
 gate remains `tsc --noEmit`. VS Code 1.126 or newer needs the recommended
 `TypeScriptTeam.native-preview` extension plus the committed `js/ts.*`
-settings to activate the native language service for the workspace package.
+settings. On first open, trust the workspace and accept the extension's
+**Allow** prompt, or run **TypeScript: Select TypeScript Version...** and choose
+**Use Workspace Version**, to run the language service from the workspace
+package.
 
 See also: [Vitest](vitest.md) for the test runner, [Oxlint & Oxfmt](oxlint.md) for linting/formatting, and [`just typecheck`](justfiles.md).

@@ -5,9 +5,9 @@
   wired up before you write a line of code.
 - **Type Safety First**: a strict `tsc` configuration
   (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, and
-  more) plus a committed VS Code `typescript.tsdk` pin, so the editor's
-  language service and the CI type-check gate always agree on the same
-  compiler version.
+  more) plus a committed TypeScript 7 VS Code configuration. After its one-time
+  workspace-version approval, the editor's language service and the CI
+  type-check gate use the same compiler version.
 - **Modern Development Tools**:
   - Oxlint + Oxfmt for lightning-fast linting and formatting (one Rust-based
     toolchain covers TypeScript, JavaScript, JSON, YAML, and Markdown)
@@ -40,9 +40,9 @@
 ## Developer Experience
 
 - **VS Code Integration**: a curated set of recommended extensions (Oxc,
-  TOML, YAML, GitLens, spell-checker, GitHub PRs/Actions, Claude Code) plus
-  the minimal `typescript.tsdk` pin — no other opinionated editor settings
-  are imposed.
+  TypeScript 7, TOML, YAML, GitLens, spell-checker, GitHub PRs/Actions, Claude
+  Code) plus workspace settings that activate TypeScript 7 and register the
+  workspace compiler — no other opinionated editor settings are imposed.
 - **Command Surface**: a single [`Justfile`](../../Justfile) exposes every
   common task (`just build`, `just test`, `just lint`, `just format`,
   `just all`, `just docs-check`, `just pack-check`, and more) — run `just`

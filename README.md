@@ -20,7 +20,8 @@ type-checked, tested, and release-automated TypeScript project.
 - **Type Safety First**: a strict `tsc` configuration (`strict`,
   `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, and more) plus the
   TypeScript 7 VS Code extension configured for the workspace package, so the
-  editor and the CI type-check gate use the same compiler version.
+  editor and the CI type-check gate use the same compiler version after you
+  approve the workspace version on first open.
 - **Modern Toolchain**: Oxlint + Oxfmt (one Rust-based toolchain for
   linting and formatting TypeScript, JSON, YAML, and Markdown), lefthook
   git hooks with commitlint-checked commit messages, and Vitest 4 for
