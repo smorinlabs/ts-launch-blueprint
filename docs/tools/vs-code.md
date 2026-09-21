@@ -4,28 +4,30 @@ This guide covers the recommended Visual Studio Code (VS Code) extensions, debug
 
 ## Recommended Extensions
 
-`.vscode/extensions.json` recommends these 9 extensions:
+`.vscode/extensions.json` recommends these 10 extensions:
 
-1. **oxc** (`oxc.oxc-vscode`)
+1. **TypeScript 7** (`TypeScriptTeam.native-preview`)
+   - Activates the native TypeScript 7 language service for the workspace package.
+2. **oxc** (`oxc.oxc-vscode`)
    - Editor integration for Oxlint and Oxfmt — inline lint diagnostics and format-on-save for the project's actual lint/format toolchain.
-2. **Even Better TOML** (`tamasfe.even-better-toml`)
+3. **Even Better TOML** (`tamasfe.even-better-toml`)
    - Syntax highlighting, formatting, and validation for TOML files (`release-please-config.json` neighbors aside, TOML still appears in editor/tool config).
-3. **YAML** (`redhat.vscode-yaml`)
+4. **YAML** (`redhat.vscode-yaml`)
    - Validation, autocompletion, and hover support for the workflow files under `.github/workflows/` and other YAML config.
-4. **GitLens** (`eamodio.gitlens`)
+5. **GitLens** (`eamodio.gitlens`)
    - Enhances the built-in Git capabilities of VS Code with blame annotations, code lens, and more.
-5. **Code Spell Checker** (`streetsidesoftware.code-spell-checker`)
+6. **Code Spell Checker** (`streetsidesoftware.code-spell-checker`)
    - A basic spell checker that works well with camelCase code.
-6. **CodeRabbit** (`coderabbit.coderabbit-vscode`)
+7. **CodeRabbit** (`coderabbit.coderabbit-vscode`)
    - AI code review integration, matching the org's CodeRabbit usage on pull requests.
-7. **GitHub Pull Requests** (`GitHub.vscode-pull-request-github`)
+8. **GitHub Pull Requests** (`GitHub.vscode-pull-request-github`)
    - Review and manage GitHub pull requests from inside the editor.
-8. **GitHub Actions** (`GitHub.vscode-github-actions`)
+9. **GitHub Actions** (`GitHub.vscode-github-actions`)
    - Inline validation and status for the workflows under `.github/workflows/` (see [GitHub Actions](github-actions.md)).
-9. **Claude Code** (`Anthropic.claude-code`)
-   - Editor integration for this project's AI-agent workflows (see `AGENTS.md`/`CLAUDE.md`).
+10. **Claude Code** (`Anthropic.claude-code`)
+    - Editor integration for this project's AI-agent workflows (see `AGENTS.md`/`CLAUDE.md`).
 
-There is no Pylance/MyPy/Ruff analogue to install: TypeScript language support (IntelliSense, go-to-definition, inline type errors) is built into VS Code, and the `oxc` extension above covers linting and formatting.
+The TypeScript 7 extension provides IntelliSense, go-to-definition, and inline type errors. The `oxc` extension covers linting and formatting.
 
 ## Installing Extensions
 
@@ -39,6 +41,7 @@ Alternatively, you can install extensions from the command line using the `code`
 
 ```bash
 code --install-extension oxc.oxc-vscode
+code --install-extension TypeScriptTeam.native-preview
 code --install-extension tamasfe.even-better-toml
 code --install-extension redhat.vscode-yaml
 code --install-extension eamodio.gitlens
@@ -63,15 +66,19 @@ Open the Run and Debug view (`Ctrl+Shift+D` / `Cmd+Shift+D`), pick a configurati
 
 ## Workspace Settings
 
-`.vscode/settings.json` commits exactly one key:
+`.vscode/settings.json` commits two TypeScript 7 integration keys:
 
 ```json
 {
-  "typescript.tsdk": "node_modules/typescript/lib"
+  "js/ts.experimental.useTsgo": true,
+  "js/ts.tsdk.path": "./node_modules/typescript"
 }
 ```
 
-This pins the editor's TypeScript language service to the **workspace's own** installed TypeScript version, rather than VS Code's bundled TypeScript. It exists so that inline type errors shown in the editor always match what `tsc --noEmit` (`just typecheck`) reports in CI — without it, a version mismatch between the editor's bundled TypeScript and the project's pinned version could show false-positive or false-negative type errors. This is the **only** key committed to `settings.json`: the project deliberately avoids checking in personal editor preferences (font size, theme, etc.) — `typescript.tsdk` is a narrow, deliberate exception because it's a correctness control, not a preference.
+These settings activate the native language service and point it at the
+**workspace's own** TypeScript package. This keeps editor diagnostics aligned
+with `tsc --noEmit` (`just typecheck`) in CI. VS Code 1.126 or newer is required
+by the extension. Personal editor preferences remain uncommitted.
 
 ## Additional Resources
 

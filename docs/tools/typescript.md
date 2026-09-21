@@ -3,15 +3,16 @@
 This project uses a single type checker: `tsc`, the TypeScript compiler, run in `--noEmit` mode.
 
 - **tsc** is used in CI and in git hooks for strict type checking.
-- **The VS Code TypeScript language service** (the same `tsc` engine, via `typescript.tsdk`) is used in the editor for real-time feedback during development.
+- **The TypeScript 7 VS Code language service** uses the workspace package for real-time feedback during development.
 
 ### About tsc
 
-[TypeScript](https://www.typescriptlang.org/)'s compiler, `tsc`, is a static type checker that reads type annotations in your source and flags code that doesn't adhere to them, catching errors before they reach runtime. Because the compiler and the editor's language service are the same program reading the same [`tsconfig.json`](../../tsconfig.json), there is no separate "editor checker" to keep in sync — the only drift risk is a version mismatch between the workspace `typescript` package and the one VS Code's built-in TypeScript falls back to, which [`.vscode/settings.json`](../../.vscode/settings.json) closes by pinning:
+[TypeScript](https://www.typescriptlang.org/)'s compiler, `tsc`, is a static type checker that reads type annotations in your source and flags code that doesn't adhere to them, catching errors before they reach runtime. The TypeScript 7 extension and CLI read the same [`tsconfig.json`](../../tsconfig.json) and workspace package. [`.vscode/settings.json`](../../.vscode/settings.json) activates the native service and points it at that package:
 
 ```json
 {
-  "typescript.tsdk": "node_modules/typescript/lib"
+  "js/ts.experimental.useTsgo": true,
+  "js/ts.tsdk.path": "./node_modules/typescript"
 }
 ```
 
@@ -216,6 +217,9 @@ function process(handler: Handler): void {
 
 ### TypeScript 7 (tsgo)
 
-TypeScript 7, the Go-native rewrite of the compiler, was in release-candidate status at the time this project was ported (7.0.1-rc). This project does not gate on it yet, but the `tsconfig.json` is kept forward-compatible with it (no `baseUrl`, no `es5` target) — the upgrade path is a `typescript` devDependency bump once TS 7 reaches general availability, since the invoked command stays `tsc --noEmit` either way.
+This project uses the stable Go-native TypeScript 7 compiler. The command-line
+gate remains `tsc --noEmit`. VS Code 1.126 or newer needs the recommended
+`TypeScriptTeam.native-preview` extension plus the committed `js/ts.*`
+settings to activate the native language service for the workspace package.
 
 See also: [Vitest](vitest.md) for the test runner, [Oxlint & Oxfmt](oxlint.md) for linting/formatting, and [`just typecheck`](justfiles.md).

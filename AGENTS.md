@@ -48,7 +48,7 @@ install-pnpm`, not bundled with Node — it self-manages to the version
 ### Task Runner
 
 - **Just**: used for command automation (see Justfile for available commands)
-  - `just install`: install dependencies (also installs git hooks via prepare)
+  - `just install`: install shell analyzers and dependencies (also installs git hooks)
   - `just format`: run the formatter (oxfmt, writes fixes + sorts imports)
   - `just format-check`: check formatting without writing
   - `just lint`: run the linter (oxlint)
@@ -58,7 +58,7 @@ install-pnpm`, not bundled with Node — it self-manages to the version
   - `just test-bun`: OPTIONAL/ADVISORY — run non-e2e tiers under Bun (D-036;
     no-op if bun absent). Never `bun install` (pnpm-only lockfile), never bare
     `bun test` (Vitest drives via `bun run vitest`); e2e stays Node-only.
-  - `just all`: run all checks (format-check, lint, typecheck, test)
+  - `just all`: run all checks (format-check, lint, shell/workflow checks, typecheck, test)
   - `just pre-commit-run`: run the full hook suite on all files (CI mirror)
   - `just setup-hooks`: install git hooks + commit-message template
   - `just build`: build distributable `dist/`
@@ -72,8 +72,9 @@ install-pnpm`, not bundled with Node — it self-manages to the version
 - **Oxfmt**: formatter (exact-pinned beta) — 100 cols, single quotes, semis,
   es5 trailing commas, LF, `sortImports`; also formats JSON/YAML/Markdown
   (`.oxfmtrc.json`)
-- **tsc**: strict type checking (`tsc --noEmit`), strict flag union incl.
-  `isolatedDeclarations` — annotate all exports explicitly
+- **TypeScript 7**: native strict type checking (`tsc --noEmit`), strict flag
+  union incl. `isolatedDeclarations` — annotate all exports explicitly. VS Code
+  uses the recommended TypeScript 7 extension and the workspace package.
 - **lefthook**: git hooks — pre-commit (staged format with stage_fixed, staged
   lint, full typecheck), commit-msg (commitlint), opt-in pre-push tests
   (`lefthook.yml`)
@@ -107,3 +108,11 @@ revert` (`commitlint.config.mjs`, mirrored in `.gitmessage`)
 - Source in `/src` (`cli.ts` bin entry, `lib.ts` public API, `version.ts`)
 - Tests in `/tests` (`*.test.ts`)
 - Build output in `/dist` (gitignored)
+
+## Shell checks
+
+Run `just install-shell-tools` once and put `~/.local/bin` on PATH. It installs
+checksum-verified ShellCheck 0.11.0 and actionlint 1.7.12. `just all` includes
+`just check-shell` for tracked `.sh`/`.bash` files and `just check-workflows`
+for embedded workflow shell commands. Staged checks run through lefthook;
+CI explicitly provisions both analyzers and repeats the checks.

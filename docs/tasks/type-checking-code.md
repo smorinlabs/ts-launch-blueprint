@@ -7,7 +7,7 @@ checker — see [Why just one checker?](#why-just-one-checker) below.
 
 ## Setting Up tsc
 
-TypeScript is already a pinned `devDependency`
+TypeScript 7 is already a pinned `devDependency`
 ([`package.json`](../../package.json)), so `pnpm install` is all the setup
 required. There is nothing to install globally.
 
@@ -19,7 +19,7 @@ required. There is nothing to install globally.
 
 2. **Configure**: the compiler options live in
    [`tsconfig.json`](../../tsconfig.json) at the repository root — the same
-   file the editor's TypeScript language service reads (see
+   file the native TypeScript 7 editor language service reads (see
    [Why just one checker?](#why-just-one-checker)).
 
 3. **Run tsc**:

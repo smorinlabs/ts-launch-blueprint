@@ -4,14 +4,14 @@ See AGENTS.md for the full project charter (canonical AI-context hub).
 
 ## Project Commands
 
-- Setup: `just install` (or `pnpm install`; installs git hooks via prepare)
+- Setup: `just install` (installs shell analyzers, dependencies, and git hooks)
 - Format: `just format` (or `pnpm exec oxfmt`)
 - Format check: `just format-check` (or `pnpm exec oxfmt --check`)
 - Lint: `just lint` (or `pnpm exec oxlint`); autofix: `just lint-fix`
 - Type check: `just typecheck` (or `pnpm exec tsc --noEmit`)
 - Test all: `just test`
 - Test single: `pnpm exec vitest run tests/version.test.ts -t 'test name'`
-- All checks: `just all` (format-check, lint, typecheck, test)
+- All checks: `just all` (format-check, lint, shell/workflow checks, typecheck, test)
 - Hook suite on all files: `just pre-commit-run`
 - Install hooks + commit template: `just setup-hooks`
 - Build: `just build`
@@ -30,5 +30,5 @@ See AGENTS.md for the full project charter (canonical AI-context hub).
 
 - Node: >= 24 required (`.nvmrc`); package manager: pnpm 10 (D-035; `pnpm
 install`, `pnpm exec`, `pnpm-lock.yaml`)
-- IDE: VS Code with the oxc extension; editor TypeScript pinned to the
-  workspace version via `.vscode/settings.json`
+- IDE: VS Code with the oxc and TypeScript 7 extensions; the native language
+  service uses the workspace package via `.vscode/settings.json`

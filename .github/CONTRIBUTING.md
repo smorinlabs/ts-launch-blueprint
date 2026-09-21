@@ -59,9 +59,10 @@ To submit a pull request, follow these steps:
 3. Set up your development environment:
    ```bash
    make check        # verify node/just are installed
-   pnpm install      # install dependencies
+   just install      # install shell analyzers and dependencies
+   export PATH="$HOME/.local/bin:$PATH" # make installed analyzers available
    just setup-hooks  # install git hooks + commit-message template
-   just all          # run the full quality-gate suite (format-check, lint, typecheck, test)
+   just all          # run the full quality-gate suite (format-check, lint, shell/workflow checks, typecheck, test)
    ```
 4. Make your changes
 5. Commit your changes with a clear and descriptive commit message

@@ -18,9 +18,9 @@ type-checked, tested, and release-automated TypeScript project.
 - **Zero Configuration Setup**: linting, formatting, type checking, and git
   hooks are wired up before you write a line of code.
 - **Type Safety First**: a strict `tsc` configuration (`strict`,
-  `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, and more) plus a
-  committed VS Code `typescript.tsdk` pin, so the editor and the CI
-  type-check gate always agree on the same compiler version.
+  `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, and more) plus the
+  TypeScript 7 VS Code extension configured for the workspace package, so the
+  editor and the CI type-check gate use the same compiler version.
 - **Modern Toolchain**: Oxlint + Oxfmt (one Rust-based toolchain for
   linting and formatting TypeScript, JSON, YAML, and Markdown), lefthook
   git hooks with commitlint-checked commit messages, and Vitest 4 for
@@ -58,9 +58,10 @@ cd ts-launch-blueprint
 # update package.json's name/bin/repository fields to match.
 
 make check      # verify the foundational tools (just, node) are installed
-pnpm install    # install dependencies (also installs git hooks via lefthook)
+just install    # install shell analyzers, dependencies, and git hooks
+export PATH="$HOME/.local/bin:$PATH" # make installed analyzers available
 just setup-hooks
-just all        # every quality gate: format-check, lint, typecheck, test
+just all        # every quality gate: format-check, lint, shell/workflow checks, typecheck, test
 ```
 
 Run `just` (no arguments) to list every available recipe.
@@ -98,26 +99,26 @@ The [`Justfile`](./Justfile) is the canonical command surface; every
 recipe below has a one-line doc comment above it in the file, and `just
 --list` groups them (`build`, `dev`, `docs`, `releases`, ...). Highlights:
 
-| Recipe                                      | Purpose                                                                 |
-| ------------------------------------------- | ----------------------------------------------------------------------- |
-| `just check-deps` (`c`)                     | Verify required tools (`just`, `node`, `pnpm`) are installed            |
-| `just install`                              | Install dependencies (generates/updates `pnpm-lock.yaml`)               |
-| `just build` (`b`)                          | Bundle CLI + library to `dist/` with tsdown                             |
-| `just typecheck` (`tc`)                     | `tsc --noEmit`                                                          |
-| `just test` (`t`)                           | Run tests with Vitest                                                   |
-| `just test-bun`                             | Optional/advisory: run non-e2e tiers under Bun (D-036; no-op if absent) |
-| `just coverage`                             | Run tests with coverage thresholds enforced                             |
-| `just format` / `format-check` (`f` / `fc`) | Format (oxfmt) / check formatting                                       |
-| `just lint` / `lint-fix` (`l`)              | Lint (oxlint) / lint with autofixes                                     |
-| `just all` (`a`)                            | Every quality gate: format-check, lint, typecheck, test                 |
-| `just setup-hooks`                          | Install lefthook git hooks + wire the commit template                   |
-| `just docs-check`                           | Verify every relative Markdown link in `README.md` + `docs/` resolves   |
-| `just docs-api`                             | Generate API reference docs with TypeDoc (optional, not CI-gated)       |
-| `just release-status`                       | Check version drift (`package.json`, manifest, latest tag)              |
-| `just pack-check`                           | Validate the packaged distribution locally (publint, attw, npm pack)    |
-| `just contributors`                         | Render `CONTRIBUTORS.md` via contributors-please                        |
-| `just debug-info`                           | Collect system/tool/dependency info for bug reports                     |
-| `just clean`                                | Remove build artifacts, caches, and installed dependencies              |
+| Recipe                                      | Purpose                                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------------------ |
+| `just check-deps` (`c`)                     | Verify required tools (`just`, `node`, `pnpm`) are installed                   |
+| `just install`                              | Install dependencies (generates/updates `pnpm-lock.yaml`)                      |
+| `just build` (`b`)                          | Bundle CLI + library to `dist/` with tsdown                                    |
+| `just typecheck` (`tc`)                     | `tsc --noEmit`                                                                 |
+| `just test` (`t`)                           | Run tests with Vitest                                                          |
+| `just test-bun`                             | Optional/advisory: run non-e2e tiers under Bun (D-036; no-op if absent)        |
+| `just coverage`                             | Run tests with coverage thresholds enforced                                    |
+| `just format` / `format-check` (`f` / `fc`) | Format (oxfmt) / check formatting                                              |
+| `just lint` / `lint-fix` (`l`)              | Lint (oxlint) / lint with autofixes                                            |
+| `just all` (`a`)                            | Every quality gate: format-check, lint, shell/workflow checks, typecheck, test |
+| `just setup-hooks`                          | Install lefthook git hooks + wire the commit template                          |
+| `just docs-check`                           | Verify every relative Markdown link in `README.md` + `docs/` resolves          |
+| `just docs-api`                             | Generate API reference docs with TypeDoc (optional, not CI-gated)              |
+| `just release-status`                       | Check version drift (`package.json`, manifest, latest tag)                     |
+| `just pack-check`                           | Validate the packaged distribution locally (publint, attw, npm pack)           |
+| `just contributors`                         | Render `CONTRIBUTORS.md` via contributors-please                               |
+| `just debug-info`                           | Collect system/tool/dependency info for bug reports                            |
+| `just clean`                                | Remove build artifacts, caches, and installed dependencies                     |
 
 ### Git hooks
 
