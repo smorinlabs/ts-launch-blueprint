@@ -52,7 +52,7 @@
     "@types/node": "^26.1.1",
     "@vitest/coverage-v8": "^4.1.10",
     "lefthook": "^2.1.10",
-    "oxfmt": "0.68.0",
+    "oxfmt": "0.70.0",
     "oxlint": "^1.74.0",
     "publint": "^0.3.21",
     "tsdown": "0.23.0",
