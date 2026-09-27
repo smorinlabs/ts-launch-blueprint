@@ -93,6 +93,25 @@ async function errorMessage(response: Response): Promise<string> {
   return fallback;
 }
 
+// The source trusted response shapes (KeyError/implicit any); a typed
+// port needs an explicit guard. Shape violations -> ApiError (clean
+// exit 1) instead of the source's accidental crash path.
+function dataArray<T>(body: unknown, endpoint: string): T[] {
+  if (typeof body !== 'object' || body === null) {
+    throw new ApiError(`API request failed: unexpected ${endpoint} response shape`);
+  }
+  const data = (body as { data?: unknown }).data;
+  if (data === undefined) {
+    // get_projects parity: response_data.get("data", []) tolerates a
+    // missing key (projects.py:247).
+    return [];
+  }
+  if (!Array.isArray(data)) {
+    throw new ApiError(`API request failed: unexpected ${endpoint} response shape`);
+  }
+  return data as T[];
+}
+
 /** Create the API client (PyClient.__init__ parity: Bearer token +
  * Accept header on every request, projects.py:156-169). */
 export function createApiClient(options: ApiClientOptions): ApiClient {
@@ -136,25 +155,6 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     } catch {
       throw new ApiError(`API request failed: malformed JSON response from ${url.toString()}`);
     }
-  }
-
-  // The source trusted response shapes (KeyError/implicit any); a typed
-  // port needs an explicit guard. Shape violations -> ApiError (clean
-  // exit 1) instead of the source's accidental crash path.
-  function dataArray<T>(body: unknown, endpoint: string): T[] {
-    if (typeof body !== 'object' || body === null) {
-      throw new ApiError(`API request failed: unexpected ${endpoint} response shape`);
-    }
-    const data = (body as { data?: unknown }).data;
-    if (data === undefined) {
-      // get_projects parity: response_data.get("data", []) tolerates a
-      // missing key (projects.py:247).
-      return [];
-    }
-    if (!Array.isArray(data)) {
-      throw new ApiError(`API request failed: unexpected ${endpoint} response shape`);
-    }
-    return data as T[];
   }
 
   return {
