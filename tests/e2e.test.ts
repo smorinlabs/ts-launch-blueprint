@@ -219,23 +219,23 @@ function startSlowApi(): Promise<MockApi & { requestArrived: Promise<void> }> {
   });
 }
 
-describe('signal contract (S3a deferred verification: SIGINT/SIGTERM)', () => {
-  async function signalMidFetch(signal: NodeJS.Signals): Promise<CliResult> {
-    const slow = await startSlowApi();
-    try {
-      const child = spawnCli(['projects', '--no-input'], {
-        ...baseEnv,
-        TS_PROJECTS_API_URL: `${slow.url}/api/1.0`,
-      });
-      const result = collect(child);
-      await slow.requestArrived;
-      child.kill(signal);
-      return await result;
-    } finally {
-      slow.server.close();
-    }
+async function signalMidFetch(signal: NodeJS.Signals): Promise<CliResult> {
+  const slow = await startSlowApi();
+  try {
+    const child = spawnCli(['projects', '--no-input'], {
+      ...baseEnv,
+      TS_PROJECTS_API_URL: `${slow.url}/api/1.0`,
+    });
+    const result = collect(child);
+    await slow.requestArrived;
+    child.kill(signal);
+    return await result;
+  } finally {
+    slow.server.close();
   }
+}
 
+describe('signal contract (S3a deferred verification: SIGINT/SIGTERM)', () => {
   it('SIGINT after connect -> exit 130', async () => {
     const result = await signalMidFetch('SIGINT');
     expect(result.code).toBe(130);

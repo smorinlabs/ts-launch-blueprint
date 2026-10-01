@@ -15,6 +15,15 @@ import releasePleaseConfig from '../release-please-config.json' with { type: 'js
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
+// Both configs are JSONC with full-line comments only.
+const readJsonc = (file: string): { ignorePatterns: string[] } => {
+  const text = readFileSync(join(REPO_ROOT, file), 'utf8')
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))
+    .join('\n');
+  return JSON.parse(text);
+};
+
 describe('commit-message contract (D-020(2,4))', () => {
   it('commitlint type-enum matches the .gitmessage type list exactly', () => {
     const rule = commitlintConfig.rules['type-enum'];
@@ -79,14 +88,6 @@ describe('lefthook configuration (D-020(6))', () => {
   // lists must mirror the tools' ignorePatterns so excluded files never
   // reach the tools and lefthook skips when no staged files remain.
   it('format/lint excludes mirror the tools ignorePatterns', () => {
-    // Both configs are JSONC with full-line comments only.
-    const readJsonc = (file: string): { ignorePatterns: string[] } => {
-      const text = readFileSync(join(REPO_ROOT, file), 'utf8')
-        .split('\n')
-        .filter((line) => !line.trim().startsWith('//'))
-        .join('\n');
-      return JSON.parse(text);
-    };
     const jobs = lefthook['pre-commit'].jobs;
     const jobExclude = (name: string): string[] =>
       jobs.find((job: { name: string }) => job.name === name).exclude;
