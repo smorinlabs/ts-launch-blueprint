@@ -8,8 +8,9 @@ classifier: path
 output_file: CONTRIBUTORS.md
 state_file: .contributors.jsonl
 in_place: true
-in_place_marker_start: '<!-- contributors-please:start -->'
-in_place_marker_end: '<!-- contributors-please:end -->'
+# Preserve blank lines around the generated Markdown list for oxfmt.
+in_place_marker_start: "<!-- contributors-please:start -->\n"
+in_place_marker_end: "\n<!-- contributors-please:end -->"
 entry_template: '- [{{name}}]({{profile}}) - {{title}} ({{commits}} commits)'
 
 classification:
