@@ -12,6 +12,7 @@ import { homedir as osHomedir } from 'node:os';
 
 import { Command, CommanderError } from 'commander';
 
+import { EXIT_CODES, exitCodeFor } from './cli/exit-codes.js';
 import { registerProjectsCommand } from './commands/projects.js';
 import {
   type ClipboardWriter,
@@ -23,7 +24,6 @@ import {
 } from './lib/adapters.js';
 import { type Colors, colorEnabled, createColors } from './lib/colors.js';
 import { type ConfigFs, redactToken, requireToken, resolveConfig } from './lib/config.js';
-import { EXIT_CODES, exitCodeFor } from './lib/errors.js';
 import { createLogger, type Logger, resolveLevel } from './lib/logger.js';
 import { VERSION } from './version.js';
 

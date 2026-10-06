@@ -20,7 +20,8 @@ import { join } from 'node:path';
 import { parse, stringify } from 'smol-toml';
 import { z } from 'zod';
 
-import { AuthError, ConfigError, UsageError } from './errors.js';
+import { ConfigError, UsageError } from '../cli/exit-codes.js';
+import { AuthError } from '../core/schemas/errors.js';
 import { configDir } from './xdg-paths.js';
 
 /** Canonical config file name (cli-standards R5.1, D-029). */

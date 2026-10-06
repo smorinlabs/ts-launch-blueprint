@@ -14,6 +14,19 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  CliError,
+  ConfigError,
+  EXIT_CODES,
+  exitCodeFor,
+  UsageError,
+} from '../src/cli/exit-codes.js';
+import {
+  AuthError,
+  ConflictError,
+  DomainError,
+  NotFoundError,
+} from '../src/core/schemas/errors.js';
+import {
   CONFIG_FILE_NAME,
   defaultConfigPath,
   redactToken,
@@ -22,16 +35,6 @@ import {
   TOKEN_ENV_VAR,
   writeUserConfig,
 } from '../src/lib/config.js';
-import {
-  AuthError,
-  CliError,
-  ConfigError,
-  ConflictError,
-  EXIT_CODES,
-  exitCodeFor,
-  NotFoundError,
-  UsageError,
-} from '../src/lib/errors.js';
 import { configDir } from '../src/lib/xdg-paths.js';
 
 const tempDirs: string[] = [];
@@ -353,10 +356,11 @@ describe('error taxonomy (D-016(2), cli-standards R6.1)', () => {
     expect(exitCodeFor('not-an-error')).toBe(1);
   });
 
-  it('AuthError is a ConfigError (config-layer compatibility) at exit 4', () => {
+  it('AuthError is a DomainError with no exit code, mapped to exit 4', () => {
     const err = new AuthError('x');
-    expect(err).toBeInstanceOf(ConfigError);
-    expect(err.exitCode).toBe(EXIT_CODES.auth);
+    expect(err).toBeInstanceOf(DomainError);
+    expect(err).not.toHaveProperty('exitCode');
+    expect(exitCodeFor(err)).toBe(EXIT_CODES.auth);
     expect(err.name).toBe('AuthError');
   });
 });
