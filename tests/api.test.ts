@@ -3,15 +3,15 @@
 // patching requests.Session.request and nothing else.
 import { describe, expect, it } from 'vitest';
 
+import { exitCodeFor } from '../src/cli/exit-codes.js';
+import { ApiError, AuthError, NotFoundError } from '../src/core/schemas/errors.js';
 import {
-  ApiError,
   BASE_URL,
   createApiClient,
   DEFAULT_LIMIT,
   type Project,
   type Workspace,
 } from '../src/lib/api.js';
-import { AuthError, NotFoundError } from '../src/lib/errors.js';
 
 interface RecordedCall {
   url: URL;
@@ -113,13 +113,14 @@ describe('failed requests (test_failed_request parity + gap closure)', () => {
     ]);
     const failure = createApiClient({ token: 'bad', fetchImpl }).getProjects();
     await expect(failure).rejects.toBeInstanceOf(AuthError);
-    await expect(
-      createApiClient({
-        token: 'bad',
-        fetchImpl: makeFetch([jsonResponse({ errors: [{ message: 'Not authorized' }] }, 401)])
-          .fetchImpl,
-      }).getProjects()
-    ).rejects.toMatchObject({ exitCode: 4 });
+    const err: unknown = await createApiClient({
+      token: 'bad',
+      fetchImpl: makeFetch([jsonResponse({ errors: [{ message: 'Not authorized' }] }, 401)])
+        .fetchImpl,
+    })
+      .getProjects()
+      .catch((caught: unknown) => caught);
+    expect(exitCodeFor(err)).toBe(4);
   });
 
   it('maps network failure to ApiError (exit 1)', async () => {
@@ -127,12 +128,11 @@ describe('failed requests (test_failed_request parity + gap closure)', () => {
     const failure = createApiClient({ token: 't', fetchImpl }).getProjects();
     await expect(failure).rejects.toBeInstanceOf(ApiError);
     const { fetchImpl: again } = makeFetch([new TypeError('fetch failed')]);
-    await expect(
-      createApiClient({ token: 't', fetchImpl: again }).getProjects()
-    ).rejects.toMatchObject({
-      exitCode: 1,
-      message: expect.stringContaining('API request failed'),
-    });
+    const err: unknown = await createApiClient({ token: 't', fetchImpl: again })
+      .getProjects()
+      .catch((caught: unknown) => caught);
+    expect(exitCodeFor(err)).toBe(1);
+    expect(err).toMatchObject({ message: expect.stringContaining('API request failed') });
   });
 
   it('maps a transport timeout to ApiError mentioning the timeout', async () => {
@@ -210,8 +210,10 @@ describe('workspace filter (test_get_projects_with_workspace parity)', () => {
     });
     await expect(failure).rejects.toBeInstanceOf(NotFoundError);
     const { fetchImpl: again } = makeFetch([jsonResponse({ data: [] })]);
-    await expect(
-      createApiClient({ token: 't', fetchImpl: again }).getProjects({ workspaceName: 'Nope' })
-    ).rejects.toMatchObject({ exitCode: 3, message: 'Workspace not found: Nope' });
+    const err: unknown = await createApiClient({ token: 't', fetchImpl: again })
+      .getProjects({ workspaceName: 'Nope' })
+      .catch((caught: unknown) => caught);
+    expect(exitCodeFor(err)).toBe(3);
+    expect(err).toMatchObject({ message: 'Workspace not found: Nope' });
   });
 });

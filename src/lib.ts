@@ -5,7 +5,6 @@
 export {
   type ApiClient,
   type ApiClientOptions,
-  ApiError,
   BASE_URL,
   createApiClient,
   DEFAULT_LIMIT,
@@ -30,15 +29,13 @@ export {
   writeUserConfig,
 } from './lib/config.js';
 export {
-  AuthError,
   CliError,
   ConfigError,
-  ConflictError,
   EXIT_CODES,
   type ExitCode,
   exitCodeFor,
-  NotFoundError,
   UsageError,
-} from './lib/errors.js';
+} from './cli/exit-codes.js';
+export { ApiError, AuthError, ConflictError, NotFoundError } from './core/schemas/errors.js';
 export { formatOutput, type OutputFormat, OUTPUT_FORMATS } from './lib/format.js';
 export { VERSION } from './version.js';
