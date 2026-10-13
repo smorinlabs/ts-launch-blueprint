@@ -9,8 +9,6 @@ export {
   createApiClient,
   DEFAULT_LIMIT,
   DEFAULT_TIMEOUT_MS,
-  type Project,
-  type Workspace,
 } from './lib/api.js';
 export {
   CONFIG_FILE_NAME,
@@ -37,5 +35,6 @@ export {
   UsageError,
 } from './cli/exit-codes.js';
 export { ApiError, AuthError, ConflictError, NotFoundError } from './core/schemas/errors.js';
+export type { Project, Workspace } from './core/schemas/project.schema.js';
 export { formatOutput, type OutputFormat, OUTPUT_FORMATS } from './lib/format.js';
 export { VERSION } from './version.js';

@@ -10,6 +10,8 @@
 // source's "API request failed: <errors[0].message>" surfacing
 // (projects.py:191-205).
 import { ApiError, AuthError, NotFoundError } from '../core/schemas/errors.js';
+import { toProjects, toWorkspaces } from '../core/schemas/project.converter.js';
+import type { Project, Workspace } from '../core/schemas/project.schema.js';
 
 /** Placeholder API root, mirroring the source's fictional service
  * (projects.py:154: https://app.py.com/api/1.0). Overridable per client
@@ -25,21 +27,6 @@ export const DEFAULT_LIMIT = 200;
 /** Default request timeout. The source (requests) had none; a hung
  * placeholder API should fail loudly rather than hang the CLI. */
 export const DEFAULT_TIMEOUT_MS = 30_000;
-
-/** Workspace shape returned by GET /workspaces (projects.py:207-214). */
-export interface Workspace {
-  gid: string;
-  name: string;
-}
-
-/** Project shape returned by GET /projects with
- * opt_fields=name,workspace.name (projects.py:229-247; fields consumed
- * at 288-291 and 308-312). */
-export interface Project {
-  id: string;
-  name: string;
-  workspace: { name: string };
-}
 
 /** Constructor inputs; fetchImpl is the injected transport seam. */
 export interface ApiClientOptions {
@@ -83,25 +70,6 @@ async function errorMessage(response: Response): Promise<string> {
     // Non-JSON error body: fall through to the HTTP status fallback.
   }
   return fallback;
-}
-
-// The source trusted response shapes (KeyError/implicit any); a typed
-// port needs an explicit guard. Shape violations -> ApiError (clean
-// exit 1) instead of the source's accidental crash path.
-function dataArray<T>(body: unknown, endpoint: string): T[] {
-  if (typeof body !== 'object' || body === null) {
-    throw new ApiError(`API request failed: unexpected ${endpoint} response shape`);
-  }
-  const data = (body as { data?: unknown }).data;
-  if (data === undefined) {
-    // get_projects parity: response_data.get("data", []) tolerates a
-    // missing key (projects.py:247).
-    return [];
-  }
-  if (!Array.isArray(data)) {
-    throw new ApiError(`API request failed: unexpected ${endpoint} response shape`);
-  }
-  return data as T[];
 }
 
 /** Create the API client (PyClient.__init__ parity: Bearer token +
@@ -152,7 +120,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
   return {
     // get_workspaces parity (projects.py:207-214).
     async getWorkspaces(): Promise<Workspace[]> {
-      return dataArray<Workspace>(await request('/workspaces'), '/workspaces');
+      return toWorkspaces(await request('/workspaces'));
     },
 
     // get_projects parity (projects.py:216-247): limit + opt_fields
@@ -177,7 +145,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         }
         params['workspace'] = workspace.gid;
       }
-      return dataArray<Project>(await request('/projects', params), '/projects');
+      return toProjects(await request('/projects', params));
     },
   };
 }

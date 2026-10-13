@@ -10,7 +10,7 @@
 // source's CSV was naive-by-design (no escaping, projects.py:287-289);
 // the port applies minimal RFC 4180 quoting, which is byte-identical
 // unless a value contains a comma, quote, or newline.
-import type { Project } from './api.js';
+import type { Project } from '../core/schemas/project.schema.js';
 
 /** The source's constrained format set (click.Choice parity). */
 export const OUTPUT_FORMATS = ['text', 'json', 'csv'] as const;

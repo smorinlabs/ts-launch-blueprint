@@ -11,8 +11,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { Project } from '../src/core/schemas/project.schema.js';
 import type { ClipboardWriter, Prompter, SpinnerFactory } from '../src/lib/adapters.js';
-import type { Project } from '../src/lib/api.js';
 import { TOKEN_ENV_VAR } from '../src/lib/config.js';
 import { type CliDeps, runCli } from '../src/router.js';
 

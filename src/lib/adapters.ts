@@ -10,7 +10,7 @@
 // exercises the non-interactive paths for real.
 import yoctoSpinner from 'yocto-spinner';
 
-import type { Project } from './api.js';
+import type { Project } from '../core/schemas/project.schema.js';
 
 /** One selectable entry: label-for-humans / value-for-code
  * (questionary.Choice parity, projects.py:373-376). */
