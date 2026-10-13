@@ -14,8 +14,9 @@ import type { Command } from 'commander';
 import { InvalidArgumentError, Option } from 'commander';
 
 import { CliError } from '../cli/exit-codes.js';
+import { createCore } from '../composition.js';
 import type { Project } from '../core/schemas/project.schema.js';
-import { createApiClient, DEFAULT_LIMIT } from '../lib/api.js';
+import { DEFAULT_LIMIT } from '../core/services/projects.service.js';
 import { requireToken, resolveConfig } from '../lib/config.js';
 import { formatOutput, type OutputFormat, OUTPUT_FORMATS } from '../lib/format.js';
 import type { CliContext, CliDeps } from '../router.js';
@@ -117,10 +118,9 @@ async function runProjects(
       ? resolved.limit
       : cmdOpts.limit;
 
-  const client = createApiClient({
-    token,
-    fetchImpl: deps.fetchImpl,
-    baseUrl: deps.env[API_URL_ENV_VAR],
+  const { projects: projectsService } = createCore({
+    source: 'http',
+    http: { token, fetchImpl: deps.fetchImpl, baseUrl: deps.env[API_URL_ENV_VAR] },
   });
 
   // Spinner on stderr, gated on stderr TTY-ness and CI (D-016(5)); when
@@ -130,7 +130,7 @@ async function runProjects(
   const spinner = spinnerEnabled ? deps.spinner('Fetching projects...') : undefined;
   let projects: Project[];
   try {
-    projects = await client.getProjects({ workspaceName: workspace, limit });
+    projects = await projectsService.listProjects({ workspaceName: workspace, limit });
   } finally {
     spinner?.stop();
   }
