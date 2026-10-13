@@ -13,9 +13,9 @@ import Table from 'cli-table3';
 import type { Command } from 'commander';
 import { InvalidArgumentError, Option } from 'commander';
 
+import { CliError } from '../cli/exit-codes.js';
 import { createApiClient, DEFAULT_LIMIT, type Project } from '../lib/api.js';
 import { requireToken, resolveConfig } from '../lib/config.js';
-import { CliError } from '../lib/errors.js';
 import { formatOutput, type OutputFormat, OUTPUT_FORMATS } from '../lib/format.js';
 import type { CliContext, CliDeps } from '../router.js';
 

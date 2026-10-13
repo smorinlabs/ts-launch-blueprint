@@ -9,7 +9,7 @@
 // ApiError (exit 1; the source used exit 3). Error text mirrors the
 // source's "API request failed: <errors[0].message>" surfacing
 // (projects.py:191-205).
-import { AuthError, CliError, EXIT_CODES, NotFoundError } from './errors.js';
+import { ApiError, AuthError, NotFoundError } from '../core/schemas/errors.js';
 
 /** Placeholder API root, mirroring the source's fictional service
  * (projects.py:154: https://app.py.com/api/1.0). Overridable per client
@@ -25,14 +25,6 @@ export const DEFAULT_LIMIT = 200;
 /** Default request timeout. The source (requests) had none; a hung
  * placeholder API should fail loudly rather than hang the CLI. */
 export const DEFAULT_TIMEOUT_MS = 30_000;
-
-/** API/network failure -> exit 1 (D-016(2); source PyError exited 3). */
-export class ApiError extends CliError {
-  constructor(message: string) {
-    super(message, EXIT_CODES.error);
-    this.name = 'ApiError';
-  }
-}
 
 /** Workspace shape returned by GET /workspaces (projects.py:207-214). */
 export interface Workspace {

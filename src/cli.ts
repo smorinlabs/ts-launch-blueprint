@@ -3,7 +3,7 @@
 // bridge. All real logic lives in runCli (src/router.ts) behind DI so it
 // is testable in-process; this file is excluded from coverage as a thin
 // adapter (D-019(3)) and exercised by the S3b subprocess tier.
-import { EXIT_CODES } from './lib/errors.js';
+import { EXIT_CODES } from './cli/exit-codes.js';
 import { realDeps, runCli } from './router.js';
 
 // Graceful EPIPE (cli-standards R9.6): `ts-projects ... | head` must not

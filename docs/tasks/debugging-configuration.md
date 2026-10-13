@@ -126,7 +126,7 @@ $ echo $?
 
 Exit 4 is reserved for authentication failures under the project's
 exit-code contract (`EXIT_CODES.auth` in
-[`src/lib/errors.ts`](../../src/lib/errors.ts)) — this is a deliberate
+[`src/cli/exit-codes.ts`](../../src/cli/exit-codes.ts)) — this is a deliberate
 divergence from the Python source, which exited 1 for a missing token. A
 malformed config file (bad TOML, or a value that fails the zod schema —
 e.g. a non-numeric `limit`) is a **different** failure mode: it's a
