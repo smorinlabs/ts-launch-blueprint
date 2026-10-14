@@ -5,13 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import { exitCodeFor } from '../src/cli/exit-codes.js';
 import { ApiError, AuthError, NotFoundError } from '../src/core/schemas/errors.js';
-import {
-  BASE_URL,
-  createApiClient,
-  DEFAULT_LIMIT,
-  type Project,
-  type Workspace,
-} from '../src/lib/api.js';
+import type { Project, Workspace } from '../src/core/schemas/project.schema.js';
+import { BASE_URL, createApiClient, DEFAULT_LIMIT } from '../src/lib/api.js';
 
 interface RecordedCall {
   url: URL;
