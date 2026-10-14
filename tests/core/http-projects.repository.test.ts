@@ -109,4 +109,18 @@ describe('HTTP repository: request params', () => {
     await repository.listWorkspaces();
     expect(urls[0]!.pathname.endsWith('/workspaces')).toBe(true);
   });
+
+  it('strips every trailing slash from baseUrl, and only those', async () => {
+    const urls: URL[] = [];
+    const fetchImpl = ((input: URL) => {
+      urls.push(input);
+      return Promise.resolve(Response.json({ data: [] }));
+    }) as unknown as typeof fetch;
+    await createHttpProjectsRepository({
+      token: 't',
+      fetchImpl,
+      baseUrl: 'http://127.0.0.1:8080/api//v1///',
+    }).listWorkspaces();
+    expect(urls[0]!.toString()).toBe('http://127.0.0.1:8080/api//v1/workspaces');
+  });
 });

@@ -96,12 +96,22 @@ function unwrapList<T>(
   });
 }
 
+/** Strip trailing slashes without a regex: `/\/+$/` backtracks
+ * quadratically on long runs of '/' (CodeQL js/polynomial-redos). */
+function trimTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url.charCodeAt(end - 1) === 47 /* '/' */) {
+    end -= 1;
+  }
+  return url.slice(0, end);
+}
+
 /** Create the HTTP repository (PyClient.__init__ parity: Bearer token +
  * Accept header on every request, projects.py:156-169). */
 export function createHttpProjectsRepository(
   options: HttpProjectsRepositoryOptions
 ): ProjectsRepository {
-  const baseUrl = (options.baseUrl ?? BASE_URL).replace(/\/+$/, '');
+  const baseUrl = trimTrailingSlashes(options.baseUrl ?? BASE_URL);
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const headers = {
     Authorization: `Bearer ${options.token}`,
