@@ -12,44 +12,14 @@ import { homedir as osHomedir } from 'node:os';
 
 import { Command, CommanderError } from 'commander';
 
-import { EXIT_CODES, exitCodeFor } from './cli/exit-codes.js';
+import { VERSION } from '../version.js';
+import { realClipboard, realPrompter, realSpinner } from './adapters.js';
+import { colorEnabled, createColors } from './colors.js';
 import { registerProjectsCommand } from './commands/projects.js';
-import {
-  type ClipboardWriter,
-  type Prompter,
-  realClipboard,
-  realPrompter,
-  realSpinner,
-  type SpinnerFactory,
-} from './lib/adapters.js';
-import { type Colors, colorEnabled, createColors } from './lib/colors.js';
-import { type ConfigFs, redactToken, requireToken, resolveConfig } from './lib/config.js';
-import { createLogger, type Logger, resolveLevel } from './lib/logger.js';
-import { VERSION } from './version.js';
-
-/** Injected dependencies for the CLI (claim-npm CliDeps pattern). */
-export interface CliDeps {
-  /** Result stream — the requested output ONLY (cli-standards R7.1). */
-  stdout: (text: string) => void;
-  /** Diagnostics stream — logs, errors, remediation guidance. */
-  stderr: (text: string) => void;
-  env: Record<string, string | undefined>;
-  homedir: () => string;
-  stdoutIsTTY: boolean;
-  stderrIsTTY: boolean;
-  /** TTY-ness of stdin — gates the interactive multi-select. */
-  stdinIsTTY: boolean;
-  /** fs surface for config discovery/reading (defaults to node:fs). */
-  fs?: ConfigFs | undefined;
-  /** HTTP transport seam — the API client's only transport (D-019(5)). */
-  fetchImpl: typeof fetch;
-  /** Interactive multi-select seam (D-016(6)). */
-  prompter: Prompter;
-  /** Clipboard seam for --copy (D-016(7)). */
-  clipboard: ClipboardWriter;
-  /** Spinner seam; invoked only when TTY/CI gating allows (D-016(5)). */
-  spinner: SpinnerFactory;
-}
+import { redactToken, requireToken, resolveConfig } from './config.js';
+import type { CliContext, CliDeps, GlobalOpts } from './deps.js';
+import { EXIT_CODES, exitCodeFor } from './exit-codes.js';
+import { createLogger, resolveLevel } from './logger.js';
 
 /** Real process-backed deps for the production entry point. */
 export function realDeps(): CliDeps {
@@ -70,25 +40,6 @@ export function realDeps(): CliDeps {
     clipboard: realClipboard,
     spinner: realSpinner,
   };
-}
-
-/** Global option values shared by every command. */
-export interface GlobalOpts {
-  verbose: number;
-  quiet: boolean;
-  debug: boolean;
-  color: boolean;
-  /** false when --no-input was passed (Commander negated-flag key). */
-  input: boolean;
-  config?: string;
-  token?: string;
-}
-
-/** Per-invocation context derived from the global options. */
-export interface CliContext {
-  opts: GlobalOpts;
-  colors: Colors;
-  logger: Logger;
 }
 
 function buildContext(program: Command, deps: CliDeps): CliContext {

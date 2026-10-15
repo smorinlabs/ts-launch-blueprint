@@ -25,7 +25,7 @@ export {
   TOKEN_ENV_VAR,
   type TokenSource,
   writeUserConfig,
-} from './lib/config.js';
+} from './cli/config.js';
 export {
   CliError,
   ConfigError,
@@ -36,5 +36,5 @@ export {
 } from './cli/exit-codes.js';
 export { ApiError, AuthError, ConflictError, NotFoundError } from './core/schemas/errors.js';
 export type { Project, Workspace } from './core/schemas/project.schema.js';
-export { formatOutput, type OutputFormat, OUTPUT_FORMATS } from './lib/format.js';
+export { formatOutput, type OutputFormat, OUTPUT_FORMATS } from './cli/format.js';
 export { VERSION } from './version.js';

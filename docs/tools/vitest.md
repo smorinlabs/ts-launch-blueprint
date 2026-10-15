@@ -71,7 +71,7 @@ const config: ReturnType<typeof defineConfig> = defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/cli.ts', 'src/lib/adapters.ts'],
+      exclude: ['src/cli.ts', 'src/cli/adapters.ts'],
       thresholds: {
         lines: 95,
         functions: 95,
@@ -89,7 +89,7 @@ export default config;
 - **`test.coverage.thresholds`**: the org-standard 95% lines / 95% functions / 90% branches / 95% statements gate, enforced whenever `--coverage` runs (`just coverage`, and in CI). The everyday `just test` loop stays coverage-free for a fast inner loop.
 - **`test.coverage.exclude`**: only two files are excluded, both thin I/O adapters rather than logic:
   - `src/cli.ts` — a thin process entry point (parses `argv`, sets `process.exitCode`) exercised by the e2e subprocess tier instead of unit tests.
-  - `src/lib/adapters.ts` — the real prompt/clipboard/spinner bridges to terminal devices (TTY prompt, OS clipboard, animated stderr); in-process tests replace them with fakes via the injected `CliDeps` object, and the e2e tier drives their non-interactive paths for real.
+  - `src/cli/adapters.ts` — the real prompt/clipboard/spinner bridges to terminal devices (TTY prompt, OS clipboard, animated stderr); in-process tests replace them with fakes via the injected `CliDeps` object, and the e2e tier drives their non-interactive paths for real.
 
 Unlike the source project's Pytest configuration, which declared `testpaths`/`python_files` but did not enforce a coverage minimum, this project enforces its thresholds in CI — a deliberate tightening, not a straight port.
 
@@ -115,7 +115,8 @@ This project prefers dependency injection over `vi.mock`:
 ```ts
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { type CliDeps, runCli } from '../src/router.js';
+import type { CliDeps } from '../src/cli/deps.js';
+import { runCli } from '../src/cli/router.js';
 
 function makeHarness(overrides: Partial<CliDeps> = {}): { deps: CliDeps; stdout: () => string } {
   const out: string[] = [];
@@ -162,7 +163,7 @@ This mirrors `unittest.mock`'s hermetic-boundary intent, but the DI shape catche
   - Check `vitest.config.ts` hasn't scoped `include`/`exclude` away from it.
 - **Coverage threshold failures**:
   - Run `just coverage` locally to see exactly which file/metric is under threshold before pushing.
-  - Only `src/cli.ts` and `src/lib/adapters.ts` are pre-approved exclusions; adding a new exclusion needs the same "thin I/O adapter, exercised elsewhere" justification as those two.
+  - Only `src/cli.ts` and `src/cli/adapters.ts` are pre-approved exclusions; adding a new exclusion needs the same "thin I/O adapter, exercised elsewhere" justification as those two.
 - **e2e tier failures**:
   - Confirm `dist/cli.js` actually rebuilt — delete `dist/` and rerun if `buildIfStale()`'s mtime comparison seems stale.
   - The mock HTTP server binds an ephemeral `127.0.0.1` port per run, so port conflicts across parallel runs shouldn't occur; if they do, check for a leaked server from a previous failed run.

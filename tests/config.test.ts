@@ -14,19 +14,6 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  CliError,
-  ConfigError,
-  EXIT_CODES,
-  exitCodeFor,
-  UsageError,
-} from '../src/cli/exit-codes.js';
-import {
-  AuthError,
-  ConflictError,
-  DomainError,
-  NotFoundError,
-} from '../src/core/schemas/errors.js';
-import {
   CONFIG_FILE_NAME,
   defaultConfigPath,
   redactToken,
@@ -34,8 +21,21 @@ import {
   resolveConfig,
   TOKEN_ENV_VAR,
   writeUserConfig,
-} from '../src/lib/config.js';
-import { configDir } from '../src/lib/xdg-paths.js';
+} from '../src/cli/config.js';
+import {
+  CliError,
+  ConfigError,
+  EXIT_CODES,
+  exitCodeFor,
+  UsageError,
+} from '../src/cli/exit-codes.js';
+import { configDir } from '../src/cli/xdg-paths.js';
+import {
+  AuthError,
+  ConflictError,
+  DomainError,
+  NotFoundError,
+} from '../src/core/schemas/errors.js';
 
 const tempDirs: string[] = [];
 

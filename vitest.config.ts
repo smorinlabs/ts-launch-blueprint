@@ -11,12 +11,12 @@ const config: ReturnType<typeof defineConfig> = defineConfig({
       // src/cli.ts is a thin process entry (argv/exit only) exercised by the
       // S3 subprocess tier, not unit-coverable (claim-npm adapter-exclusion
       // precedent, D-019(3)).
-      // src/lib/adapters.ts holds the real prompt/clipboard/spinner bridges
+      // src/cli/adapters.ts holds the real prompt/clipboard/spinner bridges
       // to terminal devices (TTY prompt, OS clipboard, animated stderr);
       // in-process tests replace them with fakes via CliDeps and the e2e
       // subprocess tier drives the non-interactive paths (same D-019(3)
       // thin-I/O-adapter exclusion, each function a one-call bridge).
-      exclude: ['src/cli.ts', 'src/lib/adapters.ts'],
+      exclude: ['src/cli.ts', 'src/cli/adapters.ts'],
       thresholds: {
         lines: 95,
         functions: 95,

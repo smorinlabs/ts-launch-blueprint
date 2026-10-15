@@ -1,7 +1,7 @@
 # Command-Line Interface (CLI) Reference
 
 This section documents `ts-projects`, the example CLI shipped by this
-template (`src/cli.ts`, `src/router.ts`, `src/commands/projects.ts`). It
+template (`src/cli.ts`, `src/cli/router.ts`, `src/cli/commands/projects.ts`). It
 is a TypeScript port of the source repo's `py-projects` tool; the full
 UX spec and source-vs-port parity notes live in
 [`EXAMPLECLI.md`](../../EXAMPLECLI.md).

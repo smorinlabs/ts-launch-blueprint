@@ -177,7 +177,7 @@ const first: string = items[0];
 3. Type checking only specific files (ad hoc, outside the project config):
 
    ```bash
-   pnpm exec tsc --noEmit src/lib/config.ts src/lib/api.ts
+   pnpm exec tsc --noEmit src/cli/config.ts src/lib/api.ts
    ```
 
    Note that this bypasses `tsconfig.json`'s `include`/`compilerOptions`, so it's useful for a quick sanity check but not a substitute for `just typecheck`, which always runs the full, correctly configured program.

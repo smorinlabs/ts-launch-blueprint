@@ -11,10 +11,11 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { ClipboardWriter, Prompter, SpinnerFactory } from '../src/cli/adapters.js';
+import { TOKEN_ENV_VAR } from '../src/cli/config.js';
+import type { CliDeps } from '../src/cli/deps.js';
+import { runCli } from '../src/cli/router.js';
 import type { Project } from '../src/core/schemas/project.schema.js';
-import type { ClipboardWriter, Prompter, SpinnerFactory } from '../src/lib/adapters.js';
-import { TOKEN_ENV_VAR } from '../src/lib/config.js';
-import { type CliDeps, runCli } from '../src/router.js';
 
 const tempDirs: string[] = [];
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Thin process entry (S3a): signal/EPIPE handling plus the exit-code
-// bridge. All real logic lives in runCli (src/router.ts) behind DI so it
+// bridge. All real logic lives in runCli (src/cli/router.ts) behind DI so it
 // is testable in-process; this file is excluded from coverage as a thin
 // adapter (D-019(3)) and exercised by the S3b subprocess tier.
 import { EXIT_CODES } from './cli/exit-codes.js';
-import { realDeps, runCli } from './router.js';
+import { realDeps, runCli } from './cli/router.js';
 
 // Graceful EPIPE (cli-standards R9.6): `ts-projects ... | head` must not
 // crash when the reader closes the pipe early.

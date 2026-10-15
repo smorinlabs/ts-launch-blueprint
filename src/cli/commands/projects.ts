@@ -13,13 +13,13 @@ import Table from 'cli-table3';
 import type { Command } from 'commander';
 import { InvalidArgumentError, Option } from 'commander';
 
-import { CliError } from '../cli/exit-codes.js';
-import { createCore } from '../composition.js';
-import type { Project } from '../core/schemas/project.schema.js';
-import { DEFAULT_LIMIT } from '../core/services/projects.service.js';
-import { requireToken, resolveConfig } from '../lib/config.js';
-import { formatOutput, type OutputFormat, OUTPUT_FORMATS } from '../lib/format.js';
-import type { CliContext, CliDeps } from '../router.js';
+import { createCore } from '../../composition.js';
+import type { Project } from '../../core/schemas/project.schema.js';
+import { DEFAULT_LIMIT } from '../../core/services/projects.service.js';
+import { requireToken, resolveConfig } from '../config.js';
+import type { CliContext, CliDeps } from '../deps.js';
+import { CliError } from '../exit-codes.js';
+import { formatOutput, type OutputFormat, OUTPUT_FORMATS } from '../format.js';
 
 /** Env var overriding the API root — exists so e2e tests (and users of
  * a self-hosted API) can point the CLI at another server. Documented in

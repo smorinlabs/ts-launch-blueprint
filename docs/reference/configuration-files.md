@@ -9,8 +9,8 @@ customize and extend the project.
 ## User Configuration (TOML + XDG)
 
 `ts-projects` reads an optional TOML config file for the token,
-default workspace, and default limit (`src/lib/config.ts`,
-`src/lib/xdg-paths.ts`).
+default workspace, and default limit (`src/cli/config.ts`,
+`src/cli/xdg-paths.ts`).
 
 ### File location
 
@@ -34,7 +34,7 @@ limit = 200                 # default maximum number of projects
 ```
 
 All keys are optional and validated with a zod schema
-(`configFileSchema` in `src/lib/config.ts`): `token`/`workspace` are
+(`configFileSchema` in `src/cli/config.ts`): `token`/`workspace` are
 strings, `limit` is a positive integer. An invalid file (bad TOML, or
 a value that fails schema validation) is a configuration error, exit 1.
 
@@ -158,7 +158,7 @@ test. See
 
 Configures Vitest, the test runner. Node environment, no injected
 globals, v8 coverage with 95/95/90/95 (lines/functions/branches/
-statements) thresholds. `src/cli.ts` and `src/lib/adapters.ts` are
+statements) thresholds. `src/cli.ts` and `src/cli/adapters.ts` are
 excluded from coverage as thin I/O adapters exercised by the
 subprocess/e2e test tier instead. See
 [vitest.config.ts](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/vitest.config.ts)

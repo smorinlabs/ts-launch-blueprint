@@ -30,7 +30,7 @@ config_file = /home/you/.config/ts-projects/ts-projects_config.toml
 Each line tells you what the CLI would actually use if you ran a real
 command right now:
 
-- `token` — the redacted token value ([`redactToken`](../../src/lib/config.ts))
+- `token` — the redacted token value ([`redactToken`](../../src/cli/config.ts))
   and, in parentheses, which layer it came from: `flag`, `env`, `file`, or
   `none`.
 - `workspace` / `limit` — only ever come from the config file (there is no
@@ -55,7 +55,7 @@ and print.
 
 The three configuration layers are merged with a fixed precedence
 (D-017), implemented in
-[`resolveConfig`](../../src/lib/config.ts):
+[`resolveConfig`](../../src/cli/config.ts):
 
 1. **`--token` flag** (highest precedence)
 2. **`TS_PROJECTS_TOKEN` environment variable**
@@ -103,7 +103,7 @@ toolchain.
 If none of the three layers supplies a token, resolution succeeds (there's
 nothing malformed) but _using_ that resolved configuration fails: both
 `config --show` and the default `projects` command call
-[`requireToken`](../../src/lib/config.ts), which throws an `AuthError` —
+[`requireToken`](../../src/cli/config.ts), which throws an `AuthError` —
 mapped to **exit code 4** (D-016(2)):
 
 ```bash

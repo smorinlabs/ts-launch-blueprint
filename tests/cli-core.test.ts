@@ -6,9 +6,10 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createColors } from '../src/lib/colors.js';
-import { CONFIG_FILE_NAME, TOKEN_ENV_VAR } from '../src/lib/config.js';
-import { type CliDeps, realDeps, runCli } from '../src/router.js';
+import { createColors } from '../src/cli/colors.js';
+import { CONFIG_FILE_NAME, TOKEN_ENV_VAR } from '../src/cli/config.js';
+import type { CliDeps } from '../src/cli/deps.js';
+import { realDeps, runCli } from '../src/cli/router.js';
 import { VERSION } from '../src/version.js';
 
 const tempDirs: string[] = [];
