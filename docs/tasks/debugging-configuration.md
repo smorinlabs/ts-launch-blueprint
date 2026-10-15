@@ -30,7 +30,7 @@ config_file = /home/you/.config/ts-projects/ts-projects_config.toml
 Each line tells you what the CLI would actually use if you ran a real
 command right now:
 
-- `token` — the redacted token value ([`redactToken`](../../src/cli/config.ts))
+- `token` — the redacted token value ([`redactToken`](../../apps/cli/src/cli/config.ts))
   and, in parentheses, which layer it came from: `flag`, `env`, `file`, or
   `none`.
 - `workspace` / `limit` — only ever come from the config file (there is no
@@ -55,7 +55,7 @@ and print.
 
 The three configuration layers are merged with a fixed precedence
 (D-017), implemented in
-[`resolveConfig`](../../src/cli/config.ts):
+[`resolveConfig`](../../apps/cli/src/cli/config.ts):
 
 1. **`--token` flag** (highest precedence)
 2. **`TS_PROJECTS_TOKEN` environment variable**
@@ -103,7 +103,7 @@ toolchain.
 If none of the three layers supplies a token, resolution succeeds (there's
 nothing malformed) but _using_ that resolved configuration fails: both
 `config --show` and the default `projects` command call
-[`requireToken`](../../src/cli/config.ts), which throws an `AuthError` —
+[`requireToken`](../../apps/cli/src/cli/config.ts), which throws an `AuthError` —
 mapped to **exit code 4** (D-016(2)):
 
 ```bash
@@ -126,7 +126,7 @@ $ echo $?
 
 Exit 4 is reserved for authentication failures under the project's
 exit-code contract (`EXIT_CODES.auth` in
-[`src/cli/exit-codes.ts`](../../src/cli/exit-codes.ts)) — this is a deliberate
+[`apps/cli/src/cli/exit-codes.ts`](../../apps/cli/src/cli/exit-codes.ts)) — this is a deliberate
 divergence from the Python source, which exited 1 for a missing token. A
 malformed config file (bad TOML, or a value that fails the zod schema —
 e.g. a non-numeric `limit`) is a **different** failure mode: it's a

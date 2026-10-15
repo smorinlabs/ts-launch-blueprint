@@ -66,11 +66,20 @@ The project's [`tsconfig.json`](../../tsconfig.json) enables `strict` plus a uni
 
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "tsdown.config.ts", "vitest.config.ts"]
+  // (from tsconfig.base.json; the root tsconfig.json extends it and sets:)
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/tests/**/*.ts",
+    "apps/*/src/**/*.ts",
+    "apps/*/tests/**/*.ts",
+    "apps/*/tsdown.config.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts"
+  ]
 }
 ```
 
-`noEmit` is set because emit is owned by [tsdown](../reference/project-structure.md), the build tool; this `tsconfig.json` exists purely to typecheck `src/`, `tests/`, and the top-level config files listed in `include` — note that, unlike a Mypy setup that often only checks a package's source, this config checks the test tree too.
+`noEmit` is set because emit is owned by [tsdown](../reference/project-structure.md), the build tool; the shared options live in `tsconfig.base.json`, and the root `tsconfig.json` exists purely to typecheck every workspace package's `src/` and `tests/`, the root `tests/`, and the config files listed in `include` — note that, unlike a Mypy setup that often only checks a package's source, this config checks the test tree too.
 
 | Flag                          | What it catches                                                                                         | Mypy/Pyright analogue                         |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
@@ -138,7 +147,7 @@ const first: string = items[0];
 - **Use the strict union (current setting) when**:
   - Starting a new project.
   - Working on a codebase fully committed to precise types.
-  - Ensuring complete type coverage across `src/` and `tests/`.
+  - Ensuring complete type coverage across every package's `src/` and `tests/`.
   - Your team is comfortable with TypeScript's stricter corners.
 
 - **Loosen a flag when**:
@@ -177,7 +186,7 @@ const first: string = items[0];
 3. Type checking only specific files (ad hoc, outside the project config):
 
    ```bash
-   pnpm exec tsc --noEmit src/cli/config.ts src/lib/api.ts
+   pnpm exec tsc --noEmit apps/cli/src/cli/config.ts apps/cli/src/api.ts
    ```
 
    Note that this bypasses `tsconfig.json`'s `include`/`compilerOptions`, so it's useful for a quick sanity check but not a substitute for `just typecheck`, which always runs the full, correctly configured program.

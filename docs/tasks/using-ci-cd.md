@@ -60,7 +60,7 @@ Runs on every push to `main` (plus manual re-trigger). Watches Conventional Comm
 
 ### Publish (`publish.yml`)
 
-Triggered by a `v*` tag push. Two jobs:
+Normally triggered by a `v*` tag push; **paused during the V1 restructure (D-045)**, so it currently runs only on manual dispatch from a `v*` tag. Two jobs, both packing and publishing from `apps/cli` (the published package):
 
 - `verify` — cheap, unprivileged: asserts the tag descends from `main`, asserts `tag == package.json version == manifest version`, runs `just all`, builds, and asserts the packed file list is exactly `dist/**` plus the root whitelist (`package.json`, `README.md`, `LICENSE`, `CHANGELOG.md`).
 - `publish` — runs only inside the protected `npm` GitHub environment (human-approved), mints an OIDC token, and runs `npm publish` via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) — no long-lived `NPM_TOKEN` anywhere.

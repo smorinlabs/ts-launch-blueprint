@@ -18,7 +18,7 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 # Publish (D-021(5), D-012(5)): a `v*` tag (pushed when a release-please Release
-# PR is merged) triggers a cheap `verify` gate that must pass before the
+# PR is merged) triggered — and, once re-enabled after D-045, triggers again — a cheap `verify` gate that must pass before the
 # environment-gated `publish` job runs. This is the direct descendant of the
 # Python source's release.yml tag-vs-version guard, upgraded from a
 # commented-out publish block to a wired-but-protected npm Trusted Publishing
@@ -26,10 +26,12 @@
 
 name: Publish
 
+# Paused during the V1 restructure (D-045); re-enable the `v*` tag trigger
+# once the published package set is decided. Until then a maintainer runs it
+# by hand ("Run workflow", choosing the v* tag as the ref); the verify job
+# rejects any non-tag ref.
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 # Deny-all baseline (D-022(10)); each job re-grants only what it needs.
 permissions: {}
@@ -73,6 +75,11 @@ jobs:
       - name: Assert tag is an ancestor of main (D-021(5))
         run: |-
           set -euo pipefail
+          # Manual dispatch (D-045) must target a v* tag, never a branch.
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${GITHUB_REF_NAME#v}" = "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Run this workflow from a v* tag (got ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME})."
+            exit 1
+          fi
           # No re-fetch: the fetch-depth: 0 checkout above already provides
           # refs/remotes/origin/main, and persist-credentials: false leaves
           # git unauthenticated — on a private repo a fetch here dies with
@@ -87,7 +94,9 @@ jobs:
         run: |-
           set -euo pipefail
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          PKG_VERSION="$(node -p "require('./package.json').version")"
+          # The published package is apps/cli (D-040); a repo-hygiene test
+          # keeps the root package.json version equal to it.
+          PKG_VERSION="$(node -p "require('./apps/cli/package.json').version")"
           MANIFEST_VERSION="$(node -p "require('./.release-please-manifest.json')['.']")"
           echo "tag=${TAG_VERSION} package.json=${PKG_VERSION} manifest=${MANIFEST_VERSION}"
           if [ "${TAG_VERSION}" != "${PKG_VERSION}" ] || [ "${TAG_VERSION}" != "${MANIFEST_VERSION}" ]; then
@@ -115,6 +124,7 @@ jobs:
       # single object and runs the prepare script, whereas `npm pack` yields the
       # array shape this assertion parses and honours --ignore-scripts (D-035).
       - name: Assert packed file list (dist + package.json/README/LICENSE/CHANGELOG)
+        working-directory: apps/cli
         run: |-
           set -euo pipefail
           npm pack --dry-run --json --ignore-scripts > pack.json
@@ -134,7 +144,7 @@ jobs:
               console.error("Unexpected packed files:", bad);
               process.exit(1);
             }
-            for (const required of ["package.json", "dist/cli.js", "dist/lib.js", "dist/lib.d.ts"]) {
+            for (const required of ["package.json", "README.md", "LICENSE", "dist/cli.js", "dist/lib.js", "dist/lib.d.ts"]) {
               if (!files.includes(required)) {
                 console.error("Missing required packed file:", required);
                 process.exit(1);
@@ -202,6 +212,7 @@ jobs:
       # Strict by design: ANY bin auto-correction fails the job; fix
       # package.json rather than trust npm's cleaning.
       - name: Fail on any npm bin auto-correction
+        working-directory: apps/cli
         run: |
           set -euo pipefail
           npm publish --dry-run 2>&1 | tee /tmp/npm-dry-run.log
@@ -211,4 +222,5 @@ jobs:
           fi
 
       - name: Publish to npm (Trusted Publishing / OIDC)
+        working-directory: apps/cli
         run: npm publish

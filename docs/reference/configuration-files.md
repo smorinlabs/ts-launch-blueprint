@@ -9,8 +9,8 @@ customize and extend the project.
 ## User Configuration (TOML + XDG)
 
 `ts-projects` reads an optional TOML config file for the token,
-default workspace, and default limit (`src/cli/config.ts`,
-`src/cli/xdg-paths.ts`).
+default workspace, and default limit (`apps/cli/src/cli/config.ts`,
+`apps/cli/src/cli/xdg-paths.ts`).
 
 ### File location
 
@@ -34,7 +34,7 @@ limit = 200                 # default maximum number of projects
 ```
 
 All keys are optional and validated with a zod schema
-(`configFileSchema` in `src/cli/config.ts`): `token`/`workspace` are
+(`configFileSchema` in `apps/cli/src/cli/config.ts`): `token`/`workspace` are
 strings, `limit` is a positive integer. An invalid file (bad TOML, or
 a value that fails schema validation) is a configuration error, exit 1.
 
@@ -84,17 +84,35 @@ including the Windows `icacls` hardening example.
 The files below configure the project's own toolchain — they are not
 read by `ts-projects` at runtime.
 
-### `package.json`
+### `pnpm-workspace.yaml`
 
-The central manifest: name (`ts-launch-blueprint`), version (bumped
-exclusively by release-please — see
-[Versioning](./versioning.md)), the `ts-projects` bin entry, the ESM
-`exports` map, package scripts (`build`, `typecheck`, `test`,
-`test:coverage`, `prepare`), dependencies/devDependencies, the
-`packageManager` field pinning pnpm 10 (D-035), and the
-`engines`/`devEngines.runtime` Node >=24 floor. See
+Declares the pnpm workspace (D-040): `packages/*` (the shared core
+library) and `apps/*` (the CLI today; the API and web app later). See
+[pnpm](../tools/pnpm.md).
+
+### `package.json` (workspace root)
+
+The private workspace root (`ts-launch-blueprint-workspace`,
+`"private": true`): the shared dev tooling (devDependencies), the root
+scripts (`build`, `typecheck`, `test`, `test:coverage`, `prepare`), the
+`packageManager` field pinning pnpm 10 (D-035), the
+`engines`/`devEngines.runtime` Node >=24 floor, and `pnpm.overrides`.
+Its version is bumped by release-please and kept equal to the CLI's (see
+[Versioning](./versioning.md)). See
 [package.json](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/package.json)
 and [pnpm](../tools/pnpm.md).
+
+### `apps/cli/package.json` and `packages/core/package.json`
+
+`apps/cli/package.json` is the published package (`ts-launch-blueprint`):
+the `ts-projects` bin entry, the ESM `exports` map, the `build` script,
+and the runtime dependencies. It depends on the core through
+`"@ts-launch-blueprint/core": "workspace:*"` as a devDependency, because
+the core is bundled into `dist/` and is never installed from npm.
+`packages/core/package.json` is the private core library
+(`@ts-launch-blueprint/core`), whose only entry is `src/index.ts` (no
+build step). See
+[apps/cli/package.json](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/apps/cli/package.json).
 
 ### `.npmrc`
 
@@ -104,14 +122,16 @@ package-manager enforcement, so `managePackageManagerVersions`,
 with the `packageManager` field — pin and verify the exact pnpm version
 (the Corepack replacement). See [pnpm](../tools/pnpm.md).
 
-### `tsconfig.json`
+### `tsconfig.base.json` and `tsconfig.json`
 
-Configures `tsc`, used here as the typecheck gate only (`noEmit:
+`tsconfig.base.json` holds the shared compiler options; the root
+`tsconfig.json` and each package's `tsconfig.json` extend it. The root
+one typechecks the whole workspace in one `tsc` run. They configure `tsc`, used here as the typecheck gate only (`noEmit:
 true` — build output is owned by tsdown). Notable settings: `strict`
 mode plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
 and `isolatedDeclarations` (enables tsdown's fast oxc-based `.d.ts`
 emission). See
-[tsconfig.json](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/tsconfig.json)
+[tsconfig.base.json](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/tsconfig.base.json)
 and [Type Checking](../tasks/type-checking-code.md).
 
 ### `.oxlintrc.json`
@@ -120,7 +140,7 @@ Configures Oxlint, the linter. The `correctness` and `suspicious`
 categories run at `error` severity, with additional rules for
 security-adjacent built-ins (`no-eval`, `no-implied-eval`, ...) and
 modernization (`no-var`, `prefer-const`). An `overrides` block relaxes
-a few rules under `tests/**`. See
+a few rules under `**/tests/**`. See
 [.oxlintrc.json](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/.oxlintrc.json)
 and [Oxlint](../tools/oxlint.md).
 
@@ -158,18 +178,20 @@ test. See
 
 Configures Vitest, the test runner. Node environment, no injected
 globals, v8 coverage with 95/95/90/95 (lines/functions/branches/
-statements) thresholds. `src/cli.ts` and `src/cli/adapters.ts` are
+statements) thresholds. `apps/cli/src/cli.ts` and `apps/cli/src/cli/adapters.ts` are
 excluded from coverage as thin I/O adapters exercised by the
 subprocess/e2e test tier instead. See
 [vitest.config.ts](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/vitest.config.ts)
 and [Vitest](../tools/vitest.md).
 
-### `tsdown.config.ts`
+### `apps/cli/tsdown.config.ts`
 
-Configures tsdown, the bundler. Two entry points (`src/cli.ts`,
-`src/lib.ts`), ESM output, `.d.ts` emission via the isolated-
-declarations fast path, source maps, and `clean: true`. See
-[tsdown.config.ts](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/tsdown.config.ts).
+Configures tsdown, the bundler. Two entry points (`apps/cli/src/cli.ts`,
+`apps/cli/src/lib.ts`), ESM output, `.d.ts` emission via the isolated-
+declarations fast path, source maps, and `clean: true`. The private
+workspace core is bundled into `dist/` (`deps.alwaysBundle`, for both
+the JS and the `.d.ts`), so the published package never imports it. See
+[apps/cli/tsdown.config.ts](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/apps/cli/tsdown.config.ts).
 
 ### `release-please-config.json` and `.release-please-manifest.json`
 

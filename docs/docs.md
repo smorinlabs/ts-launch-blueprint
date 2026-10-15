@@ -134,7 +134,7 @@ Standard GFM table syntax works as-is:
 ## API Reference Docs
 
 `just docs-api` generates API reference markdown from the library entry
-point (`src/lib.ts`) via [TypeDoc](https://typedoc.org/), writing into
+point (`apps/cli/src/lib.ts`) via [TypeDoc](https://typedoc.org/), writing into
 `docs/reference/api/`. It is optional and not part of `just all` or CI —
 run it locally when you want generated reference pages, and commit the
 output if you want it to persist. See

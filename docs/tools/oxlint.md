@@ -91,7 +91,7 @@ just format-check    # alias: just fc
   },
   "overrides": [
     {
-      "files": ["tests/**", "**/*.test.ts"],
+      "files": ["**/tests/**", "**/*.test.ts"],
       "rules": {
         "typescript/no-non-null-assertion": "off",
         "typescript/no-explicit-any": "off",
@@ -100,7 +100,7 @@ just format-check    # alias: just fc
       },
     },
   ],
-  "ignorePatterns": ["dist/**", "coverage/**"],
+  "ignorePatterns": ["**/dist/**", "coverage/**"],
 }
 ```
 

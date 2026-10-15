@@ -142,7 +142,7 @@ jobs:
   # the local `just test-bun` recipe: installs stay pnpm-only (never
   # `bun install`, which would fork a bun.lock and drift from pnpm-lock.yaml);
   # the runner is Vitest driven by `bun run vitest` (never bare `bun test`,
-  # which invokes Bun's own runner); tests/e2e.test.ts is excluded because it
+  # which invokes Bun's own runner); apps/cli/tests/e2e.test.ts is excluded because it
   # spawns process.execPath to assert the published Node signal contract
   # (SIGINT->130/SIGTERM->143), which under Bun would exercise Bun's signal
   # emulation instead. The published package + engines are unchanged.

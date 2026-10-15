@@ -57,11 +57,11 @@ code --install-extension Anthropic.claude-code
 
 `.vscode/launch.json` ships three `node`-type launch configurations built on VS Code's bundled `vscode-js-debug` — no extra debugger extension is required:
 
-| Configuration                  | Runs                                         | Use case                                                                                                                                       |
-| ------------------------------ | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CLI: Launch (tsx)`            | `tsx src/cli.ts`                             | Debug the CLI directly from TypeScript source, no build step.                                                                                  |
-| `CLI: Launch (tsx, With Args)` | `tsx src/cli.ts --workspace test --limit 10` | Same as above, pre-populated with sample arguments — edit the `args` array to match the scenario you're debugging.                             |
-| `CLI: Launch dist build`       | `dist/cli.js`                                | Debug the built output, with `sourceMaps: true` and `outFiles` pointed at `dist/**/*.js` so breakpoints resolve back to the TypeScript source. |
+| Configuration                  | Runs                                                  | Use case                                                                                                                                       |
+| ------------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CLI: Launch (tsx)`            | `tsx apps/cli/src/cli.ts`                             | Debug the CLI directly from TypeScript source, no build step.                                                                                  |
+| `CLI: Launch (tsx, With Args)` | `tsx apps/cli/src/cli.ts --workspace test --limit 10` | Same as above, pre-populated with sample arguments — edit the `args` array to match the scenario you're debugging.                             |
+| `CLI: Launch dist build`       | `apps/cli/dist/cli.js`                                | Debug the built output, with `sourceMaps: true` and `outFiles` pointed at `dist/**/*.js` so breakpoints resolve back to the TypeScript source. |
 
 Open the Run and Debug view (`Ctrl+Shift+D` / `Cmd+Shift+D`), pick a configuration, and press F5 to launch the CLI under the debugger with breakpoints in your TypeScript source. For debugging the CLI's _configuration resolution_ (which layer a value came from) rather than attaching a debugger, see [Debugging Configuration](../tasks/debugging-configuration.md).
 

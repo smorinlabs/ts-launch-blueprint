@@ -58,7 +58,7 @@ pre-commit:
     - name: lint
       glob: '*.{ts,tsx,js,mjs,cjs}'
       exclude:
-        - 'dist/**'
+        - '**/dist/**'
         - 'coverage/**'
       run: pnpm exec oxlint {staged_files}
     # Type check runs on the FULL program, not per-file — tsc semantics need

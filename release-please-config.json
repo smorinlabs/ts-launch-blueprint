@@ -16,7 +16,8 @@
         { "type": "test", "section": "Tests" },
         { "type": "refactor", "section": "Code Refactoring" },
         { "type": "chore", "section": "Miscellaneous", "hidden": true }
-      ]
+      ],
+      "extra-files": [{ "type": "json", "path": "apps/cli/package.json", "jsonpath": "$.version" }]
     }
   }
 }

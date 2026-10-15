@@ -104,7 +104,7 @@ recipe below has a one-line doc comment above it in the file, and `just
 | ------------------------------------------- | ------------------------------------------------------------------------------ |
 | `just check-deps` (`c`)                     | Verify required tools (`just`, `node`, `pnpm`) are installed                   |
 | `just install`                              | Install dependencies (generates/updates `pnpm-lock.yaml`)                      |
-| `just build` (`b`)                          | Bundle CLI + library to `dist/` with tsdown                                    |
+| `just build` (`b`)                          | Bundle CLI + library to `apps/cli/dist/` with tsdown                           |
 | `just typecheck` (`tc`)                     | `tsc --noEmit`                                                                 |
 | `just test` (`t`)                           | Run tests with Vitest                                                          |
 | `just test-bun`                             | Optional/advisory: run non-e2e tiers under Bun (D-036; no-op if absent)        |

@@ -62,13 +62,13 @@ that class of check is delegated to Oxlint (the org convention, with an
 `_`-prefix escape hatch for intentionally-unused parameters); see
 [Oxlint](../tools/oxlint.md).
 
-`tsconfig.json`'s `include` covers `src/**/*.ts` **and** `tests/**/*.ts`,
+The root `tsconfig.json`'s `include` covers every workspace package's `src/` **and** `tests/` (plus the root `tests/`),
 so test files get the same strict checking as production code — closing a
 gap the Python source had (its mypy config under-checked `tests/`).
 
 Emit is disabled (`noEmit: true`): `tsc` here is a pure typecheck gate.
 Building the distributable output is a separate step owned by `tsdown` —
-see `just build` and [`tsdown.config.ts`](../../tsdown.config.ts).
+see `just build` and [`apps/cli/tsdown.config.ts`](../../apps/cli/tsdown.config.ts).
 
 ## Why just one checker?
 
@@ -140,7 +140,7 @@ bundled copy (D-032).
 4. **Missing types for a third-party library**
 
    - **Solution**: install its `@types/<library>` package, or add a
-     `declare module '<library>'` ambient shim under `src/` if none exists.
+     `declare module '<library>'` ambient shim under the package's `src/` if none exists.
 
 5. **Type checking only specific files**
 
