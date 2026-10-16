@@ -116,6 +116,8 @@ revert` (`commitlint.config.mjs`, mirrored in `.gitmessage`)
   `.dependency-cruiser.cjs`, described in `docs/reference/boundary-rules.md`.
   Run `just check-boundaries` after changing imports; never silence a
   boundary rule, fix the import.
+- Read `docs/about/architecture.md` before adding a feature (the layers, the
+  request flow, and the add-a-feature checklist).
 
 ## Shell checks
 
