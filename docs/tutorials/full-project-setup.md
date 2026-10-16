@@ -87,9 +87,9 @@ purpose (setup, build, test, docs, releases, ...).
 ### 6. Build and Run the CLI
 
 ```bash
-just build             # bundles src/cli.ts + src/lib.ts to dist/ via tsdown
-just run --help        # node dist/cli.js --help
-just version           # node dist/cli.js --version
+just build             # bundles apps/cli/src/cli.ts + apps/cli/src/lib.ts to dist/ via tsdown
+just run --help        # node apps/cli/dist/cli.js --help
+just version           # node apps/cli/dist/cli.js --version
 ```
 
 `just run` forwards any arguments to the built CLI, so you can exercise
@@ -146,7 +146,7 @@ just coverage     # vitest run --coverage (95/95/90/95 thresholds)
 | Coverage          | `just coverage`     | `pnpm run test:coverage`               |
 | All quality gates | `just all`          | format-check + lint + typecheck + test |
 | Build             | `just build`        | `pnpm run build` (tsdown)              |
-| Run built CLI     | `just run [args]`   | `node dist/cli.js [args]`              |
+| Run built CLI     | `just run [args]`   | `node apps/cli/dist/cli.js [args]`     |
 | Docs link check   | `just docs-check`   | `node scripts/check-links.mjs`         |
 | Full CI mirror    | `just ci`           | install + gates + build + hook suite   |
 

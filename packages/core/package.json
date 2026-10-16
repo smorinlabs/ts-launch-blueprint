@@ -1,0 +1,13 @@
+{
+  "name": "@ts-launch-blueprint/core",
+  "private": true,
+  "description": "Shared core library (schemas, repositories, services) for ts-launch-blueprint",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

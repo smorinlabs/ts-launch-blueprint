@@ -1,6 +1,10 @@
 # Node-generated files
 node_modules/
 dist/
+# README.md/LICENSE copied next to the published package by its build
+# (apps/cli/scripts/copy-package-files.mjs); the repo-root files are canonical.
+apps/cli/README.md
+apps/cli/LICENSE
 build/
 *.tsbuildinfo
 

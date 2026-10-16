@@ -8,10 +8,10 @@ To ensure consistency and maintainability, please follow these code style guidel
 
 - **Line Length**: 100 characters (Oxfmt `printWidth`).
 - **Types**: Strict TypeScript everywhere (`strict: true` in `tsconfig.json`); avoid `any` outside test files.
-- **Imports**: Sorted automatically by Oxfmt (`sortImports`); prefer relative imports within `src/`.
+- **Imports**: Sorted automatically by Oxfmt (`sortImports`); prefer relative imports within a package's `src/`, and import another workspace package only through its package entry (e.g. `@ts-launch-blueprint/core`).
 - **Naming**: `camelCase` for variables and functions, `PascalCase` for types and classes — enforced by review, not a dedicated linter rule.
 - **Errors**: Prefer the project's typed error taxonomy (`ConfigError`/`ApiError`, mapped to CLI exit codes) over throwing raw strings or relying on assertions.
-- **Tests**: `typescript/no-explicit-any` and `typescript/no-non-null-assertion` are relaxed for `tests/**` and `*.test.ts` (see `.oxlintrc.json` overrides) — loose typing is fine in fixtures and mocks.
+- **Tests**: `typescript/no-explicit-any` and `typescript/no-non-null-assertion` are relaxed for `**/tests/**` and `*.test.ts` (see `.oxlintrc.json` overrides) — loose typing is fine in fixtures and mocks.
 - **Security**: Avoid hardcoded credentials; Oxlint's security-adjacent rules (`no-eval`, `no-implied-eval`, `no-new-func`, `no-script-url`) plus CodeQL and OSV-Scanner in CI stand in for `bandit`.
 
 ## Development Workflow

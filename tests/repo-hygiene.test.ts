@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
 import releasePleaseManifest from '../.release-please-manifest.json' with { type: 'json' };
+import cliPackageJson from '../apps/cli/package.json' with { type: 'json' };
 import commitlintConfig from '../commitlint.config.mjs';
 import packageJson from '../package.json' with { type: 'json' };
 import releasePleaseConfig from '../release-please-config.json' with { type: 'json' };
@@ -407,6 +408,19 @@ describe('release, versioning & packaging (S5: D-021, D-012)', () => {
 
   it('manifest version equals package.json version (D-021(1,2))', () => {
     expect(releasePleaseManifest['.']).toBe(packageJson.version);
+  });
+
+  it('root, apps/cli and manifest versions move together (D-040)', () => {
+    // apps/cli is the published package; release-please bumps it through
+    // extra-files so its version never drifts from the root and the manifest.
+    expect(cliPackageJson.version).toBe(packageJson.version);
+    expect(cliPackageJson.version).toBe(releasePleaseManifest['.']);
+    const extraFiles = (
+      releasePleaseConfig.packages['.'] as { 'extra-files'?: { path: string; jsonpath: string }[] }
+    )['extra-files'];
+    expect(extraFiles).toContainEqual(
+      expect.objectContaining({ path: 'apps/cli/package.json', jsonpath: '$.version' })
+    );
   });
 
   it('release PR version surfaces are atomic and need no lockfile repair', () => {

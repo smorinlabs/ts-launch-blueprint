@@ -6,7 +6,7 @@
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "tsx",
-      "program": "${workspaceFolder}/src/cli.ts",
+      "program": "${workspaceFolder}/apps/cli/src/cli.ts",
       "console": "integratedTerminal"
     },
     {
@@ -14,7 +14,7 @@
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "tsx",
-      "program": "${workspaceFolder}/src/cli.ts",
+      "program": "${workspaceFolder}/apps/cli/src/cli.ts",
       "args": ["--workspace", "test", "--limit", "10"],
       "console": "integratedTerminal"
     },
@@ -22,9 +22,9 @@
       "name": "CLI: Launch dist build",
       "type": "node",
       "request": "launch",
-      "program": "${workspaceFolder}/dist/cli.js",
+      "program": "${workspaceFolder}/apps/cli/dist/cli.js",
       "sourceMaps": true,
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "outFiles": ["${workspaceFolder}/apps/cli/dist/**/*.js"],
       "console": "integratedTerminal"
     }
   ]

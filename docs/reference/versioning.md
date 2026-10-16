@@ -1,23 +1,29 @@
 # Versioning and Release Management
 
 This project uses automatic version management powered by
-**release-please**. `package.json`'s `version` field is the single
-source of truth, and it is bumped exclusively by release-please's
-generated Release PRs — never hand-edited.
+**release-please**. The `version` field in the root `package.json` and in
+`apps/cli/package.json` (the published package) is the single source of
+truth; release-please bumps both together (the CLI's through
+`extra-files`), exclusively in its generated Release PRs — never
+hand-edited. A repo-hygiene test keeps the two and the manifest equal.
+
+> **Publishing is paused during the V1 restructure (D-045).** `publish.yml`
+> runs only on manual dispatch, and Release PRs are not merged until V1 is
+> complete.
 
 ## Key Features
 
 - **Automatic Versioning**: release-please scans Conventional Commits
   on every push to `main` and maintains a standing "Release PR" that
-  bumps `package.json`, `.release-please-manifest.json`, and
+  bumps the root and `apps/cli` `package.json`, `.release-please-manifest.json`, and
   regenerates `CHANGELOG.md`.
-- **Single Source of Truth**: `src/version.ts` imports `package.json`
+- **Single Source of Truth**: `apps/cli/src/version.ts` imports `apps/cli/package.json`
   directly (`import packageJson from '../package.json' with { type:
 "json" }`) and re-exports its `version` as `VERSION`; the bundler
   inlines it at build time. There is no separate generated version
   file to keep in sync.
 - **CI/CD Integration**: the `publish.yml` workflow's `verify` job
-  asserts the release tag, `package.json`, and the manifest all agree
+  asserts the release tag, `apps/cli/package.json`, and the manifest all agree
   before anything is published.
 - **Semantic Versioning**: `bump-minor-pre-major: true` and
   `bump-patch-for-minor-pre-major: true` keep bumps semver-correct
@@ -75,9 +81,9 @@ just version
 node -e "console.log(require('./package.json').version)"
 ```
 
-`tests/version.test.ts` pins three invariants: `VERSION` equals
+`apps/cli/tests/version.test.ts` pins three invariants: `VERSION` equals
 `package.json`'s version, `VERSION` has a semver shape, and the
-library entry point (`src/lib.ts`) re-exports the identical value.
+library entry point (`apps/cli/src/lib.ts`) re-exports the identical value.
 
 ---
 
@@ -124,7 +130,7 @@ Two workflows implement the release pipeline end to end:
   this should only happen from a manual/out-of-band tag push; let
   release-please manage tags instead.
 - **`VERSION` doesn't match `package.json` in tests**: rerun `just
-build` — `src/version.ts` reads `package.json` at build time via the
+build` — `apps/cli/src/version.ts` reads `package.json` at build time via the
   bundler's JSON import, so a stale `dist/` can lag a version bump.
 
 ### Workflow Issues

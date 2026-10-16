@@ -42,7 +42,7 @@ just build
 You can also run the built entry directly:
 
 ```bash
-node dist/cli.js --help
+node apps/cli/dist/cli.js --help
 ```
 
 ## Configuration

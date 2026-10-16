@@ -10,31 +10,6 @@ overrides:
 importers:
 
   .:
-    dependencies:
-      '@inquirer/prompts':
-        specifier: ^8.5.2
-        version: 8.7.2(@types/node@26.6.2)
-      cli-table3:
-        specifier: ^0.6.5
-        version: 0.6.5
-      clipboardy:
-        specifier: ^5.3.1
-        version: 5.3.2
-      commander:
-        specifier: ^15.0.0
-        version: 15.0.0
-      picocolors:
-        specifier: ^1.1.1
-        version: 1.1.1
-      smol-toml:
-        specifier: ^1.9.1
-        version: 1.9.1
-      yocto-spinner:
-        specifier: ^1.2.2
-        version: 1.2.2
-      zod:
-        specifier: ^4.4.3
-        version: 4.6.5
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: ^0.18.5
@@ -78,6 +53,43 @@ importers:
       yaml:
         specifier: ^2.9.0
         version: 2.9.1
+
+  apps/cli:
+    dependencies:
+      '@inquirer/prompts':
+        specifier: ^8.5.2
+        version: 8.7.2(@types/node@26.6.2)
+      cli-table3:
+        specifier: ^0.6.5
+        version: 0.6.5
+      clipboardy:
+        specifier: ^5.3.1
+        version: 5.3.2
+      commander:
+        specifier: ^15.0.0
+        version: 15.0.0
+      picocolors:
+        specifier: ^1.1.1
+        version: 1.1.1
+      smol-toml:
+        specifier: ^1.9.1
+        version: 1.9.1
+      yocto-spinner:
+        specifier: ^1.2.2
+        version: 1.2.2
+      zod:
+        specifier: ^4.4.3
+        version: 4.6.5
+    devDependencies:
+      '@ts-launch-blueprint/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+
+  packages/core:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.6.5
 
 packages:
 
@@ -1648,8 +1660,8 @@ packages:
     resolution: {integrity: sha512-eKCa6bwnJhvxj14kZk5NCPc6Hb6BdsU9DZcOnmQKSnO1VKrfV0zCvtttPZUsBvjmNDn8rpcJfpwSYnHBjc95MQ==}
     engines: {node: '>=18.18.0'}
 
-  iconv-lite@0.7.3:
-    resolution: {integrity: sha512-IKXpvIzjnC9XTAUbVBcMfGS0EPaIXtW6v+zr+RRp+hqULEpo0owZax6wyRwPOJbWbzjYspQwusTsfVr0ifh4uQ==}
+  iconv-lite@0.7.2:
+    resolution: {integrity: sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw==}
     engines: {node: '>=0.10.0'}
 
   import-fresh@3.3.1:
@@ -2430,10 +2442,6 @@ packages:
     resolution: {integrity: sha512-DODGl1wJjA/s5pnJFKau9lIYHT81lnhob1i3e1TjxZRxEhWRKl74nTbWE6H5KlkViQQTo/Z29YFdxzTZAMY3ng==}
     engines: {node: '>=18.19'}
 
-  yoctocolors@2.1.2:
-    resolution: {integrity: sha512-CzhO+pFNo8ajLM2d2IW/R93ipy99LWjtwblvC1RsoSUMZgyLbYFr221TnSNT7GjGdYui6P459mw9JH/g/zW2ug==}
-    engines: {node: '>=18'}
-
   yoctocolors@2.2.0:
     resolution: {integrity: sha512-xYqdZFUK/VYazNl/oCDYN+3WloWQwMfZxBoiNt6qNyk+xfOdi598muWE42rNZFp1kNOiqW936q5RhUdnpqElSg==}
     engines: {node: '>=18'}
@@ -2762,7 +2770,7 @@ snapshots:
   '@inquirer/external-editor@3.0.5(@types/node@26.6.2)':
     dependencies:
       chardet: 2.2.0
-      iconv-lite: 0.7.3
+      iconv-lite: 0.7.2
     optionalDependencies:
       '@types/node': 26.6.2
 
@@ -3595,7 +3603,7 @@ snapshots:
 
   human-signals@8.0.1: {}
 
-  iconv-lite@0.7.3:
+  iconv-lite@0.7.2:
     dependencies:
       safer-buffer: 2.1.2
 
@@ -4282,9 +4290,7 @@ snapshots:
 
   yocto-spinner@1.2.2:
     dependencies:
-      yoctocolors: 2.1.2
-
-  yoctocolors@2.1.2: {}
+      yoctocolors: 2.2.0
 
   yoctocolors@2.2.0: {}
 

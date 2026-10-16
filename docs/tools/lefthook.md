@@ -35,7 +35,7 @@ just setup-hooks
   staged file over 500KB, the equivalent of pre-commit's
   `check-added-large-files`.
 - **`lint`** — runs `oxlint` on staged `*.{ts,tsx,js,mjs,cjs}` files (excluding
-  `dist/**` and `coverage/**`), the equivalent of the source's `ruff` lint
+  `**/dist/**` and `coverage/**`), the equivalent of the source's `ruff` lint
   hook.
 - **`typecheck`** — runs `tsc --noEmit` on the _whole_ program, not just the
   staged files, because type-checking needs the full module graph. This

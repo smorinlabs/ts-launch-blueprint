@@ -1,0 +1,4 @@
+# pnpm workspace (D-040): the shared core library and the apps that use it.
+packages:
+  - 'packages/*'
+  - 'apps/*'

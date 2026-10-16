@@ -49,11 +49,11 @@ just coverage        # or: pnpm run test:coverage
 just all
 
 # Run the CLI from source (via tsx, no build step)
-pnpm exec tsx src/cli.ts --help
+pnpm exec tsx apps/cli/src/cli.ts --help
 
 # Build and run the packaged CLI
 just build
-node dist/cli.js --help
+node apps/cli/dist/cli.js --help
 ```
 
 See [Managing Dependencies](managing-dependencies.md) for adding, updating,
@@ -82,7 +82,7 @@ Three hard rules keep the lane safe:
    a `bun.lock` and drift from the committed `pnpm-lock.yaml`.
 2. **Never bare `bun test`.** That invokes Bun's own test runner; Vitest must
    always be the driver, via `bun run vitest`.
-3. **The e2e tier stays Node-only.** `tests/e2e.test.ts` spawns
+3. **The e2e tier stays Node-only.** `apps/cli/tests/e2e.test.ts` spawns
    `process.execPath` to assert the published Node signal contract
    (SIGINT→130 / SIGTERM→143); under Bun it would exercise Bun's signal
    emulation instead, so it is excluded from this lane.

@@ -51,7 +51,7 @@
   // global gate (more categories, type-aware mode) never taxes test code.
   "overrides": [
     {
-      "files": ["tests/**", "**/*.test.ts"],
+      "files": ["**/tests/**", "**/*.test.ts"],
       "rules": {
         // Tests assert freely, including on possibly-undefined values —
         // non-null assertions are idiomatic in test bodies (ruff S101 analog).
@@ -66,5 +66,5 @@
       }
     }
   ],
-  "ignorePatterns": ["dist/**", "coverage/**"]
+  "ignorePatterns": ["**/dist/**", "coverage/**"]
 }

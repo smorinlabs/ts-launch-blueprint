@@ -36,10 +36,10 @@ install-pnpm`, not bundled with Node — it self-manages to the version
 
 ### Build System
 
-- **tsdown**: bundles `src/cli.ts` + `src/lib.ts` to `dist/` (ESM-only) with
+- **tsdown**: bundles `apps/cli/src/cli.ts` + `apps/cli/src/lib.ts` to `dist/` (ESM-only) with
   declarations and sourcemaps
 - Version management: `package.json` is the single version source, bumped only
-  by release-please Release PRs; `src/version.ts` inlines it at build time.
+  by release-please Release PRs; `apps/cli/src/version.ts` inlines it at build time.
   `pnpm-lock.yaml` does not duplicate the root project version, so release PRs
   need no follow-up lockfile mutation and must remain atomic.
 
@@ -61,14 +61,14 @@ install-pnpm`, not bundled with Node — it self-manages to the version
   - `just all`: run all checks (format-check, lint, shell/workflow checks, typecheck, test)
   - `just pre-commit-run`: run the full hook suite on all files (CI mirror)
   - `just setup-hooks`: install git hooks + commit-message template
-  - `just build`: build distributable `dist/`
+  - `just build`: build the published CLI package into `apps/cli/dist/`
   - `just check-deps` / `just debug-info`: toolchain diagnosis
 
 ### Code Quality Tools
 
 - **Oxlint**: linter — correctness + suspicious categories at error severity,
   security-adjacent built-ins (no-eval family), `^_` unused-code convention;
-  per-context relaxations for `tests/**` (`.oxlintrc.json`)
+  per-context relaxations for `**/tests/**` (`.oxlintrc.json`)
 - **Oxfmt**: formatter (exact-pinned beta) — 100 cols, single quotes, semis,
   es5 trailing commas, LF, `sortImports`; also formats JSON/YAML/Markdown
   (`.oxfmtrc.json`)
@@ -106,9 +106,12 @@ revert` (`commitlint.config.mjs`, mirrored in `.gitmessage`)
 
 - Package name: `ts-launch-blueprint`
 - Command name: `ts-projects`
-- Source in `/src` (`cli.ts` bin entry, `lib.ts` public API, `version.ts`)
-- Tests in `/tests` (`*.test.ts`)
-- Build output in `/dist` (gitignored)
+- pnpm workspace (D-040): `packages/core` (shared library: schemas,
+  repositories, services; private, imported only via its `src/index.ts`) and
+  `apps/cli` (the published package: `src/cli.ts` bin entry, `src/lib.ts`
+  public API, `src/version.ts`, `src/cli/` controller code)
+- Tests in each package's `tests/` (`*.test.ts`); repo-level checks in `/tests`
+- Build output in `apps/cli/dist` (gitignored; the core is bundled into it)
 
 ## Shell checks
 

@@ -1,7 +1,7 @@
 # Command-Line Interface (CLI) Reference
 
 This section documents `ts-projects`, the example CLI shipped by this
-template (`src/cli.ts`, `src/router.ts`, `src/commands/projects.ts`). It
+template (`apps/cli/src/cli.ts`, `apps/cli/src/cli/router.ts`, `apps/cli/src/cli/commands/projects.ts`). It
 is a TypeScript port of the source repo's `py-projects` tool; the full
 UX spec and source-vs-port parity notes live in
 [`EXAMPLECLI.md`](../../EXAMPLECLI.md).
@@ -213,7 +213,7 @@ tasks (build, lint, format, typecheck, test) are run through the
 Justfile, not through `ts-projects`:
 
 ```bash
-just build       # tsdown build -> dist/
+just build       # tsdown build -> apps/cli/dist/
 just typecheck   # tsc --noEmit
 just lint        # oxlint
 just format      # oxfmt --write

@@ -10,7 +10,7 @@ See AGENTS.md for the full project charter (canonical AI-context hub).
 - Lint: `just lint` (or `pnpm exec oxlint`); autofix: `just lint-fix`
 - Type check: `just typecheck` (or `pnpm exec tsc --noEmit`)
 - Test all: `just test`
-- Test single: `pnpm exec vitest run tests/version.test.ts -t 'test name'`
+- Test single: `pnpm exec vitest run apps/cli/tests/version.test.ts -t 'test name'`
 - All checks: `just all` (format-check, lint, shell/workflow checks, typecheck, test)
 - Hook suite on all files: `just pre-commit-run`
 - Install hooks + commit template: `just setup-hooks`

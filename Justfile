@@ -93,10 +93,10 @@ alias c := check-deps
     just check-deps
     pnpm install
 
-# Build distributable package (dist/) with tsdown
+# Build the published CLI package (apps/cli/dist/) with tsdown
 [group('build'), group('dev')]
 @build:
-    pnpm run build
+    pnpm --filter ts-launch-blueprint build
 
 alias b := build
 
@@ -154,7 +154,8 @@ alias t := test
 # pnpm-only — never `bun install`, which would fork a bun.lock and drift from
 # pnpm-lock.yaml; (2) NEVER bare `bun test` — that invokes Bun's own runner
 # (Vitest's docs warn explicitly); Vitest is always the driver via
-# `bun run vitest`; (3) tests/e2e.test.ts stays Node-only and is excluded here
+# `bun run vitest`; (3) apps/cli/tests/e2e.test.ts stays Node-only and is excluded
+# here (the exclude glob is matched relative to each Vitest project's root)
 # because it spawns process.execPath and under Bun would silently exercise
 # Bun's signal emulation (SIGINT->130/SIGTERM->143) instead of the published
 # Node contract. Prints install guidance and exits 0 when bun is absent
@@ -207,11 +208,11 @@ alias pc := pre-commit-run
     #!/usr/bin/env sh
     if ! pnpm exec typedoc --version >/dev/null 2>&1; then
         printf "{{YELLOW}}typedoc is not installed{{NC}} (optional, not CI-gated, D-023(4)).\n"
-        printf "Run on demand:   {{BLUE}}pnpm dlx typedoc --out docs/reference/api src/lib.ts{{NC}}\n"
+        printf "Run on demand:   {{BLUE}}pnpm dlx typedoc --out docs/reference/api apps/cli/src/lib.ts{{NC}}\n"
         printf "or add it:       {{BLUE}}pnpm add -D typedoc typedoc-plugin-markdown{{NC}}\n"
         exit 0
     fi
-    pnpm exec typedoc --out docs/reference/api src/lib.ts
+    pnpm exec typedoc --out docs/reference/api apps/cli/src/lib.ts
 
 # Run the full CI sequence locally (mirror of .github/workflows/ci.yml).
 # Same order CI runs: install deps, the direct quality gates, build, then the
@@ -230,12 +231,12 @@ alias pc := pre-commit-run
 # Run package command
 [group('run'), group('quick start')]
 @run *args=args:
-    node dist/cli.js {{args}}
+    node apps/cli/dist/cli.js {{args}}
 
 # Check built package version
 [group('releases'), group('utilities')]
 @version:
-    node dist/cli.js --version
+    node apps/cli/dist/cli.js --version
 
 # Render CONTRIBUTORS.md from the committed contributor-state ledger
 # (.contributors.jsonl) via the org's contributors-please CLI (D-024(9)).
@@ -279,10 +280,14 @@ release-status:
 pack-check:
     #!/usr/bin/env sh
     set -eu
+    # The published package is apps/cli (D-040); every step runs there.
+    cd apps/cli
     echo "{{CYAN}}[1/6] build{{NC}}"
     pnpm run build
     echo "{{CYAN}}[2/6] publint{{NC}}"
-    pnpm exec publint
+    # Pack with npm, the CLI that actually publishes (D-035); pnpm pack would
+    # also try to resolve the private workspace core's version.
+    pnpm exec publint --pack npm
     echo "{{CYAN}}[3/6] attw (--profile esm-only: ESM-only package is intentional){{NC}}"
     pnpm exec attw --pack . --profile esm-only
     echo "{{CYAN}}[4/6] npm pack --dry-run file-list assertion{{NC}}"
@@ -293,7 +298,7 @@ pack-check:
       const rootWhitelist = new Set(["package.json", "README.md", "LICENSE", "CHANGELOG.md"]);
       const bad = files.filter((p) => !p.startsWith("dist/") && !rootWhitelist.has(p));
       if (bad.length > 0) { console.error("Unexpected packed files:", bad); process.exit(1); }
-      for (const req of ["package.json", "dist/cli.js", "dist/lib.js", "dist/lib.d.ts"]) {
+      for (const req of ["package.json", "README.md", "LICENSE", "dist/cli.js", "dist/lib.js", "dist/lib.d.ts"]) {
         if (!files.includes(req)) { console.error("Missing required packed file:", req); process.exit(1); }
       }
       console.log("  OK:", files.length, "files (dist/** + root whitelist).");
@@ -318,9 +323,9 @@ pack-check:
 # Clean up build artifacts, caches, and installed dependencies
 [group('clean')]
 @clean:
-    rm -rf dist
+    rm -rf apps/cli/dist apps/cli/README.md apps/cli/LICENSE
     rm -rf coverage
-    rm -rf node_modules
+    rm -rf node_modules packages/*/node_modules apps/*/node_modules
     rm -f *.tsbuildinfo
 
 # Collect system and environment information for debugging (dependency-free)
@@ -358,7 +363,7 @@ debug-info:
     if command -v git >/dev/null 2>&1; then echo "git: $(git --version)"; else echo "git: Not Found"; fi
     if command -v just >/dev/null 2>&1; then echo "just: $(just --version)"; else echo "just: Not Found"; fi
     if command -v bun >/dev/null 2>&1; then echo "bun: $(bun --version) (optional dev/test lane, D-036)"; else echo "bun: Not Found (optional, D-036)"; fi
-    echo "CLI Version ({{command_name}}): $(node dist/cli.js --version 2>/dev/null || echo 'Not Found (run: just build)')"
+    echo "CLI Version ({{command_name}}): $(node apps/cli/dist/cli.js --version 2>/dev/null || echo 'Not Found (run: just build)')"
     if command -v node >/dev/null 2>&1; then
         echo "Project Version: $(node -p "JSON.parse(require('node:fs').readFileSync('package.json','utf8')).version" 2>/dev/null || echo 'Version Not Found')"
     fi
@@ -366,9 +371,9 @@ debug-info:
     echo "### Installed Project Packages"
     if command -v pnpm >/dev/null 2>&1; then pnpm list --depth 0 2>/dev/null || echo "(no node_modules; run 'just install')"; else echo "pnpm not found, cannot list packages"; fi
     echo ""
-    echo "### Declared Dependencies (package.json)"
+    echo "### Declared Dependencies (apps/cli/package.json)"
     if command -v node >/dev/null 2>&1; then
-        node -p "const p=JSON.parse(require('node:fs').readFileSync('package.json','utf8')); JSON.stringify({dependencies:p.dependencies??{},devDependencies:p.devDependencies??{}},null,2)" 2>/dev/null || echo "Could not read dependencies from package.json"
+        node -p "const p=JSON.parse(require('node:fs').readFileSync('apps/cli/package.json','utf8')); JSON.stringify({dependencies:p.dependencies??{},devDependencies:p.devDependencies??{}},null,2)" 2>/dev/null || echo "Could not read dependencies from package.json"
     else
         echo "node not found, cannot read package.json"
     fi
