@@ -112,6 +112,10 @@ revert` (`commitlint.config.mjs`, mirrored in `.gitmessage`)
   public API, `src/version.ts`, `src/cli/` controller code)
 - Tests in each package's `tests/` (`*.test.ts`); repo-level checks in `/tests`
 - Build output in `apps/cli/dist` (gitignored; the core is bundled into it)
+- Architecture boundaries (D-042): rules in `.oxlintrc.json` and
+  `.dependency-cruiser.cjs`, described in `docs/reference/boundary-rules.md`.
+  Run `just check-boundaries` after changing imports; never silence a
+  boundary rule, fix the import.
 
 ## Shell checks
 
