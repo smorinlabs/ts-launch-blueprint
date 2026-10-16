@@ -20,6 +20,7 @@ import { redactToken, requireToken, resolveConfig } from './config.js';
 import type { CliContext, CliDeps, GlobalOpts } from './deps.js';
 import { EXIT_CODES, exitCodeFor } from './exit-codes.js';
 import { createLogger, resolveLevel } from './logger.js';
+import { resolveSource } from './source.js';
 
 /** Real process-backed deps for the production entry point. */
 export function realDeps(): CliDeps {
@@ -99,6 +100,9 @@ function buildProgram(deps: CliDeps): Command {
       return;
     }
     const globals = program.opts<GlobalOpts>();
+    // --source belongs to the projects command, so only the env var applies
+    // here; memory mode needs no token, so requireToken is skipped.
+    const { source, origin } = resolveSource({ env: deps.env });
     const resolved = resolveConfig({
       flagToken: globals.token,
       configPathFlag: globals.config,
@@ -107,14 +111,17 @@ function buildProgram(deps: CliDeps): Command {
       fs: deps.fs,
       warn: (message) => logger.warn(message),
     });
-    const token = requireToken(resolved, deps.env, deps.homedir);
+    const token = source === 'memory' ? undefined : requireToken(resolved, deps.env, deps.homedir);
     // Leveled diagnostics (D-018(3)): info by default, debug at -v,
     // trace at -vv; -q drops info. All on stderr, never stdout.
     logger.info(`resolved configuration (config file: ${resolved.configPath ?? 'none'})`);
     logger.debug(`token source: ${resolved.tokenSource}`);
     logger.trace('configuration resolution complete');
     const lines = [
-      `token = "${redactToken(token)}" (source: ${resolved.tokenSource})`,
+      `source = ${source} (source: ${origin})`,
+      token === undefined
+        ? 'token = (not needed: memory source)'
+        : `token = "${redactToken(token)}" (source: ${resolved.tokenSource})`,
       `workspace = ${resolved.workspace === undefined ? '(unset)' : `"${resolved.workspace}"`}`,
       `limit = ${resolved.limit === undefined ? '(unset)' : String(resolved.limit)}`,
       `config_file = ${resolved.configPath ?? '(none)'}`,
