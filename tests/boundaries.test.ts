@@ -45,7 +45,9 @@ function run(bin: string, args: string[]): RunResult {
   return { status: result.status, output: `${result.stdout}${result.stderr}` };
 }
 
-const oxlint = (files: string[]): RunResult => run('oxlint', files);
+// Pinned: in GitHub Actions oxlint switches to its `github` format, which
+// drops the `help:` text that carries our rule tags.
+const oxlint = (files: string[]): RunResult => run('oxlint', ['--format', 'default', ...files]);
 
 /** A result shape whose comparison shows the tool output on failure. */
 const outcome = (result: RunResult): { passed: boolean; output: string } => ({
