@@ -9,7 +9,7 @@
 // preserved.
 import { writeFileSync } from 'node:fs';
 
-import { createCore, DEFAULT_LIMIT, type Project } from '@ts-launch-blueprint/core';
+import { type Core, createCore, DEFAULT_LIMIT, type Project } from '@ts-launch-blueprint/core';
 import Table from 'cli-table3';
 import type { Command } from 'commander';
 import { InvalidArgumentError, Option } from 'commander';
@@ -18,6 +18,7 @@ import { requireToken, resolveConfig } from '../config.js';
 import type { CliContext, CliDeps } from '../deps.js';
 import { CliError } from '../exit-codes.js';
 import { formatOutput, type OutputFormat, OUTPUT_FORMATS } from '../format.js';
+import { resolveSource, SOURCE_ENV_VAR } from '../source.js';
 
 /** Env var overriding the API root — exists so e2e tests (and users of
  * a self-hosted API) can point the CLI at another server. Documented in
@@ -32,6 +33,8 @@ interface ProjectsOptions {
   json?: boolean;
   output?: string;
   copy: boolean;
+  /** --source (http | memory); validated by resolveSource. */
+  source?: string;
 }
 
 /** click-style strict positive-integer parser for --limit; rejection is
@@ -82,6 +85,7 @@ export function registerProjectsCommand(
     .addOption(new Option('--json', 'output json (alias for --format json)').conflicts('format'))
     .option('--output <file>', 'write results to file')
     .option('--copy', 'copy results to clipboard', false)
+    .option('--source <name>', 'data source: http (default) or memory (demo data, no token)')
     .action(async (cmdOpts: ProjectsOptions, command: Command) => {
       await runProjects(cmdOpts, command, deps, getContext());
     });
@@ -96,8 +100,12 @@ async function runProjects(
   const { opts, colors, logger } = ctx;
   const format: OutputFormat = cmdOpts.json === true ? 'json' : cmdOpts.format;
 
-  // Token required before any network call; missing -> AuthError exit 4
-  // (D-016(2); the source exited 1 here).
+  // Validated before anything else so a bad --source/TS_PROJECTS_SOURCE is
+  // a usage error (exit 2) even when no token is configured.
+  const { source, origin } = resolveSource({ flag: cmdOpts.source, env: deps.env });
+
+  // resolveConfig runs in both modes: it supplies the config file's
+  // workspace/limit defaults.
   const resolved = resolveConfig({
     flagToken: opts.token,
     configPathFlag: opts.config,
@@ -106,7 +114,6 @@ async function runProjects(
     fs: deps.fs,
     warn: (message) => logger.warn(message),
   });
-  const token = requireToken(resolved, deps.env, deps.homedir);
 
   // Config-file workspace/limit act as defaults; explicit flags win
   // (cli-standards R5.1 flags > file).
@@ -116,10 +123,23 @@ async function runProjects(
       ? resolved.limit
       : cmdOpts.limit;
 
-  const { projects: projectsService } = createCore({
-    source: 'http',
-    http: { token, fetchImpl: deps.fetchImpl, baseUrl: deps.env[API_URL_ENV_VAR] },
-  });
+  // memory: the core's demo seed, so no token and no network (any token
+  // given is ignored). http: token required before any network call;
+  // missing -> AuthError exit 4 (D-016(2); the source exited 1 here).
+  let core: Core;
+  if (source === 'memory') {
+    logger.info(
+      `Using in-memory demo data (${origin === 'flag' ? '--source memory' : `${SOURCE_ENV_VAR}=memory`})`
+    );
+    core = createCore({ source: 'memory' });
+  } else {
+    const token = requireToken(resolved, deps.env, deps.homedir);
+    core = createCore({
+      source: 'http',
+      http: { token, fetchImpl: deps.fetchImpl, baseUrl: deps.env[API_URL_ENV_VAR] },
+    });
+  }
+  const { projects: projectsService } = core;
 
   // Spinner on stderr, gated on stderr TTY-ness and CI (D-016(5)); when
   // suppressed the fetch is silent and piped stdout stays clean.

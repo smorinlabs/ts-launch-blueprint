@@ -174,6 +174,21 @@ describe('piped stdout purity (D-018(4,5))', () => {
   });
 });
 
+describe('demo mode: in-memory data source end-to-end', () => {
+  it('TS_PROJECTS_SOURCE=memory lists the 4 demo projects with no token configured', async () => {
+    // Remove the base env's token: this proves "no token anywhere" (HOME is
+    // an empty temp dir, so there is no config-file token either).
+    const { TS_PROJECTS_TOKEN: _token, ...envWithoutToken } = baseEnv;
+    const result = await runCliProcess(['projects', '--no-input', '--format', 'json'], {
+      ...envWithoutToken,
+      TS_PROJECTS_SOURCE: 'memory',
+    });
+    expect(result.code).toBe(0);
+    expect((JSON.parse(result.stdout) as { projects: unknown[] }).projects).toHaveLength(4);
+    expect(result.stderr).toContain('Using in-memory demo data');
+  });
+});
+
 describe('exit codes end-to-end (D-016(2))', () => {
   it('success -> 0', async () => {
     const result = await runCliProcess(['projects', '--no-input'], baseEnv);
