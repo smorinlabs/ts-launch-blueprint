@@ -67,6 +67,13 @@ just all        # every quality gate: format-check, lint, shell/workflow checks,
 
 Run `just` (no arguments) to list every available recipe.
 
+Try the example CLI without a token or a server, on the built-in demo data:
+
+```bash
+just build
+TS_PROJECTS_SOURCE=memory node apps/cli/dist/cli.js projects
+```
+
 Optionally, `just test-bun` runs the non-e2e tests under [Bun](https://bun.sh)
 as an advisory forward-compatibility signal (D-036) — installs stay pnpm-only
 and the published package is unchanged; see

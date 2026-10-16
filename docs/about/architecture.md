@@ -97,11 +97,13 @@ sequenceDiagram
   Note over CLI: format as text / JSON / CSV, write to stdout
 ```
 
-- **The CLI always uses the HTTP source today**
+- **The CLI uses the HTTP source by default**
   ([`apps/cli/src/cli/commands/projects.ts`](../../apps/cli/src/cli/commands/projects.ts)
   calls `createCore({ source: 'http', … })`). The API URL defaults to a
   placeholder; the `TS_PROJECTS_API_URL` environment variable points it at a
-  real server. Letting the CLI use the in-memory seed is a planned option.
+  real server. `--source memory` / `TS_PROJECTS_SOURCE=memory` runs the CLI on
+  the in-memory seed instead (`createCore({ source: 'memory' })`), with no
+  token and no server.
 - **Only data from outside is validated.** The HTTP repository runs every
   item through the converter (`unwrapList` → `convertProject` /
   `convertWorkspace`). The in-memory repository returns its seed as is,
