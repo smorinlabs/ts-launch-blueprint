@@ -21,6 +21,7 @@ ts-projects config --show
 ```
 
 ```text
+source = http (source: default)
 token = "***ab12" (source: env)
 workspace = (unset)
 limit = (unset)
@@ -103,7 +104,8 @@ toolchain.
 If none of the three layers supplies a token, resolution succeeds (there's
 nothing malformed) but _using_ that resolved configuration fails: both
 `config --show` and the default `projects` command call
-[`requireToken`](../../apps/cli/src/cli/config.ts), which throws an `AuthError` —
+[`requireToken`](../../apps/cli/src/cli/config.ts) (skipped when
+`TS_PROJECTS_SOURCE=memory`, which needs no token), which throws an `AuthError` —
 mapped to **exit code 4** (D-016(2)):
 
 ```bash
