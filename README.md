@@ -142,6 +142,7 @@ Full documentation lives in [`docs/`](./docs/docs.md) — plain
 GitHub-Flavored Markdown, no generated site:
 
 - [About](./docs/about/index.md) — philosophy and full feature list
+- [Architecture](./docs/about/architecture.md) — the layers, how a request flows, how to add a feature
 - [Tutorials](./docs/tutorials/index.md) — guided full-project-setup walkthrough
 - [Tasks](./docs/tasks/index.md) — how-to guides (dependencies, type checking, CI/CD, debugging, contributing code)
 - [Tools](./docs/tools/index.md) — what each tool does and why it was chosen (TypeScript, Vitest, Oxlint, pnpm, lefthook, GitHub Actions, VS Code, Justfiles, Makefiles, CLA Assistant)

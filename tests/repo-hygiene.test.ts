@@ -9,7 +9,6 @@ import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
 import releasePleaseManifest from '../.release-please-manifest.json' with { type: 'json' };
-import cliPackageJson from '../apps/cli/package.json' with { type: 'json' };
 import commitlintConfig from '../commitlint.config.mjs';
 import packageJson from '../package.json' with { type: 'json' };
 import releasePleaseConfig from '../release-please-config.json' with { type: 'json' };
@@ -410,18 +409,30 @@ describe('release, versioning & packaging (S5: D-021, D-012)', () => {
     expect(releasePleaseManifest['.']).toBe(packageJson.version);
   });
 
-  it('root, apps/cli and manifest versions move together (D-040)', () => {
-    // apps/cli is the published package; release-please bumps it through
-    // extra-files so its version never drifts from the root and the manifest.
-    expect(cliPackageJson.version).toBe(packageJson.version);
-    expect(cliPackageJson.version).toBe(releasePleaseManifest['.']);
-    const extraFiles = (
-      releasePleaseConfig.packages['.'] as { 'extra-files'?: { path: string; jsonpath: string }[] }
-    )['extra-files'];
-    expect(extraFiles).toContainEqual(
-      expect.objectContaining({ path: 'apps/cli/package.json', jsonpath: '$.version' })
-    );
-  });
+  // Read at runtime (not a static JSON import) and skipped when apps/cli is
+  // absent, so `just check-removable cli` can typecheck and test the repo
+  // without the CLI (docs/reference/boundary-rules.md, "Removing the CLI").
+  const CLI_PACKAGE_JSON = join(REPO_ROOT, 'apps', 'cli', 'package.json');
+  it.skipIf(!existsSync(CLI_PACKAGE_JSON))(
+    'root, apps/cli and manifest versions move together (D-040)',
+    () => {
+      // apps/cli is the published package; release-please bumps it through
+      // extra-files so its version never drifts from the root and the manifest.
+      const cliPackageJson = JSON.parse(readFileSync(CLI_PACKAGE_JSON, 'utf8')) as {
+        version: string;
+      };
+      expect(cliPackageJson.version).toBe(packageJson.version);
+      expect(cliPackageJson.version).toBe(releasePleaseManifest['.']);
+      const extraFiles = (
+        releasePleaseConfig.packages['.'] as {
+          'extra-files'?: { path: string; jsonpath: string }[];
+        }
+      )['extra-files'];
+      expect(extraFiles).toContainEqual(
+        expect.objectContaining({ path: 'apps/cli/package.json', jsonpath: '$.version' })
+      );
+    }
+  );
 
   it('release PR version surfaces are atomic and need no lockfile repair', () => {
     const pnpmLock = parse(readFileSync(join(REPO_ROOT, 'pnpm-lock.yaml'), 'utf8')) as {
@@ -550,6 +561,37 @@ describe('community files & contributors automation (S6a: D-022(11), D-024(9))',
     for (const relPath of candidateFiles) {
       const content = readFileSync(join(REPO_ROOT, relPath), 'utf8');
       expect(content).not.toContain('update_contributors.py');
+    }
+  });
+});
+
+/** Every tsconfig*.json in the repo, skipping installed and generated trees. */
+function tsconfigs(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.isDirectory()) {
+      return ['node_modules', 'dist', 'coverage', '.git'].includes(entry.name)
+        ? []
+        : tsconfigs(join(dir, entry.name));
+    }
+    return /^tsconfig.*\.json$/.test(entry.name) ? [join(dir, entry.name)] : [];
+  });
+}
+
+describe('architecture boundaries (D-042)', () => {
+  it('[no-path-alias] no tsconfig defines compilerOptions.paths', () => {
+    // One import style: relative inside a package, the package name across
+    // packages. A path alias could route around the boundary rules.
+    const files = tsconfigs(REPO_ROOT);
+    expect(files.length).toBeGreaterThanOrEqual(4);
+    for (const file of files) {
+      // tsconfig files are JSONC with full-line comments only (same as above).
+      const text = readFileSync(file, 'utf8')
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('//'))
+        .join('\n')
+        .replace(/\/\/[^"\n]*$/gm, '');
+      const config = JSON.parse(text) as { compilerOptions?: { paths?: unknown } };
+      expect({ file, paths: config.compilerOptions?.paths }).toEqual({ file, paths: undefined });
     }
   });
 });

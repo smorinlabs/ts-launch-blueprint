@@ -4,5 +4,6 @@ Welcome to the Reference section of the TS Launch Blueprint documentation. This 
 
 - [Project Structure](project-structure.md)
 - [Configuration Files](configuration-files.md)
+- [Architecture Boundary Rules](boundary-rules.md)
 - [CLI Reference](cli-reference.md)
 - [Versioning](versioning.md)

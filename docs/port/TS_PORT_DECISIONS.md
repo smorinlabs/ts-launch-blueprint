@@ -427,3 +427,51 @@ the old one.
 - Options: (1) picocolors 1.1.1 via createColors(enabled) behind the existing colorEnabled() gate, preserving colors.ts's public API so no call sites change (2) keep node:util styleText
 - Decision: (1). createColors(enabled) fully overrides picocolors' module-load env detection (verified in its source), so the repo's --no-color/NO_COLOR/FORCE_COLOR/TTY precedence stays authoritative; semantic mapping error→red, warn→yellow, success→green, dim→dim.
 - Why: User instruction. Cost: one 196M-downloads/week micro-dependency in place of a Node built-in; benefit: independence from node:util availability (mild synergy with the D-036 Bun lane). Docs referencing the styleText choice update accordingly.
+
+## D-039: BankSheets layered architecture for the shared library (schemas / repositories / services, CLI and API as controllers)
+- Ref: maintainer decision (Husnain, decision authority delegated by Steve, 2026-10); call with Steve 2026-10-01 ("bring all the layers from BankSheets"; "do what we're doing in BankSheets first"); implemented in P1-1 to P1-4 (PRs #40, #42, #43, #45)
+- Options: (1) BankSheets layer names: `core/schemas` (shapes, Zod schemas, converters, domain errors) → `core/repositories` (data access behind an interface) → `core/services` (business rules), with the CLI and the API as controllers that call services through a composition root (2) PyLaunch hexagonal names (`models / ports / services / adapters`) (3) keep the flat `src/lib/` layout
+- Decision: (1). Two additions over BankSheets, taken from PyLaunch: repositories sit behind an interface (`ProjectsRepository`) so the data source can be swapped (HTTP, in-memory, later e.g. Firestore), and a single composition root (`createCore`) is the only place that picks an implementation. Domain errors carry no transport detail; each controller maps them (CLI → exit codes, API → HTTP/tRPC codes). The architecture doc (P1-7) maps each layer to its PyLaunch equivalent.
+- Why: Steve's direction: BankSheets is the more mature pattern and wins on conflict; PyLaunch is updated to match later. The team already knows these names. The interface + composition root are what make the in-memory demo source and the "API and CLI share one service" requirement possible.
+
+## D-040: pnpm workspace monorepo — `packages/core` + `apps/cli`, later `apps/api` and `apps/web` (amends D-012(1,3,7))
+- Ref: maintainer decision 2026-10; call with Steve 2026-10-01 ("if you want to delete the CLI, you should be able to delete the CLI"; goal is a ready web template); implemented in P1-5a/P1-5b (PRs #48, #49)
+- Options: (1) pnpm workspaces: `packages/core` (shared library), `apps/cli`, `apps/api` (Phase 2), `apps/web` (React, later) (2) one package with folders `src/core`, `src/cli`, `src/api` (3) separate repositories
+- Decision: (1). Each part has its own `package.json`, dependencies and tsconfig (extending a shared `tsconfig.base.json`). Apps depend on core through its package entry only (`@ts-launch-blueprint/core`, a `workspace:*` devDependency because tsdown bundles the core into the published `dist/`); nothing depends on an app. Amends D-012(1) (tsdown entries now live in `apps/cli`), D-012(3) (the published package is `apps/cli`; the root is a private workspace root) and D-012(7) (packaging validation runs inside `apps/cli`, with `publint --pack npm`).
+- Why: A web template with a React app needs browser settings and a different bundler from the Node apps, which conflict in one package. Separate packages keep dependencies apart (no React in the API, no Commander in the web app) and make "delete a part" literally deleting one folder (proved by `just check-removable cli`, D-042). Follows BankSheets' `packages/core` split and pnpm, and goes further by making it a real workspace package, which BankSheets does not yet do (its `packages/core` is reached through tsconfig path aliases). What gets published is decided separately (D-045).
+
+## D-041: No Turborepo; use pnpm's built-in workspace commands (reaffirms D-024(10)'s no-Turbo; amends its scripts-only-for-lifecycle clause)
+- Ref: maintainer decision 2026-10, alongside D-040
+- Options: (1) pnpm only (`pnpm -r`, `pnpm --filter`) driven by the existing Justfile (2) add Turborepo (3) add Nx
+- Decision: (1). Workspace packages may define their own `build`/`test` scripts (e.g. `apps/cli`'s `build`), which D-024(10)'s "package.json scripts only for npm lifecycle hooks" clause did not allow; the Justfile stays the single command surface that calls them.
+- Why: D-024(10) already rejected Turbo. With 3–4 small packages, task caching adds a tool to learn and configure for little gain. Revisit only if build or test time becomes a real problem.
+
+## D-042: Architectural boundaries enforced with oxlint rules + dependency-cruiser (swc parser), not ESLint (builds on D-014)
+- Ref: maintainer decision 2026-10; task requirement "Configure ESLint with appropriate architectural boundary rules, or an equivalent dependency checker"; implemented in P1-6; spike 2026-10-16
+- Options: (1) oxlint per-folder `overrides` with `no-restricted-imports` + `import/no-cycle`, plus dependency-cruiser for graph rules (cycles, package entry points, resolved targets, type-only edges) (2) add ESLint with `eslint-plugin-boundaries` alongside oxlint (3) dependency-cruiser only
+- Decision: (1). Every rule message starts with a grep-able tag such as `[service-no-concrete-repository]`, adapted from BankSheets' `(rule: <tag>)` message convention. dependency-cruiser runs with `parser: 'swc'` (`@swc/core`): the spike showed TypeScript 7.0.2 ships no JS compiler API, so the default TS parser silently cruises no `.ts` files and exits 0; swc parses everything and marks `import type` edges `type-only`. A sanity test guards against that silent failure. Fixture-based probe tests prove each forbidden import fails with its tag and each allowed one passes. Runs in `just all`, the pre-commit hook and CI; `just check-removable <app>` proves an app folder can be deleted and the core and root tooling still pass. Rules live in `docs/reference/boundary-rules.md`.
+- Why: Keeps D-014's one-fast-linter choice; the task explicitly allows an equivalent checker. oxlint covers path rules cheaply; dependency-cruiser sees the whole import graph (cycles, where an import really resolves, type-only edges), which a per-file linter can't. Switch back to the TS parser once dependency-cruiser supports TypeScript 7's API.
+
+## D-043: API built with Hono + tRPC; plain Hono routes only for operational endpoints
+- Ref: call with Steve 2026-10-01 (tRPC confirmed; "one endpoint"); maintainer decision 2026-10; implemented in Phase 2
+- Options: (1) tRPC procedures for business endpoints, mounted in Hono; plain Hono routes for `/healthz`, `/readyz` and `/metrics` (2) tRPC plus a full REST `/v1` mirror of every procedure (3) REST only
+- Decision: (1). The example endpoint (list projects) is a tRPC procedure calling the same projects service as the CLI. The web app imports only the router *type* (`AppRouter`) from the API, never runtime code; that rule is enforced by D-042. The tRPC contract is guarded by a type/snapshot test rather than PyLaunch's OpenAPI tooling, which doesn't apply to tRPC.
+- Why: Steve confirmed tRPC, and the example must stay small. tRPC gives the React app end-to-end types for free. Operational endpoints stay plain HTTP because Cloud Run and monitoring tools expect normal URLs. A REST mirror would double the surface for no V1 benefit.
+
+## D-044: Node-first runtime for the API and CLI; Bun stays an optional lane (reaffirms D-036)
+- Ref: maintainer decision 2026-10
+- Options: (1) Node ≥ 24 with `@hono/node-server`; Cloud Run image on Node; Bun remains the advisory CI lane (2) Bun runtime (3) support both equally
+- Decision: (1).
+- Why: Keeps D-011/D-036 consistent: the published package and the CI gates target Node, and Bun tracks Node one major behind. BankSheets' backend runs on Node and is evaluating Bun alongside it (`functions-run/` has both a Node `Dockerfile` and a `Dockerfile.bun`); a template should default to the most widely supported runtime. Revisit if Bun becomes a gating CI lane.
+
+## D-045: npm publishing paused during the V1 restructure (amends D-012(5) and D-021(5) timing)
+- Ref: maintainer decision 2026-10; takes effect immediately; `publish.yml` switched to manual-only in P1-5b (PR #49)
+- Options: (1) pause: switch `publish.yml` to manual-only (`workflow_dispatch`, from a `v*` tag) and don't merge release-please PRs until V1 is complete, then decide what to publish (2) keep publishing the root package throughout (3) stop publishing permanently (template-only)
+- Decision: (1). Do not merge release PR #14 (or any release-please PR) until V1 is complete. Before the first V1 release, decide which packages are published (`packages/core`, `apps/cli`, both, or none) and record it as a new decision.
+- Why: The package is already on npm (0.0.1, 0.1.3), and after D-040 the repo root is a private workspace root, so the old publish flow can't run unchanged. Publishing is the one hard-to-undo action, so it waits until the structure is final. Pausing is reversible: re-enable the `v*` tag trigger. Trade-off: fixes don't reach npm users during the pause; the risk is low, since a fresh install of the published ranges already resolves patched dependencies (e.g. `smol-toml` ^1.7.0 → 1.9.1).
+
+## D-046: TypeScript 7 adopted (supersedes D-037's deferral)
+- Ref: commit `af7fb4f` "build(deps-dev): upgrade to TypeScript 7" (Dependabot PR #18); repo state (`typescript` ^7.0.2 in the root `package.json`); P1-6 dependency-cruiser spike (D-042)
+- Options: (1) record TypeScript 7 as adopted (2) roll back to TypeScript 6 to match D-037
+- Decision: (1). TypeScript 7.0.2 is the repo's compiler for `tsc --noEmit` and the editor language service. D-037's unblock condition (tsdown publishing TS7 peer support) was met, so its deferral no longer applies; D-037 stays unedited as the record of that decision.
+- Why: The repo already runs TypeScript 7 and every gate passes on it; a rollback would only make the log match an outdated state. Follow-on effect: TypeScript 7 ships no JS compiler API, so tools that relied on it need another parser; dependency-cruiser uses `parser: 'swc'` (D-042).
