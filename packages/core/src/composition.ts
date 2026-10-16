@@ -1,7 +1,6 @@
 // Composition root: the only place that chooses implementations. It picks
 // a ProjectsRepository (HTTP or in-memory) and builds the services on it;
 // controllers ask for a Core instead of wiring infrastructure themselves.
-// Moves into packages/core in P1-5.
 import {
   createHttpProjectsRepository,
   type HttpProjectsRepositoryOptions,

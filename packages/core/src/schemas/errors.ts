@@ -37,8 +37,8 @@ export class ConflictError extends DomainError {
 
 /**
  * The data source failed (network, timeout, bad response). Name kept as
- * `ApiError` because it is part of the public API (P1-0 test); a rename is
- * a candidate for the later public-API cleanup.
+ * `ApiError` because it is part of the public API (locked by the public-API
+ * test); a rename is a candidate for the later public-API cleanup.
  */
 export class ApiError extends DomainError {
   constructor(message: string) {
