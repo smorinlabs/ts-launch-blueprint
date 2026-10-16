@@ -61,6 +61,11 @@ pre-commit:
         - '**/dist/**'
         - 'coverage/**'
       run: pnpm exec oxlint {staged_files}
+    # Architecture boundaries (D-042) over the WHOLE import graph, not only
+    # staged files: a staged change can break a rule elsewhere in the graph.
+    - name: boundaries
+      glob: '*.{ts,tsx}'
+      run: just check-boundaries
     # Type check runs on the FULL program, not per-file — tsc semantics need
     # the whole graph (mirrors the source's repo-wide mypy hook).
     - name: typecheck

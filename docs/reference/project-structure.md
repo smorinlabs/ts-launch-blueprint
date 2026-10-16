@@ -7,6 +7,9 @@ deleting an app is deleting its folder. Repo-level checks live in
 `tests/` and documentation in `docs/`. This section walks through the
 actual directory layout and the purpose of each file.
 
+The layers and the direction of imports between them are enforced by
+boundary rules; see [Architecture Boundary Rules](./boundary-rules.md).
+
 ## Directory Layout
 
 ```
