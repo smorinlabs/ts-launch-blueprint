@@ -132,6 +132,7 @@ nothing, and `[core-no-app-import]` keeps it that way.
 
 ## See Also
 
+- [Architecture](../about/architecture.md): the layers, the request flow, and how to add a feature
 - [Project Structure](./project-structure.md)
 - [Configuration Files](./configuration-files.md)
 - [Oxlint](../tools/oxlint.md)

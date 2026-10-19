@@ -469,3 +469,9 @@ the old one.
 - Options: (1) pause: switch `publish.yml` to manual-only (`workflow_dispatch`, from a `v*` tag) and don't merge release-please PRs until V1 is complete, then decide what to publish (2) keep publishing the root package throughout (3) stop publishing permanently (template-only)
 - Decision: (1). Do not merge release PR #14 (or any release-please PR) until V1 is complete. Before the first V1 release, decide which packages are published (`packages/core`, `apps/cli`, both, or none) and record it as a new decision.
 - Why: The package is already on npm (0.0.1, 0.1.3), and after D-040 the repo root is a private workspace root, so the old publish flow can't run unchanged. Publishing is the one hard-to-undo action, so it waits until the structure is final. Pausing is reversible: re-enable the `v*` tag trigger. Trade-off: fixes don't reach npm users during the pause; the risk is low, since a fresh install of the published ranges already resolves patched dependencies (e.g. `smol-toml` ^1.7.0 → 1.9.1).
+
+## D-046: TypeScript 7 adopted (supersedes D-037's deferral)
+- Ref: commit `af7fb4f` "build(deps-dev): upgrade to TypeScript 7" (Dependabot PR #18); repo state (`typescript` ^7.0.2 in the root `package.json`); P1-6 dependency-cruiser spike (D-042)
+- Options: (1) record TypeScript 7 as adopted (2) roll back to TypeScript 6 to match D-037
+- Decision: (1). TypeScript 7.0.2 is the repo's compiler for `tsc --noEmit` and the editor language service. D-037's unblock condition (tsdown publishing TS7 peer support) was met, so its deferral no longer applies; D-037 stays unedited as the record of that decision.
+- Why: The repo already runs TypeScript 7 and every gate passes on it; a rollback would only make the log match an outdated state. Follow-on effect: TypeScript 7 ships no JS compiler API, so tools that relied on it need another parser; dependency-cruiser uses `parser: 'swc'` (D-042).

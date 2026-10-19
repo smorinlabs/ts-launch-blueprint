@@ -10,7 +10,7 @@
 // failed: <errors[0].message>" surfacing (projects.py:191-205).
 //
 // Data access only: no workspace-name lookup and no default limit. Those
-// are business rules (createApiClient today, the service from P1-4).
+// are business rules (the projects service).
 import { ApiError, AuthError } from '../schemas/errors.js';
 import {
   type ConvertResult,

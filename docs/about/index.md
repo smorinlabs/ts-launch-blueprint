@@ -4,6 +4,7 @@ Welcome to TS Launch Blueprint! This section covers the project's purpose, philo
 
 - [Philosophy](philosophy.md)
 - [Features](features.md)
+- [Architecture](architecture.md) — the layers, how a request flows, how to add a feature
 
 > [!NOTE]
 > This project does not yet have its own logo. The source repository's logo

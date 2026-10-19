@@ -17,6 +17,7 @@ See AGENTS.md for the full project charter (canonical AI-context hub).
 - Build: `just build`
 - Boundaries: `just check-boundaries` after changing imports; never silence a
   boundary rule, fix the import (`docs/reference/boundary-rules.md`)
+- Architecture: read `docs/about/architecture.md` before adding a feature
 
 ## Code Style Guidelines
 
