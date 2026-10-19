@@ -1,6 +1,7 @@
 // Public entry of the shared core library (@ts-launch-blueprint/core). Apps
 // import the core only through this file, never through ./src/... paths.
-// Converters and Zod schemas stay internal. Locked by tests/public-api.test.ts.
+// Converters and raw-API schemas stay internal; only the `listProjects`
+// contract schemas are public (D-047). Locked by tests/public-api.test.ts.
 export { type Core, type CoreConfig, createCore } from './composition.js';
 export {
   BASE_URL,
@@ -22,6 +23,11 @@ export {
   NotFoundError,
 } from './schemas/errors.js';
 export type { Project, Workspace } from './schemas/project.schema.js';
+export {
+  ListProjectsInputSchema,
+  type ListProjectsOutput,
+  ListProjectsOutputSchema,
+} from './schemas/projects.contract.js';
 export {
   createProjectsService,
   DEFAULT_LIMIT,

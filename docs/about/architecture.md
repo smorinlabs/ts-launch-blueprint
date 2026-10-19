@@ -168,7 +168,9 @@ A made-up example, "get one project by id", touches each layer in this order:
    repository (no fetch mocks), as in
    `packages/core/tests/projects.service.test.ts`.
 4. **Core entry.** Export it from `packages/core/src/index.ts` only if an app
-   needs it, and add it to `packages/core/tests/public-api.test.ts`.
+   needs it, and add it to `packages/core/tests/public-api.test.ts`. If the
+   operation is exposed by the API, add its contract schemas next to the shape
+   in `schemas/` (like `projects.contract.ts`) and export them.
 5. **Controller.** A CLI command now (in `apps/cli/src/cli/commands/`), a
    tRPC procedure later, calling the service through `createCore`.
 6. **Check.** Run `just all`: it includes the lint and boundary rules, so a
@@ -206,11 +208,12 @@ Planned, not built yet:
 - **`apps/web`**: React. It imports only the API's router **type**
   (`AppRouter`), never runtime code; a boundary rule will enforce that.
 
-Today the core entry exports the `Project`/`Workspace` **types** but not the
-**Zod schemas** or converters; the core public-API test
-(`packages/core/tests/public-api.test.ts`) locks that. The API will need
-request/response schemas, so exporting a small contract from the core is a
-**deliberate public-API change**, made in the API phase.
+The core exports the `listProjects` contract schemas
+(`ListProjectsInputSchema`, `ListProjectsOutputSchema`, in
+[`packages/core/src/schemas/projects.contract.ts`](../../packages/core/src/schemas/projects.contract.ts))
+for controllers to validate with; converters and the raw-API schemas stay
+internal (D-047). The core public-API test
+(`packages/core/tests/public-api.test.ts`) locks exactly what is exported.
 
 ## See Also
 
