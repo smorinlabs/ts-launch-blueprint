@@ -19,12 +19,21 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const ROOT = join(import.meta.dirname, '..');
 const CLI = join(ROOT, 'dist', 'cli.js');
 
-/** Newest mtime (ms) under a directory tree. */
+/** Newest mtime (ms) under a directory tree. Skips the temporary probe files
+ * tests/boundaries.test.ts writes into src/ (they run in parallel and are
+ * never part of the build), and tolerates a file vanishing mid-walk. */
 function newestMtime(dir: string): number {
   let newest = 0;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith('__boundary-probe-')) {
+      continue;
+    }
     const path = join(dir, entry.name);
-    newest = Math.max(newest, entry.isDirectory() ? newestMtime(path) : statSync(path).mtimeMs);
+    try {
+      newest = Math.max(newest, entry.isDirectory() ? newestMtime(path) : statSync(path).mtimeMs);
+    } catch {
+      // Removed between readdir and stat: it no longer affects the build.
+    }
   }
   return newest;
 }

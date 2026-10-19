@@ -5,6 +5,9 @@ dist/
 # (apps/cli/scripts/copy-package-files.mjs); the repo-root files are canonical.
 apps/cli/README.md
 apps/cli/LICENSE
+# Temporary probe files written by tests/boundaries.test.ts (always removed;
+# ignored in case a crashed run leaves one behind).
+**/__boundary-probe-*
 build/
 *.tsbuildinfo
 

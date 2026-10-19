@@ -96,6 +96,9 @@ jobs:
       - name: Lint
         run: just lint
 
+      - name: Architecture boundaries (D-042)
+        run: just check-boundaries
+
       - name: Type check
         run: just typecheck
 
@@ -107,6 +110,14 @@ jobs:
 
       - name: Build
         run: just build
+
+      # Proves apps/cli can be deleted and the core + root tooling still pass
+      # (D-040/D-042). Its own step, not in `just all`: it reinstalls in a
+      # temp copy, so it needs the network.
+      - name: Removable app check (apps/cli)
+        # Once per run, not per Node version: it reinstalls in a temp copy.
+        if: matrix.node-version == '24.x'
+        run: just check-removable cli
 
       # --- Dual enforcement: re-run the WHOLE hook suite on all files, mirroring
       #     the source's `just pre-commit-run` step (D-022(1)). ---

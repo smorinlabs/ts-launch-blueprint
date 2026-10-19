@@ -127,6 +127,24 @@ alias fc := format-check
 
 alias l := lint
 
+# Check architecture boundaries over the whole import graph (D-042):
+# dependency-cruiser with .dependency-cruiser.cjs; oxlint covers the
+# per-file half in `just lint`. See docs/reference/boundary-rules.md.
+[group('dev'), group('pre-commit')]
+@check-boundaries:
+    echo "Checking architecture boundaries..."
+    echo "  depcruise"
+    # Only the groups that exist: after deleting the last app, apps/ is gone.
+    pnpm exec depcruise $(ls -d packages apps 2>/dev/null) --config .dependency-cruiser.cjs --output-type err-long
+
+# Prove an app can be deleted and the rest still works (D-040/D-042): copies
+# the repo without apps/<app>, then runs the core's typecheck/tests/boundaries
+# and the root lint/typecheck/check-boundaries. Needs network for the install,
+# so it is NOT part of `just all`; CI runs it as its own step.
+[group('dev')]
+check-removable app="cli":
+    sh scripts/check-removable.sh {{app}}
+
 # Run linter with autofixes applied
 [group('dev')]
 @lint-fix:
@@ -179,14 +197,14 @@ test-bun:
 
 # Run all quality gates, including shell scripts and workflow commands.
 [group('test'), group('dev'), group('quick start')]
-@all: format-check lint check-shell check-workflows typecheck test
+@all: format-check lint check-boundaries check-shell check-workflows typecheck test
 
 alias a := all
 
 # Run the full hook-suite gates on ALL files (CI mirror of the
 # pre-commit/commit-time discipline; source pre-commit-run intent)
 [group('pre-commit')]
-@pre-commit-run: format-check lint check-shell check-workflows typecheck test
+@pre-commit-run: format-check lint check-boundaries check-shell check-workflows typecheck test
 
 alias pc := pre-commit-run
 

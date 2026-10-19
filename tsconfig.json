@@ -9,6 +9,8 @@
     "apps/*/src/**/*.ts",
     "apps/*/tests/**/*.ts",
     "apps/*/tsdown.config.ts",
+    "packages/*/vitest.config.ts",
+    "apps/*/vitest.config.ts",
     "tests/**/*.ts",
     "vitest.config.ts"
   ]
