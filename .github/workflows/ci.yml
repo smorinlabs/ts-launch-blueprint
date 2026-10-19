@@ -119,6 +119,11 @@ jobs:
         if: matrix.node-version == '24.x'
         run: just check-removable cli
 
+      - name: Removable app check (apps/api)
+        # Once per run, not per Node version: it reinstalls in a temp copy.
+        if: matrix.node-version == '24.x'
+        run: just check-removable api
+
       # --- Dual enforcement: re-run the WHOLE hook suite on all files, mirroring
       #     the source's `just pre-commit-run` step (D-022(1)). ---
       - name: Run pre-commit hook suite (all files)

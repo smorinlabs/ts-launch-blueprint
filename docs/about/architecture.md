@@ -13,7 +13,8 @@ The repo is a pnpm workspace with three parts:
   calls it.
 - **The CLI** (`apps/cli`, the `ts-projects` command and the published npm
   package): one controller that calls the core.
-- **The API** (`apps/api`, planned): a second controller over the same core.
+- **The API** (`apps/api`, Hono + tRPC): a second controller over the same
+  core. See the [API Reference](../reference/api-reference.md).
 
 The goal is a ready web template: the CLI and the API run the same business
 logic, and each part can be removed on its own. Delete an app and the rest
@@ -27,7 +28,7 @@ still works; `just check-removable cli` proves it on every CI run.
 | Repositories     | [`packages/core/src/repositories/`](../../packages/core/src/repositories/)   | Data access behind the `ProjectsRepository` interface, with an HTTP and an in-memory implementation                 | `schemas/`                                                     | `services/`, `composition.ts`, any framework           |
 | Services         | [`packages/core/src/services/`](../../packages/core/src/services/)           | Business rules: the case-insensitive workspace lookup, the default limit (200), `NotFoundError`                     | `schemas/`, and the repository interface as `import type` only | Concrete repositories, `composition.ts`, any framework |
 | Composition root | [`packages/core/src/composition.ts`](../../packages/core/src/composition.ts) | `createCore`: the only place that picks a repository implementation and builds the services on it                   | Repositories, services                                         | Apps, any framework                                    |
-| Controllers      | [`apps/cli/`](../../apps/cli/) now, `apps/api` later                         | Turn input (flags, a request) into a service call, and the result or error into output                              | The core, only as `@ts-launch-blueprint/core`                  | `packages/core/src/...` paths, other apps              |
+| Controllers      | [`apps/cli/`](../../apps/cli/), [`apps/api/`](../../apps/api/)               | Turn input (flags, a request) into a service call, and the result or error into output                              | The core, only as `@ts-launch-blueprint/core`                  | `packages/core/src/...` paths, other apps              |
 
 Apps reach the core only through its entry,
 [`packages/core/src/index.ts`](../../packages/core/src/index.ts). Nothing in
@@ -46,7 +47,7 @@ there.
 
 ```mermaid
 flowchart TB
-  apps["Controllers<br/>apps/cli · apps/api (planned)"]
+  apps["Controllers<br/>apps/cli · apps/api"]
   entry["Core entry<br/>packages/core/src/index.ts"]
   composition["Composition root<br/>composition.ts"]
   services["Services<br/>services/"]
@@ -108,8 +109,11 @@ sequenceDiagram
   item through the converter (`unwrapList` → `convertProject` /
   `convertWorkspace`). The in-memory repository returns its seed as is,
   without validation, because the seed is trusted data defined in code.
-- **The API will take the same path** from a tRPC procedure instead of a CLI
-  command: `createCore` → `projectsService.listProjects` → the repository.
+- **The API takes the same path** from a tRPC procedure instead of a CLI
+  command (`GET /trpc/projects.list` → `createCore` →
+  `projectsService.listProjects` → the repository); see the
+  [API Reference](../reference/api-reference.md). Unlike the CLI, the API
+  uses the in-memory seed by default (D-048).
 
 ## Errors
 
@@ -131,8 +135,10 @@ Each controller decides how to report them. The CLI maps them with
 | `CliError` with a code | CLI only                                     | that code     |
 | anything else          | —                                            | 1             |
 
-The API will map the same domain errors to tRPC/HTTP codes (for example
-`NotFoundError` → 404) in its own module, without touching the core.
+The API doesn't map domain errors yet: today `NotFoundError` comes back as
+tRPC `INTERNAL_SERVER_ERROR` (500). Mapping them to tRPC/HTTP codes (for
+example `NotFoundError` → 404) in the API's own module, without touching the
+core, is the next API step.
 
 ## Swapping the Data Source
 
@@ -171,8 +177,9 @@ A made-up example, "get one project by id", touches each layer in this order:
    needs it, and add it to `packages/core/tests/public-api.test.ts`. If the
    operation is exposed by the API, add its contract schemas next to the shape
    in `schemas/` (like `projects.contract.ts`) and export them.
-5. **Controller.** A CLI command now (in `apps/cli/src/cli/commands/`), a
-   tRPC procedure later, calling the service through `createCore`.
+5. **Controller.** A CLI command (in `apps/cli/src/cli/commands/`) and/or a
+   tRPC procedure (in `apps/api/src/router.ts`), calling the service through
+   `createCore`.
 6. **Check.** Run `just all`: it includes the lint and boundary rules, so a
    wrong import fails here, with a tag that
    [Architecture Boundary Rules](../reference/boundary-rules.md) explains.
@@ -201,10 +208,13 @@ Deliberate differences:
 
 ## What's Next
 
+Built: **`apps/api`**, Hono + tRPC (D-043, D-048). Its `projects.list`
+procedure calls the same projects service as the CLI.
+
 Planned, not built yet:
 
-- **`apps/api`**: Hono + tRPC (D-043). Its procedures call the same projects
-  service as the CLI, and it maps domain errors to tRPC/HTTP codes.
+- **API error mapping**: domain errors to tRPC/HTTP codes, and readable
+  validation messages.
 - **`apps/web`**: React. It imports only the API's router **type**
   (`AppRouter`), never runtime code; a boundary rule will enforce that.
 

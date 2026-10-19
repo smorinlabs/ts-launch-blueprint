@@ -93,10 +93,12 @@ alias c := check-deps
     just check-deps
     pnpm install
 
-# Build the published CLI package (apps/cli/dist/) with tsdown
+# Build every app present (apps/*/dist/) with tsdown. A glob filter, so a
+# deleted app never breaks it (just check-removable); publishing uses the
+# CLI package's own build (pnpm run build), not this recipe.
 [group('build'), group('dev')]
 @build:
-    pnpm --filter ts-launch-blueprint build
+    pnpm -r --filter './apps/*' build
 
 alias b := build
 
@@ -150,11 +152,11 @@ check-removable app="cli":
 @lint-fix:
     pnpm exec oxlint --fix
 
-# Run type checker (tsc --noEmit)
+# Run type checker: the root tsc --noEmit plus each app with its own
+# tsconfig (scripts/typecheck.sh, D-048)
 [group('dev')]
 @typecheck:
     echo "Running type checker..."
-    echo "  tsc --noEmit"
     pnpm run typecheck
 
 alias tc := typecheck
@@ -245,6 +247,13 @@ alias pc := pre-commit-run
     pnpm exec lefthook install
     git config commit.template .gitmessage
     echo "Hooks installed; commit template wired (.gitmessage)"
+
+# Build and start the API (Hono + tRPC) on PORT (default 8080), in-memory
+# demo data by default (D-048). See docs/reference/api-reference.md.
+[group('run'), group('quick start')]
+@api:
+    pnpm --filter @ts-launch-blueprint/api build
+    node apps/api/dist/server.js
 
 # Run package command
 [group('run'), group('quick start')]

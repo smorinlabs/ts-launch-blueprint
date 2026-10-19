@@ -86,13 +86,13 @@ boundary rule; fix the import.**
 
 ## Where Each Check Runs
 
-| Check                                      | Local                               | Git hook                              | CI                                              |
-| ------------------------------------------ | ----------------------------------- | ------------------------------------- | ----------------------------------------------- |
-| oxlint rules                               | `just lint`, `just all`             | pre-commit `lint` (staged files)      | `Lint` step, hook-suite step                    |
-| dependency-cruiser rules                   | `just check-boundaries`, `just all` | pre-commit `boundaries` (whole graph) | `Architecture boundaries` step, hook-suite step |
-| Proof tests (`tests/boundaries.test.ts`)   | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
-| `[no-path-alias]`                          | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
-| Removable app (`just check-removable cli`) | on demand                           | —                                     | `Removable app check` step                      |
+| Check                                              | Local                               | Git hook                              | CI                                              |
+| -------------------------------------------------- | ----------------------------------- | ------------------------------------- | ----------------------------------------------- |
+| oxlint rules                                       | `just lint`, `just all`             | pre-commit `lint` (staged files)      | `Lint` step, hook-suite step                    |
+| dependency-cruiser rules                           | `just check-boundaries`, `just all` | pre-commit `boundaries` (whole graph) | `Architecture boundaries` step, hook-suite step |
+| Proof tests (`tests/boundaries.test.ts`)           | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
+| `[no-path-alias]`                                  | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
+| Removable app (`just check-removable cli` / `api`) | on demand                           | —                                     | `Removable app check` step                      |
 
 `just check-removable` is not part of `just all`: it reinstalls dependencies
 in a temp copy, so it needs the network and takes a while.
@@ -111,8 +111,7 @@ CLI:
 2. `release-please-config.json`: remove the `extra-files` entry for
    `apps/cli/package.json`.
 3. `vitest.config.ts`: remove the two `apps/cli/src/...` coverage exclusions.
-4. `Justfile`: the `build` recipe (`pnpm --filter ts-launch-blueprint build`),
-   `run`, `version`, `docs-api`, `pack-check` (`cd apps/cli`), `clean` and
+4. `Justfile`: `run`, `version`, `docs-api`, `pack-check` (`cd apps/cli`), `clean` and
    `debug-info` name the CLI; remove or repoint them.
 5. `.github/workflows/publish.yml`: the version check
    (`apps/cli/package.json`) and the three `working-directory: apps/cli`
@@ -129,6 +128,20 @@ CLI:
 
 No core file names the CLI: `grep -rn "apps/" packages/core/src` returns
 nothing, and `[core-no-app-import]` keeps it that way.
+
+## Removing the API
+
+`just check-removable api` proves the same for `apps/api`. A real delete then
+needs:
+
+1. `rm -rf apps/api`, then `pnpm install` (updates `pnpm-lock.yaml`).
+2. `tsconfig.json`: remove the `"exclude": ["apps/api/**"]` entry.
+   `scripts/typecheck.sh` finds app tsconfigs by glob, so it needs no edit.
+3. `vitest.config.ts`: remove the `apps/api/src/server.ts` coverage exclusion.
+4. `Justfile`: remove the `api` recipe. `build` builds whatever apps exist.
+5. `.github/workflows/ci.yml`: remove the `Removable app check (apps/api)` step.
+6. Docs that describe the API (`docs/reference/api-reference.md`, the README's
+   "Run the API" lines).
 
 ## See Also
 

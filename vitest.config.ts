@@ -25,11 +25,15 @@ const config: ReturnType<typeof defineConfig> = defineConfig({
       // stderr); in-process tests replace them with fakes via CliDeps and the
       // e2e subprocess tier drives the non-interactive paths (same D-019(3)
       // thin-I/O-adapter exclusion, each function a one-call bridge).
+      // apps/api/src/server.ts is the API's thin process entry (config ->
+      // createCore -> serve), exercised by the API e2e test (same D-019(3)
+      // thin-entry exclusion as the CLI's src/cli.ts).
       // **/__boundary-probe-*: temporary files written by tests/boundaries.test.ts,
       // in case a crashed run leaves one behind.
       exclude: [
         'apps/cli/src/cli.ts',
         'apps/cli/src/cli/adapters.ts',
+        'apps/api/src/server.ts',
         '**/__boundary-probe-*',
         '**/__boundary-probe-*/**',
       ],

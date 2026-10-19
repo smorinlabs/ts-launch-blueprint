@@ -18,6 +18,7 @@ the code is shaped this way and how to add a feature, see
 ts-launch-blueprint/
 ├── packages/core/                  # Shared core library (schemas, repositories, services)
 ├── apps/cli/                       # The ts-projects CLI — the published npm package
+├── apps/api/                       # Hono + tRPC API (private, not published)
 ├── tests/                          # Repo-level meta-tests (repo-hygiene)
 ├── docs/                           # Documentation (this tree)
 ├── .github/                        # GitHub Actions workflows, issue/PR templates
@@ -72,6 +73,16 @@ ts-launch-blueprint/
 │   ├── scripts/                     # copy-package-files.mjs (README/LICENSE for npm)
 │   ├── dist/                        # tsdown build output (generated, not tracked)
 │   └── tsdown.config.ts             # Build (bundler) configuration
+├── apps/api/                        # @ts-launch-blueprint/api (private, not published)
+│   ├── src/
+│   │   ├── app.ts                   # Hono app: /healthz, /readyz, /trpc/*
+│   │   ├── config.ts                # PORT and TS_PROJECTS_SOURCE parsing (memory default)
+│   │   ├── router.ts                # tRPC router (projects.list) and the AppRouter type
+│   │   ├── server.ts                # Thin process entry: config -> createCore -> serve
+│   │   └── trpc.ts                  # initTRPC with a { core } context
+│   ├── tests/                       # Router, app, config and e2e tests
+│   ├── tsconfig.json                # Own tsconfig: isolatedDeclarations off (D-048)
+│   └── tsdown.config.ts             # Build (bundler) configuration
 ├── tests/
 │   └── repo-hygiene.test.ts         # Meta-tests (config drift, doc/link consistency)
 ├── scripts/
@@ -123,6 +134,16 @@ mapping; `cli/commands/projects.ts` implements the default `projects`
 command. `lib.ts` re-exports the surface meant for consumers who import
 the package as a library. `just build` bundles it, with the core, into
 `apps/cli/dist/` (never tracked in git).
+
+### `apps/api/`
+
+The Hono + tRPC API (`@ts-launch-blueprint/api`, private): the second
+controller over the core. `src/router.ts` holds the tRPC router
+(`projects.list`, and the `AppRouter` type), `src/app.ts` the Hono app with
+`/healthz`, `/readyz` and `/trpc/*`, `src/config.ts` the environment parsing,
+and `src/server.ts` the thin process entry. It has its own `tsconfig.json`
+with `isolatedDeclarations` off (D-048). `just api` builds and starts it; see
+the [API Reference](./api-reference.md).
 
 ### `tests/` and each package's `tests/`
 

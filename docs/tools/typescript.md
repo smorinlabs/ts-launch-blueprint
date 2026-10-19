@@ -95,6 +95,13 @@ The project's [`tsconfig.json`](../../tsconfig.json) enables `strict` plus a uni
 | `isolatedModules`             | Disallows patterns that can't be compiled file-by-file                                                  | n/a (TS-specific)                             |
 | `isolatedDeclarations`        | Every exported API must have an inferable, explicit-enough type; enables tsdown's fast oxc `.d.ts` path | n/a (TS-specific)                             |
 
+`isolatedDeclarations` is on everywhere except `apps/api`. A tRPC router's
+type is inferred and can't be written out by hand (TS9010/TS9013, even for
+`export type AppRouter = typeof appRouter`), and the API is an app that emits
+no `.d.ts`. So `apps/api/tsconfig.json` turns it off, the root `tsconfig.json`
+excludes `apps/api`, and `scripts/typecheck.sh` (`just typecheck`) runs that
+config as a second pass (D-048).
+
 Deliberately **not** enabled here: `noUnusedLocals` / `noUnusedParameters`. Those are delegated to Oxlint's `no-unused-vars` rule instead, which supports the project's `^_` prefix escape convention (`function f(_unused: string)`) — `tsc` itself has no such escape hatch. See [Oxlint & Oxfmt](oxlint.md) for that rule.
 
 ### Why and how to disable a strict flag

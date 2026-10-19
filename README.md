@@ -74,6 +74,13 @@ just build
 TS_PROJECTS_SOURCE=memory node apps/cli/dist/cli.js projects
 ```
 
+Run the API (Hono + tRPC) the same way, on the demo data by default:
+
+```bash
+just api                                      # listens on :8080
+curl -s localhost:8080/trpc/projects.list     # in another terminal
+```
+
 Optionally, `just test-bun` runs the non-e2e tests under [Bun](https://bun.sh)
 as an advisory forward-compatibility signal (D-036) — installs stay pnpm-only
 and the published package is unchanged; see
