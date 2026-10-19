@@ -62,6 +62,7 @@ ts-projects projects [options]
 | `--json`             | Alias for `--format json`; conflicts with an explicit `--format`         |
 | `--output <file>`    | Write results to a file instead of stdout                                |
 | `--copy`             | Also copy the formatted result to the clipboard                          |
+| `--source <name>`    | Data source: `http` (default) or `memory` (built-in demo data, no token) |
 
 #### Behavior
 
@@ -101,7 +102,16 @@ ts-projects --output projects.txt --copy
 
 # Verbose diagnostics (adds the ID column to the preview table)
 ts-projects --verbose
+
+# Demo mode: the built-in in-memory data, no token or server needed
+ts-projects --source memory --workspace engineering
+TS_PROJECTS_SOURCE=memory ts-projects --no-input --format json
 ```
+
+With `memory`, no token is looked up (one given anyway is ignored),
+`TS_PROJECTS_API_URL` is ignored, and a one-line notice goes to stderr
+(hidden by `-q`). The flag beats `TS_PROJECTS_SOURCE`; any other value is
+a usage error (exit 2).
 
 See [`EXAMPLECLI.md`](../../EXAMPLECLI.md) for the full options
 reference, including the config-file precedence and the machine-mode
@@ -133,6 +143,7 @@ help text.
 
 ```bash
 $ ts-projects config --show
+source = http (source: default)
 token = "***abcd" (source: env)
 workspace = (unset)
 limit = (unset)
@@ -143,14 +154,15 @@ config_file = (none)
 
 ## Environment Variables
 
-| Variable              | Effect                                                                          |
-| --------------------- | ------------------------------------------------------------------------------- |
-| `TS_PROJECTS_TOKEN`   | Personal access token (beats the config file; empty string is treated as unset) |
-| `TS_PROJECTS_API_URL` | Overrides the API root (default `https://app.ts.com/api/1.0`)                   |
-| `XDG_CONFIG_HOME`     | Overrides the config base directory                                             |
-| `NO_COLOR`            | Disables colored output (any non-empty value)                                   |
-| `FORCE_COLOR`         | Forces colored output even when not a TTY (`0` disables)                        |
-| `CI`                  | Any non-empty value suppresses the fetch spinner                                |
+| Variable              | Effect                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| `TS_PROJECTS_TOKEN`   | Personal access token (beats the config file; empty string is treated as unset)      |
+| `TS_PROJECTS_API_URL` | Overrides the API root (default `https://app.ts.com/api/1.0`)                        |
+| `TS_PROJECTS_SOURCE`  | Data source: `http` (default) or `memory` (demo data, no token); `--source` beats it |
+| `XDG_CONFIG_HOME`     | Overrides the config base directory                                                  |
+| `NO_COLOR`            | Disables colored output (any non-empty value)                                        |
+| `FORCE_COLOR`         | Forces colored output even when not a TTY (`0` disables)                             |
+| `CI`                  | Any non-empty value suppresses the fetch spinner                                     |
 
 Precedence for color: `--no-color` beats `NO_COLOR`, which beats
 `FORCE_COLOR`, which beats TTY detection.
