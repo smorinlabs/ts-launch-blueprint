@@ -210,3 +210,42 @@ jobs:
       # Vitest is the runner (never bare `bun test`); e2e stays Node-only.
       - name: Test under Bun (non-e2e tiers)
         run: bun run vitest run --exclude tests/e2e.test.ts
+
+  # API container (D-050): build the image from the repo root, run it, smoke-
+  # test it with the same script the Cloud Run deploy uses, then check that
+  # `docker stop` (SIGTERM) shuts it down gracefully with exit code 0.
+  # Started WITHOUT --rm, so its exit code can still be inspected after stop.
+  api-image:
+    name: api-image
+    runs-on: ubuntu-latest
+    permissions:
+      # Read-only checkout; nothing here writes or pushes.
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # No push here; drop the persisted token (zizmor artipacked).
+          persist-credentials: false
+
+      - name: Build the API image
+        run: docker build -f apps/api/Dockerfile -t ts-launch-blueprint-api .
+
+      - name: Run the image
+        run: docker run -d --name api -p 8080:8080 ts-launch-blueprint-api
+
+      - name: Smoke-test the running container
+        run: sh scripts/smoke-api.sh http://localhost:8080 10
+
+      - name: Stop gracefully (SIGTERM) and check exit code 0
+        run: |
+          docker stop api
+          docker logs api
+          code="$(docker inspect -f '{{.State.ExitCode}}' api)"
+          echo "exit code: ${code}"
+          test "${code}" = "0"
+
+      - name: Remove the container
+        if: always()
+        run: docker rm -f api || true

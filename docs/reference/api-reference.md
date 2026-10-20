@@ -102,6 +102,30 @@ The encoded input above is `{"workspaceName":"engineering"}`.
 The CLI reads the same `TS_PROJECTS_SOURCE`, but its default is `http`; see
 the [CLI Reference](./cli-reference.md).
 
+## Container
+
+`apps/api/Dockerfile` builds a small image (D-050): every dependency is
+bundled into `dist/server.js`, so the runtime stage holds only `dist/` (no
+`node_modules`) on `node:24-slim`, running as the non-root `node` user, with
+`PORT=8080`. Build it from the repo root (Docker must be running):
+
+```bash
+just docker-build   # docker build -f apps/api/Dockerfile -t ts-launch-blueprint-api .
+just docker-run     # docker run --rm -p 8080:8080 ts-launch-blueprint-api
+just smoke          # in another terminal; or: just smoke https://your-service-url
+```
+
+`just smoke` runs `scripts/smoke-api.sh`, the same 5 checks CI runs against
+the image (`/healthz`, `/readyz`, `projects.list`, an unknown workspace →
+404, an unknown path → 404). Pass the URL positionally: `just smoke https://…`.
+
+### Shutdown
+
+On `SIGTERM` (Cloud Run, `docker stop`) or `SIGINT` (Ctrl-C), the server logs
+`shutting down (SIGTERM)`, stops accepting connections, lets in-flight
+requests finish, and exits **0**. If closing takes longer than 10 seconds it
+exits 1. CI checks that `docker stop` on the image exits 0.
+
 ## See Also
 
 - [Architecture](../about/architecture.md): how the API and the CLI share the core

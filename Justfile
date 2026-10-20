@@ -255,6 +255,23 @@ alias pc := pre-commit-run
     pnpm --filter @ts-launch-blueprint/api build
     node apps/api/dist/server.js
 
+# Build the API container image from the repo root (apps/api/Dockerfile, D-050)
+[group('run')]
+@docker-build:
+    docker build -f apps/api/Dockerfile -t ts-launch-blueprint-api .
+
+# Run the API container on port 8080 (Ctrl-C stops it gracefully)
+[group('run')]
+@docker-run:
+    docker run --rm -p 8080:8080 ts-launch-blueprint-api
+
+# Call it positionally: `just smoke` (localhost) or `just smoke https://…`
+# (never `url=…`, which passes that literal text).
+# Smoke-test a running API (scripts/smoke-api.sh, shared with CI and the deploy)
+[group('run')]
+@smoke url="http://localhost:8080":
+    sh scripts/smoke-api.sh {{url}}
+
 # Run package command
 [group('run'), group('quick start')]
 @run *args=args:

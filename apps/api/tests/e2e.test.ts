@@ -3,8 +3,9 @@
 // over real HTTP. Node-only; the Bun lane's `--exclude tests/e2e.test.ts`
 // already skips it (matched per Vitest project).
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -62,28 +63,37 @@ function freePort(): Promise<number> {
   });
 }
 
-let child: ChildProcess;
-let baseUrl: string;
-
-beforeAll(async () => {
-  buildIfStale();
+/** Start a built server with a hermetic env (no inherited TS_PROJECTS_*, so
+ * the in-memory default applies); resolves once it logs its startup line. */
+async function startServer(
+  server: string,
+  cwd: string
+): Promise<{ child: ChildProcess; url: string; stdout: () => string }> {
   const port = await freePort();
-  baseUrl = `http://127.0.0.1:${port}`;
-  // Hermetic env: no inherited TS_PROJECTS_* (so the in-memory default applies).
-  child = spawn(process.execPath, [SERVER], {
+  const started = spawn(process.execPath, [server], {
+    cwd,
     env: { PATH: process.env['PATH'] ?? '', PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+  let stdout = '';
   await new Promise<void>((resolve, reject) => {
-    let stdout = '';
-    child.stdout?.on('data', (chunk: Buffer) => {
+    started.stdout?.on('data', (chunk: Buffer) => {
       stdout += chunk.toString();
       if (stdout.includes(`listening on :${port} (source: memory)`)) {
         resolve();
       }
     });
-    child.once('exit', (code) => reject(new Error(`server exited early (${code})`)));
+    started.once('exit', (code) => reject(new Error(`server exited early (${code})`)));
   });
+  return { child: started, url: `http://127.0.0.1:${port}`, stdout: () => stdout };
+}
+
+let child: ChildProcess;
+let baseUrl: string;
+
+beforeAll(async () => {
+  buildIfStale();
+  ({ child, url: baseUrl } = await startServer(SERVER, ROOT));
 }, 120_000);
 
 afterAll(() => {
@@ -110,5 +120,36 @@ describe('API end-to-end (built server)', () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { result: { data: { projects: unknown[] } } };
     expect(body.result.data.projects).toHaveLength(4);
+  });
+});
+
+describe('API process lifecycle (built server)', () => {
+  it('exits 0 within 5 s on SIGTERM and logs the shutdown line', async () => {
+    const server = await startServer(SERVER, ROOT);
+    const exited = new Promise<number | null>((resolve) => {
+      server.child.once('exit', (code) => resolve(code));
+    });
+    server.child.kill('SIGTERM');
+    const timeout = new Promise<'timeout'>((resolve) => {
+      setTimeout(() => resolve('timeout'), 5000).unref();
+    });
+    expect(await Promise.race([exited, timeout])).toBe(0);
+    expect(server.stdout()).toContain('shutting down (SIGTERM)');
+  });
+
+  it('runs from a folder with only dist/ (no node_modules): every dependency is bundled', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'ts-api-dist-only-'));
+    try {
+      cpSync(join(ROOT, 'dist'), join(folder, 'dist'), { recursive: true });
+      const server = await startServer(join(folder, 'dist', 'server.js'), folder);
+      try {
+        const response = await fetch(`${server.url}/trpc/projects.list`);
+        expect(response.status).toBe(200);
+      } finally {
+        server.child.kill('SIGTERM');
+      }
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
   });
 });
