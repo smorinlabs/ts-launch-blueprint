@@ -1,0 +1,10 @@
+# Build context for apps/api/Dockerfile (D-050): installs and builds happen in
+# the image, so nothing generated or local is sent.
+node_modules
+**/node_modules
+**/dist
+coverage
+.git
+Claude outputs
+*.log
+.env*

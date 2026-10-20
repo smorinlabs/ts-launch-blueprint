@@ -12,6 +12,7 @@ const REPO_ROOT = resolve(import.meta.dirname, '..');
 const BIN = join(REPO_ROOT, 'node_modules', '.bin');
 const CORE = 'packages/core/src';
 const CLI = 'apps/cli/src';
+const API = 'apps/api/src';
 const PROBE_APP = 'apps/__boundary-probe-app';
 const TIMEOUT_MS = 30_000;
 
@@ -220,6 +221,32 @@ const FORBIDDEN: [string, ForbiddenCase][] = [
     },
   ],
   [
+    'apps/api importing a service factory instead of using createCore',
+    {
+      tag: 'api-core-via-create-core',
+      tools: ['oxlint'],
+      files: () => [
+        probe(
+          `${API}/__boundary-probe-createservice.ts`,
+          "import { createProjectsService } from '@ts-launch-blueprint/core';\nexport const probe: unknown = createProjectsService;\n"
+        ),
+      ],
+    },
+  ],
+  [
+    'apps/api importing the core by a relative path (the API override keeps the rule)',
+    {
+      tag: 'app-core-entry-only',
+      tools: ['oxlint', 'depcruise'],
+      files: () => [
+        probe(
+          `${API}/__boundary-probe-relative.ts`,
+          "import { createCore } from '../../../packages/core/src/index.js';\nexport const probe: unknown = createCore;\n"
+        ),
+      ],
+    },
+  ],
+  [
     'one app importing another app',
     {
       tag: 'app-no-cross-app-import',
@@ -376,6 +403,23 @@ describe.sequential('architecture boundaries (D-042)', () => {
           const path = probe(
             `${CLI}/__boundary-probe-allowed.ts`,
             "import { createCore } from '@ts-launch-blueprint/core';\nexport const probe: unknown = createCore;\n"
+          );
+          expect(outcome(oxlint([path]))).toEqual(PASSED);
+          expect(outcome(depcruise())).toEqual(PASSED);
+        } finally {
+          removeProbes();
+        }
+      },
+      TIMEOUT_MS
+    );
+
+    it(
+      'apps/api importing createCore from @ts-launch-blueprint/core',
+      () => {
+        try {
+          const path = probe(
+            `${API}/__boundary-probe-allowed.ts`,
+            "import { createCore, NotFoundError } from '@ts-launch-blueprint/core';\nexport const probe: unknown = [createCore, NotFoundError];\n"
           );
           expect(outcome(oxlint([path]))).toEqual(PASSED);
           expect(outcome(depcruise())).toEqual(PASSED);

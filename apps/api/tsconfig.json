@@ -1,0 +1,14 @@
+// @ts-launch-blueprint/api: an app, not a published library: no `.d.ts` is
+// emitted, and tRPC router types can't be written out by hand, so
+// isolatedDeclarations is off here (it fails with TS9010/TS9013 even for
+// `export type AppRouter = typeof appRouter`). The root tsconfig.json
+// excludes apps/api and keeps isolatedDeclarations for everything else;
+// scripts/typecheck.sh runs this config as a second pass (D-048).
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "isolatedDeclarations": false,
+    "declaration": false
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "tsdown.config.ts", "vitest.config.ts"]
+}

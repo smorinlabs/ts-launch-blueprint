@@ -25,28 +25,28 @@ expected and doesn't affect the result.
 
 Every rule's message starts with a tag. Search for the tag on this page.
 
-| Tag                                         | Rule                                                                                                                                                                                                      | Tool                        |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `[core-no-app-import]`                      | `packages/core/**` imports nothing from `apps/**` or the `ts-launch-blueprint` package.                                                                                                                   | oxlint + dependency-cruiser |
-| `[core-no-framework-import]`                | `packages/core/src/**` imports no CLI/web/API framework: `commander`, `@inquirer/*`, `cli-table3`, `yocto-spinner`, `clipboardy`, `picocolors`, `smol-toml`, `hono`, `@hono/*`, `@trpc/*`, `react`.       | oxlint + dependency-cruiser |
-| `[schema-is-leaf]`                          | `schemas/**` imports only other `schemas/**` files and `zod`.                                                                                                                                             | oxlint + dependency-cruiser |
-| `[repository-no-service]`                   | `repositories/**` doesn't import `services/**` or `composition.ts`.                                                                                                                                       | oxlint + dependency-cruiser |
-| `[service-no-concrete-repository]`          | `services/**` doesn't import `http-*.repository.ts`, `in-memory-*.repository.ts` or `composition.ts`.                                                                                                     | oxlint + dependency-cruiser |
-| `[service-type-only-repository]`            | `services/**` → `repositories/**` imports are `import type` only; the repository is injected.                                                                                                             | dependency-cruiser          |
-| `[concrete-repository-in-composition-only]` | Inside `packages/core/src`, only `composition.ts` and the `index.ts` entry import a concrete repository.                                                                                                  | dependency-cruiser          |
-| `[app-core-entry-only]`                     | `apps/**` imports the core only as `@ts-launch-blueprint/core`: no relative path into `packages/`, no `@ts-launch-blueprint/core/<subpath>`.                                                              | oxlint + dependency-cruiser |
-| `[app-no-cross-app-import]`                 | One app never imports another app.                                                                                                                                                                        | dependency-cruiser          |
-| `[no-cycle]`                                | No import cycles anywhere, type-only cycles included. oxlint's `import/no-cycle` also fails, but its message is fixed and carries no tag.                                                                 | dependency-cruiser + oxlint |
-| `[not-to-unresolvable]`                     | Every import resolves (a typo'd path fails here, not only in `tsc`).                                                                                                                                      | dependency-cruiser          |
-| `[reexport-entry-only]`                     | Only package entry files re-export (`export … from`): `packages/core/src/index.ts`, `apps/cli/src/lib.ts`, `apps/cli/src/api.ts`. No folder barrels, so a forbidden import can't hide behind a re-export. | boundary test (source scan) |
-| `[no-path-alias]`                           | No `tsconfig*.json` sets `compilerOptions.paths`: relative imports inside a package, the package name across packages.                                                                                    | repo-hygiene test           |
+| Tag                                         | Rule                                                                                                                                                                                                                                                                                                                                    | Tool                        |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `[core-no-app-import]`                      | `packages/core/**` imports nothing from `apps/**` or the `ts-launch-blueprint` package.                                                                                                                                                                                                                                                 | oxlint + dependency-cruiser |
+| `[core-no-framework-import]`                | `packages/core/src/**` imports no CLI/web/API framework: `commander`, `@inquirer/*`, `cli-table3`, `yocto-spinner`, `clipboardy`, `picocolors`, `smol-toml`, `hono`, `@hono/*`, `@trpc/*`, `react`.                                                                                                                                     | oxlint + dependency-cruiser |
+| `[schema-is-leaf]`                          | `schemas/**` imports only other `schemas/**` files and `zod`.                                                                                                                                                                                                                                                                           | oxlint + dependency-cruiser |
+| `[repository-no-service]`                   | `repositories/**` doesn't import `services/**` or `composition.ts`.                                                                                                                                                                                                                                                                     | oxlint + dependency-cruiser |
+| `[service-no-concrete-repository]`          | `services/**` doesn't import `http-*.repository.ts`, `in-memory-*.repository.ts` or `composition.ts`.                                                                                                                                                                                                                                   | oxlint + dependency-cruiser |
+| `[service-type-only-repository]`            | `services/**` → `repositories/**` imports are `import type` only; the repository is injected.                                                                                                                                                                                                                                           | dependency-cruiser          |
+| `[concrete-repository-in-composition-only]` | Inside `packages/core/src`, only `composition.ts` and the `index.ts` entry import a concrete repository.                                                                                                                                                                                                                                | dependency-cruiser          |
+| `[app-core-entry-only]`                     | `apps/**` imports the core only as `@ts-launch-blueprint/core`: no relative path into `packages/`, no `@ts-launch-blueprint/core/<subpath>`.                                                                                                                                                                                            | oxlint + dependency-cruiser |
+| `[app-no-cross-app-import]`                 | One app never imports another app.                                                                                                                                                                                                                                                                                                      | dependency-cruiser          |
+| `[api-core-via-create-core]`                | `apps/api/src/**` doesn't import `createHttpProjectsRepository`, `createInMemoryProjectsRepository` or `createProjectsService`; the API builds its core with `createCore` (in `server.ts`). The CLI is deliberately not covered: its public `createApiClient` wrapper (`apps/cli/src/api.ts`) builds a repository and service directly. | oxlint                      |
+| `[no-cycle]`                                | No import cycles anywhere, type-only cycles included. oxlint's `import/no-cycle` also fails, but its message is fixed and carries no tag.                                                                                                                                                                                               | dependency-cruiser + oxlint |
+| `[not-to-unresolvable]`                     | Every import resolves (a typo'd path fails here, not only in `tsc`).                                                                                                                                                                                                                                                                    | dependency-cruiser          |
+| `[reexport-entry-only]`                     | Only package entry files re-export (`export … from`): `packages/core/src/index.ts`, `apps/cli/src/lib.ts`, `apps/cli/src/api.ts`. No folder barrels, so a forbidden import can't hide behind a re-export.                                                                                                                               | boundary test (source scan) |
+| `[no-path-alias]`                           | No `tsconfig*.json` sets `compilerOptions.paths`: relative imports inside a package, the package name across packages.                                                                                                                                                                                                                  | repo-hygiene test           |
 
 The rules apply to `src/` files only. Tests (`**/tests/**`) may import their
 own package's `src/` directly.
 
 **Planned** (added with the apps that need them):
 
-- `apps/api` rules, in Phase 2.
 - `[web-types-only-from-api]`: the web app may import only the `AppRouter`
   _type_ from the API, never runtime code. Added when `apps/web` lands.
 
@@ -86,13 +86,13 @@ boundary rule; fix the import.**
 
 ## Where Each Check Runs
 
-| Check                                      | Local                               | Git hook                              | CI                                              |
-| ------------------------------------------ | ----------------------------------- | ------------------------------------- | ----------------------------------------------- |
-| oxlint rules                               | `just lint`, `just all`             | pre-commit `lint` (staged files)      | `Lint` step, hook-suite step                    |
-| dependency-cruiser rules                   | `just check-boundaries`, `just all` | pre-commit `boundaries` (whole graph) | `Architecture boundaries` step, hook-suite step |
-| Proof tests (`tests/boundaries.test.ts`)   | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
-| `[no-path-alias]`                          | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
-| Removable app (`just check-removable cli`) | on demand                           | —                                     | `Removable app check` step                      |
+| Check                                              | Local                               | Git hook                              | CI                                              |
+| -------------------------------------------------- | ----------------------------------- | ------------------------------------- | ----------------------------------------------- |
+| oxlint rules                                       | `just lint`, `just all`             | pre-commit `lint` (staged files)      | `Lint` step, hook-suite step                    |
+| dependency-cruiser rules                           | `just check-boundaries`, `just all` | pre-commit `boundaries` (whole graph) | `Architecture boundaries` step, hook-suite step |
+| Proof tests (`tests/boundaries.test.ts`)           | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
+| `[no-path-alias]`                                  | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
+| Removable app (`just check-removable cli` / `api`) | on demand                           | —                                     | `Removable app check` step                      |
 
 `just check-removable` is not part of `just all`: it reinstalls dependencies
 in a temp copy, so it needs the network and takes a while.
@@ -111,8 +111,7 @@ CLI:
 2. `release-please-config.json`: remove the `extra-files` entry for
    `apps/cli/package.json`.
 3. `vitest.config.ts`: remove the two `apps/cli/src/...` coverage exclusions.
-4. `Justfile`: the `build` recipe (`pnpm --filter ts-launch-blueprint build`),
-   `run`, `version`, `docs-api`, `pack-check` (`cd apps/cli`), `clean` and
+4. `Justfile`: `run`, `version`, `docs-api`, `pack-check` (`cd apps/cli`), `clean` and
    `debug-info` name the CLI; remove or repoint them.
 5. `.github/workflows/publish.yml`: the version check
    (`apps/cli/package.json`) and the three `working-directory: apps/cli`
@@ -129,6 +128,20 @@ CLI:
 
 No core file names the CLI: `grep -rn "apps/" packages/core/src` returns
 nothing, and `[core-no-app-import]` keeps it that way.
+
+## Removing the API
+
+`just check-removable api` proves the same for `apps/api`. A real delete then
+needs:
+
+1. `rm -rf apps/api`, then `pnpm install` (updates `pnpm-lock.yaml`).
+2. `tsconfig.json`: remove the `"exclude": ["apps/api/**"]` entry.
+   `scripts/typecheck.sh` finds app tsconfigs by glob, so it needs no edit.
+3. `vitest.config.ts`: remove the `apps/api/src/server.ts` coverage exclusion.
+4. `Justfile`: remove the `api` recipe. `build` builds whatever apps exist.
+5. `.github/workflows/ci.yml`: remove the `Removable app check (apps/api)` step.
+6. Docs that describe the API (`docs/reference/api-reference.md`, the README's
+   "Run the API" lines).
 
 ## See Also
 

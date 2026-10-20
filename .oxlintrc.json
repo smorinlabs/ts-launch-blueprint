@@ -235,6 +235,42 @@
         ]
       }
     },
+    // The API: services come from createCore only (D-049). This override also
+    // matches apps/*/src/** above and REPLACES its options, so it repeats the
+    // two [app-core-entry-only] patterns. The CLI is deliberately not covered:
+    // apps/cli/src/api.ts (the public createApiClient compatibility wrapper)
+    // builds a repository and a service directly.
+    {
+      "files": ["apps/api/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@ts-launch-blueprint/core",
+                "importNames": [
+                  "createHttpProjectsRepository",
+                  "createInMemoryProjectsRepository",
+                  "createProjectsService"
+                ],
+                "message": "[api-core-via-create-core] The API gets its services from createCore (built in server.ts); only the composition root picks implementations."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["**/packages/**"],
+                "message": "[app-core-entry-only] Apps import the core only as @ts-launch-blueprint/core, never by a relative path into packages/."
+              },
+              {
+                "group": ["@ts-launch-blueprint/core/**"],
+                "message": "[app-core-entry-only] Apps import the core only as @ts-launch-blueprint/core, never a @ts-launch-blueprint/core/<subpath>."
+              }
+            ]
+          }
+        ]
+      }
+    },
     {
       "files": ["**/tests/**", "**/*.test.ts"],
       "rules": {

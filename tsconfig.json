@@ -1,8 +1,10 @@
-// Root typecheck over the whole workspace: `just typecheck` stays one
-// `tsc --noEmit` (D-013(4)). Packages extend the same base for the editor
-// and tsdown.
+// Root typecheck over the workspace (D-013(4)), with isolatedDeclarations on.
+// Packages extend the same base for the editor and tsdown. apps/api is
+// excluded: it typechecks with its own tsconfig (isolatedDeclarations off,
+// D-048), run as a second pass by scripts/typecheck.sh (`just typecheck`).
 {
   "extends": "./tsconfig.base.json",
+  "exclude": ["apps/api/**"],
   "include": [
     "packages/*/src/**/*.ts",
     "packages/*/tests/**/*.ts",

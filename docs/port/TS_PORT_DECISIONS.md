@@ -475,3 +475,52 @@ the old one.
 - Options: (1) record TypeScript 7 as adopted (2) roll back to TypeScript 6 to match D-037
 - Decision: (1). TypeScript 7.0.2 is the repo's compiler for `tsc --noEmit` and the editor language service. D-037's unblock condition (tsdown publishing TS7 peer support) was met, so its deferral no longer applies; D-037 stays unedited as the record of that decision.
 - Why: The repo already runs TypeScript 7 and every gate passes on it; a rollback would only make the log match an outdated state. Follow-on effect: TypeScript 7 ships no JS compiler API, so tools that relied on it need another parser; dependency-cruiser uses `parser: 'swc'` (D-042).
+
+## D-047: Core exports the `listProjects` contract schemas (core previously kept all Zod schemas internal, locked by the core public-API test)
+- Ref: maintainer decision 2026-10; Phase 2 (API), ticket P2-1; `packages/core/src/schemas/projects.contract.ts`
+- Options: (1) export a small contract from core: `ListProjectsInputSchema`, `ListProjectsOutputSchema` and the `ListProjectsOutput` type (2) each controller defines its own schemas (3) a separate `packages/contracts` package
+- Decision: (1). Only what `projects.list` needs is public; converters and the raw-API schemas (`ProjectSchema`, `WorkspaceSchema`) stay internal, with `ProjectSchema` reachable only inside the output schema. The output is an object (`{ projects }`), not a bare array, so fields such as a cursor can be added later without a breaking change, and it matches the CLI's JSON output. The service keeps its plain `ListProjectsInput` interface; a compile-time `expectTypeOf(...).toEqualTypeOf(...)` check keeps it exactly equal to the input schema. A max page size is not set here; it is an API decision for the `apps/api` work, since a cap would also change the CLI.
+- Why: One source of truth with no duplication, so the API can't drift from the core, and no deep imports past the core entry (`[app-core-entry-only]`, D-042). A separate contracts package is overkill for one operation; revisit when there are several. This replaces the earlier convention (from the schema-layer and workspace work, enforced only by the core public-API test) that the core exported no Zod schemas; it does not amend D-039 or D-040, neither of which stated that rule.
+
+## D-048: API app defaults — in-memory data, port 8080, health routes, own tsconfig (builds on D-043, D-044, D-047)
+- Ref: maintainer decision 2026-10; ticket P2-2 (`apps/api`); spike 2026-10-19 (throwaway copy of the P2-1 branch with real Hono, tRPC and the core)
+- Options: (1) the defaults below (2) mirror the CLI exactly (HTTP source and a required token by default) (3) drop `isolatedDeclarations` repo-wide so the API typechecks with the rest
+- Decision: (1).
+  1. **Data source**: in-memory demo data by default (`TS_PROJECTS_SOURCE=memory`), unlike the CLI's `http` default; `http` needs `TS_PROJECTS_TOKEN`, checked at startup, not on the first request.
+  2. **Port**: `PORT`, default 8080 (Cloud Run's default).
+  3. **Routes**: `GET /healthz` (liveness) and `GET /readyz` (readiness, trivial until a real data source needs a check) as plain Hono routes; `projects.list` as a tRPC **query** (so a GET) at `/trpc/projects.list`, with an **optional** input (`ListProjectsInputSchema.optional()`: a GET without `?input=` passes `undefined`, which the bare object schema would reject with 400).
+  4. **Errors**: `initTRPC.create({ isDev: false })`, so error bodies never carry stack traces or file paths, whatever `NODE_ENV` says. Domain errors aren't mapped yet (an unknown workspace is a 500); that is the API's next step.
+  5. **No max `limit`** yet: a cap set in the shared contract would also change the CLI (D-047); revisit with a real data source.
+  6. **Typecheck**: `apps/api` has its own `tsconfig.json` with `isolatedDeclarations` and `declaration` off, the root `tsconfig.json` excludes it, and `scripts/typecheck.sh` runs each such app config as a second pass (found by glob, so deleting an app never breaks it). The spike showed `isolatedDeclarations` can't type a tRPC router, even with only `export type AppRouter = typeof appRouter` exported (TS9010/TS9013); the per-app config passes.
+  7. **Build**: tsdown with `dts: false` (nothing consumes the app's types; a web client imports `AppRouter` from source), the core bundled as for the CLI; `apps/api/package.json` has no `version` (only the published CLI is versioned).
+- Why: A clone-and-run API that needs credentials before it answers would fail the "runs without cloud credentials" goal, so the template's API answers on the demo data out of the box. Turning `isolatedDeclarations` off only for an app that emits no declarations keeps it (and tsdown's fast `.d.ts` path) for the core and the published CLI.
+
+## D-049: API error mapping — domain errors to HTTP codes, generic 5xx, readable validation, `[api-core-via-create-core]` (builds on D-043, D-048)
+- Ref: maintainer decision 2026-10; ticket P2-3; spike 2026-10-20 (real tRPC v11 over HTTP)
+- Options: (1) one mapping module in `apps/api`, applied by a tRPC middleware on the base procedure (2) map in each procedure (3) map in the core
+- Decision: (1). `toTRPCError` in `apps/api/src/errors.ts`:
+  | Domain error | tRPC code | HTTP | Client message |
+  |---|---|---|---|
+  | `NotFoundError` | `NOT_FOUND` | 404 | the domain message |
+  | `ConflictError` | `CONFLICT` | 409 | the domain message |
+  | `AuthError` | `BAD_GATEWAY` | 502 | generic |
+  | `ApiError` | `BAD_GATEWAY` | 502 | generic |
+  | a `TRPCError` (e.g. input validation) | unchanged | unchanged | unchanged |
+  | anything else | `INTERNAL_SERVER_ERROR` | 500 | generic |
+  1. **`AuthError` is a 502, not a 401** (unlike the CLI's exit 4): in the CLI the user supplies the token, but in the API it is server configuration (`TS_PROJECTS_TOKEN`) and the caller didn't authenticate at all, so a 401 would wrongly tell them to log in. When the API gets its own auth, that gets 401.
+  2. **Generic 5xx messages** (upstream and unexpected errors can carry URLs, hostnames or secrets); the original error is logged to stderr once per 5xx via `trpcServer`'s `onError` (`<procedure> failed: <name>: <message>`), and 4xx aren't logged. Structured logs replace this in the observability work.
+  3. **Readable validation errors**: an `errorFormatter` turns a `BAD_REQUEST` with schema issues into one `path: message` line per issue (`input` for an empty path), plus `data.issues: { path, message }[]`; `isDev: false` stays, so no stack.
+  4. **The middleware maps only errors from the procedure body.** A thrown domain or unexpected error arrives as `INTERNAL_SERVER_ERROR` with the original as `cause`, and is mapped; tRPC's own errors (input validation's `BAD_REQUEST`, whose `cause` is the ZodError) pass through unchanged. The spike showed that mapping `result.error.cause ?? result.error` for every failure turns a validation 400 into a 500. New procedures built from `publicProcedure` get the mapping automatically.
+  5. **`[api-core-via-create-core]`** (oxlint): `apps/api/src/**` may not import `createHttpProjectsRepository`, `createInMemoryProjectsRepository` or `createProjectsService`; the API gets its services from `createCore`, keeping the composition root the only place that picks implementations. Its override repeats the two `[app-core-entry-only]` patterns, because it replaces the `apps/*/src/**` override's options. The CLI's `createApiClient` compatibility wrapper is deliberately not covered.
+- Why: the core stays transport-free (D-039), each controller owns its own reporting, and nothing the client sees on a 5xx can leak upstream or internal detail.
+
+## D-050: API container image — fully bundled, multi-stage, non-root, graceful SIGTERM (builds on D-044, D-048)
+- Ref: maintainer decision 2026-10; ticket P2-4a; spike 2026-10-20 (git-less copy of the P2-3 branch)
+- Options: (1) bundle every dependency into `dist/server.js` and ship only `dist/` (2) ship `node_modules` (a `pnpm deploy` / production install in the image) (3) a distroless or Alpine base
+- Decision: (1), on `node:24-slim`.
+  1. **Bundle everything**: `deps: { alwaysBundle: [/.*/] }` in `apps/api/tsdown.config.ts`; `dist/server.js` (about 377 kB, 91 kB gzipped) imports only `node:*` built-ins, so the runtime stage has no `node_modules` and no pnpm, and nothing is installed at runtime. An e2e test starts `dist/` copied to a folder without `node_modules`.
+  2. **Multi-stage** from the repo root: the build stage installs pnpm `10.34.3` with npm (matching `packageManager`, D-035; not corepack) and runs `pnpm install --frozen-lockfile --ignore-scripts --filter @ts-launch-blueprint/api...`. `--ignore-scripts` is required: the build context has no `.git`, so the root `prepare` script (`lefthook install`) fails the install (spike: exit 1, "not a git repository"); no build script is needed for the API, and pnpm 10 already blocks the only ones in the tree. The runtime stage copies only `dist/`, sets `NODE_ENV=production` and `PORT=8080`, and runs as the non-root `node` user.
+  3. **Graceful shutdown**: on `SIGTERM`/`SIGINT` the server logs `shutting down (<signal>)`, calls `server.close()` and exits 0 once in-flight requests finish; an unref'd 10 s safety timer exits 1 if closing hangs (`apps/api/src/shutdown.ts`, unit-tested). Node runs as PID 1 in a container, where default signal handling doesn't apply, so the explicit handler is required.
+  4. **One smoke script** (`scripts/smoke-api.sh`, POSIX `sh` + `curl`) used by the CI `api-image` job and by the Cloud Run deploy. The CI job runs the image without `--rm`, smoke-tests it, then checks `docker stop` leaves exit code 0.
+  5. Base image by tag (`node:24-slim`); pinning by digest is a hardening follow-up.
+- Why: the smallest runtime surface that still runs anywhere Node 24 runs: no package manager, no install step and no dependency tree at runtime, and a stop that Cloud Run and Docker treat as clean.

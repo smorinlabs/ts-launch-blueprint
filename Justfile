@@ -93,10 +93,12 @@ alias c := check-deps
     just check-deps
     pnpm install
 
-# Build the published CLI package (apps/cli/dist/) with tsdown
+# Build every app present (apps/*/dist/) with tsdown. A glob filter, so a
+# deleted app never breaks it (just check-removable); publishing uses the
+# CLI package's own build (pnpm run build), not this recipe.
 [group('build'), group('dev')]
 @build:
-    pnpm --filter ts-launch-blueprint build
+    pnpm -r --filter './apps/*' build
 
 alias b := build
 
@@ -150,11 +152,11 @@ check-removable app="cli":
 @lint-fix:
     pnpm exec oxlint --fix
 
-# Run type checker (tsc --noEmit)
+# Run type checker: the root tsc --noEmit plus each app with its own
+# tsconfig (scripts/typecheck.sh, D-048)
 [group('dev')]
 @typecheck:
     echo "Running type checker..."
-    echo "  tsc --noEmit"
     pnpm run typecheck
 
 alias tc := typecheck
@@ -245,6 +247,30 @@ alias pc := pre-commit-run
     pnpm exec lefthook install
     git config commit.template .gitmessage
     echo "Hooks installed; commit template wired (.gitmessage)"
+
+# Build and start the API (Hono + tRPC) on PORT (default 8080), in-memory
+# demo data by default (D-048). See docs/reference/api-reference.md.
+[group('run'), group('quick start')]
+@api:
+    pnpm --filter @ts-launch-blueprint/api build
+    node apps/api/dist/server.js
+
+# Build the API container image from the repo root (apps/api/Dockerfile, D-050)
+[group('run')]
+@docker-build:
+    docker build -f apps/api/Dockerfile -t ts-launch-blueprint-api .
+
+# Run the API container on port 8080 (Ctrl-C stops it gracefully)
+[group('run')]
+@docker-run:
+    docker run --rm -p 8080:8080 ts-launch-blueprint-api
+
+# Call it positionally: `just smoke` (localhost) or `just smoke https://…`
+# (never `url=…`, which passes that literal text).
+# Smoke-test a running API (scripts/smoke-api.sh, shared with CI and the deploy)
+[group('run')]
+@smoke url="http://localhost:8080":
+    sh scripts/smoke-api.sh {{url}}
 
 # Run package command
 [group('run'), group('quick start')]

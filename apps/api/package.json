@@ -1,0 +1,21 @@
+{
+  "name": "@ts-launch-blueprint/api",
+  "private": true,
+  "description": "Hono + tRPC API for ts-launch-blueprint (D-043): the second controller over the shared core",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "@hono/trpc-server": "^0.4.2",
+    "@trpc/server": "^11.19.0",
+    "@ts-launch-blueprint/core": "workspace:*",
+    "hono": "^4.13.13"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

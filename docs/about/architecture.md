@@ -13,7 +13,8 @@ The repo is a pnpm workspace with three parts:
   calls it.
 - **The CLI** (`apps/cli`, the `ts-projects` command and the published npm
   package): one controller that calls the core.
-- **The API** (`apps/api`, planned): a second controller over the same core.
+- **The API** (`apps/api`, Hono + tRPC): a second controller over the same
+  core. See the [API Reference](../reference/api-reference.md).
 
 The goal is a ready web template: the CLI and the API run the same business
 logic, and each part can be removed on its own. Delete an app and the rest
@@ -27,7 +28,7 @@ still works; `just check-removable cli` proves it on every CI run.
 | Repositories     | [`packages/core/src/repositories/`](../../packages/core/src/repositories/)   | Data access behind the `ProjectsRepository` interface, with an HTTP and an in-memory implementation                 | `schemas/`                                                     | `services/`, `composition.ts`, any framework           |
 | Services         | [`packages/core/src/services/`](../../packages/core/src/services/)           | Business rules: the case-insensitive workspace lookup, the default limit (200), `NotFoundError`                     | `schemas/`, and the repository interface as `import type` only | Concrete repositories, `composition.ts`, any framework |
 | Composition root | [`packages/core/src/composition.ts`](../../packages/core/src/composition.ts) | `createCore`: the only place that picks a repository implementation and builds the services on it                   | Repositories, services                                         | Apps, any framework                                    |
-| Controllers      | [`apps/cli/`](../../apps/cli/) now, `apps/api` later                         | Turn input (flags, a request) into a service call, and the result or error into output                              | The core, only as `@ts-launch-blueprint/core`                  | `packages/core/src/...` paths, other apps              |
+| Controllers      | [`apps/cli/`](../../apps/cli/), [`apps/api/`](../../apps/api/)               | Turn input (flags, a request) into a service call, and the result or error into output                              | The core, only as `@ts-launch-blueprint/core`                  | `packages/core/src/...` paths, other apps              |
 
 Apps reach the core only through its entry,
 [`packages/core/src/index.ts`](../../packages/core/src/index.ts). Nothing in
@@ -46,7 +47,7 @@ there.
 
 ```mermaid
 flowchart TB
-  apps["Controllers<br/>apps/cli · apps/api (planned)"]
+  apps["Controllers<br/>apps/cli · apps/api"]
   entry["Core entry<br/>packages/core/src/index.ts"]
   composition["Composition root<br/>composition.ts"]
   services["Services<br/>services/"]
@@ -108,31 +109,39 @@ sequenceDiagram
   item through the converter (`unwrapList` → `convertProject` /
   `convertWorkspace`). The in-memory repository returns its seed as is,
   without validation, because the seed is trusted data defined in code.
-- **The API will take the same path** from a tRPC procedure instead of a CLI
-  command: `createCore` → `projectsService.listProjects` → the repository.
+- **The API takes the same path** from a tRPC procedure instead of a CLI
+  command (`GET /trpc/projects.list` → `createCore` →
+  `projectsService.listProjects` → the repository); see the
+  [API Reference](../reference/api-reference.md). Unlike the CLI, the API
+  uses the in-memory seed by default (D-048).
 
 ## Errors
 
 The core throws **domain errors** that describe what went wrong and carry no
 transport detail (no exit code, no HTTP status):
 [`packages/core/src/schemas/errors.ts`](../../packages/core/src/schemas/errors.ts).
-Each controller decides how to report them. The CLI maps them with
-`exitCodeFor` in
-[`apps/cli/src/cli/exit-codes.ts`](../../apps/cli/src/cli/exit-codes.ts):
+Each controller decides how to report them: the CLI with `exitCodeFor` in
+[`apps/cli/src/cli/exit-codes.ts`](../../apps/cli/src/cli/exit-codes.ts), the
+API with `toTRPCError` in
+[`apps/api/src/errors.ts`](../../apps/api/src/errors.ts) (D-049):
 
-| Error                  | Raised by                                    | CLI exit code |
-| ---------------------- | -------------------------------------------- | ------------- |
-| `NotFoundError`        | core (unknown workspace)                     | 3             |
-| `AuthError`            | core (token rejected); CLI (no token found)  | 4             |
-| `ConflictError`        | core (defined; nothing throws it yet)        | 5             |
-| `ApiError`             | core (network, timeout, bad response)        | 1             |
-| `UsageError`           | CLI only (bad flag, missing `--config` file) | 2             |
-| `ConfigError`          | CLI only (bad config file)                   | 1             |
-| `CliError` with a code | CLI only                                     | that code     |
-| anything else          | —                                            | 1             |
+| Error                  | Raised by                                    | CLI exit code | API (HTTP) |
+| ---------------------- | -------------------------------------------- | ------------- | ---------- |
+| `NotFoundError`        | core (unknown workspace)                     | 3             | 404        |
+| `AuthError`            | core (token rejected); CLI (no token found)  | 4             | 502        |
+| `ConflictError`        | core (defined; nothing throws it yet)        | 5             | 409        |
+| `ApiError`             | core (network, timeout, bad response)        | 1             | 502        |
+| `UsageError`           | CLI only (bad flag, missing `--config` file) | 2             | —          |
+| `ConfigError`          | CLI only (bad config file)                   | 1             | —          |
+| `CliError` with a code | CLI only                                     | that code     | —          |
+| invalid API input      | API only (contract validation)               | —             | 400        |
+| anything else          | —                                            | 1             | 500        |
 
-The API will map the same domain errors to tRPC/HTTP codes (for example
-`NotFoundError` → 404) in its own module, without touching the core.
+`AuthError` differs on purpose: in the CLI the user supplies the token, so
+it's theirs to fix (exit 4); in the API the token is server configuration,
+so the API's caller sees an upstream failure (502), not "log in" (401). The
+API's 5xx responses carry a generic message, and the original error goes to
+the server log.
 
 ## Swapping the Data Source
 
@@ -168,9 +177,12 @@ A made-up example, "get one project by id", touches each layer in this order:
    repository (no fetch mocks), as in
    `packages/core/tests/projects.service.test.ts`.
 4. **Core entry.** Export it from `packages/core/src/index.ts` only if an app
-   needs it, and add it to `packages/core/tests/public-api.test.ts`.
-5. **Controller.** A CLI command now (in `apps/cli/src/cli/commands/`), a
-   tRPC procedure later, calling the service through `createCore`.
+   needs it, and add it to `packages/core/tests/public-api.test.ts`. If the
+   operation is exposed by the API, add its contract schemas next to the shape
+   in `schemas/` (like `projects.contract.ts`) and export them.
+5. **Controller.** A CLI command (in `apps/cli/src/cli/commands/`) and/or a
+   tRPC procedure (in `apps/api/src/router.ts`), calling the service through
+   `createCore`.
 6. **Check.** Run `just all`: it includes the lint and boundary rules, so a
    wrong import fails here, with a tag that
    [Architecture Boundary Rules](../reference/boundary-rules.md) explains.
@@ -199,18 +211,20 @@ Deliberate differences:
 
 ## What's Next
 
+Built: **`apps/api`**, Hono + tRPC (D-043, D-048). Its `projects.list`
+procedure calls the same projects service as the CLI.
+
 Planned, not built yet:
 
-- **`apps/api`**: Hono + tRPC (D-043). Its procedures call the same projects
-  service as the CLI, and it maps domain errors to tRPC/HTTP codes.
 - **`apps/web`**: React. It imports only the API's router **type**
   (`AppRouter`), never runtime code; a boundary rule will enforce that.
 
-Today the core entry exports the `Project`/`Workspace` **types** but not the
-**Zod schemas** or converters; the core public-API test
-(`packages/core/tests/public-api.test.ts`) locks that. The API will need
-request/response schemas, so exporting a small contract from the core is a
-**deliberate public-API change**, made in the API phase.
+The core exports the `listProjects` contract schemas
+(`ListProjectsInputSchema`, `ListProjectsOutputSchema`, in
+[`packages/core/src/schemas/projects.contract.ts`](../../packages/core/src/schemas/projects.contract.ts))
+for controllers to validate with; converters and the raw-API schemas stay
+internal (D-047). The core public-API test
+(`packages/core/tests/public-api.test.ts`) locks exactly what is exported.
 
 ## See Also
 

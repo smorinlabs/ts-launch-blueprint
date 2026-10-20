@@ -69,7 +69,7 @@ pre-commit:
     # Type check runs on the FULL program, not per-file — tsc semantics need
     # the whole graph (mirrors the source's repo-wide mypy hook).
     - name: typecheck
-      run: pnpm exec tsc --noEmit
+      run: sh scripts/typecheck.sh
 
 commit-msg:
   jobs:
