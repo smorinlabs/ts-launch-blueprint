@@ -50,19 +50,32 @@ tRPC wraps every response:
 
 - **Success**: `{"result":{"data":{"projects":[…]}}}`, each project
   `{ "id", "name", "workspace": { "name" } }`.
-- **Error**: `{"error":{"code":-32603,"message":"…","data":{"code":"INTERNAL_SERVER_ERROR","httpStatus":500,"path":"projects.list"}}}`.
+- **Error**: `{"error":{"code":-32004,"message":"Workspace not found: nope","data":{"code":"NOT_FOUND","httpStatus":404,"path":"projects.list"}}}`.
   `error.data.code` is the tRPC code and `error.data.httpStatus` the HTTP
   status.
 
-| Case                                   | HTTP  | `error.data.code`       |
-| -------------------------------------- | ----- | ----------------------- |
-| Invalid input (for example `limit: 0`) | `400` | `BAD_REQUEST`           |
-| Unknown workspace                      | `500` | `INTERNAL_SERVER_ERROR` |
+Domain errors from the core are mapped in `apps/api/src/errors.ts` (D-049):
 
-Error bodies never contain a stack trace or file paths, whatever `NODE_ENV`
-says (`isDev: false`). Two known gaps, to be fixed by the API's error-mapping
-work: an unknown workspace (`NotFoundError`) is reported as a 500 rather
-than a 404, and a validation error's `message` is the raw Zod issue list.
+| Case                                               | HTTP  | `error.data.code`       | `error.message`                                                  |
+| -------------------------------------------------- | ----- | ----------------------- | ---------------------------------------------------------------- |
+| Invalid input (for example `limit: 0`)             | `400` | `BAD_REQUEST`           | One line per field: `limit: Too small: expected number to be >0` |
+| Unknown workspace (`NotFoundError`)                | `404` | `NOT_FOUND`             | The domain message: `Workspace not found: nope`                  |
+| `ConflictError`                                    | `409` | `CONFLICT`              | The domain message                                               |
+| Upstream rejected the server's token (`AuthError`) | `502` | `BAD_GATEWAY`           | `Upstream projects API rejected the server's credentials`        |
+| Upstream failure (`ApiError`)                      | `502` | `BAD_GATEWAY`           | `Upstream projects API error`                                    |
+| Anything unexpected                                | `500` | `INTERNAL_SERVER_ERROR` | `Internal server error`                                          |
+
+- **400s** also carry `error.data.issues`, one `{ "path", "message" }` per
+  problem field (the path is `input` when the whole input is wrong), so a form
+  can show field errors.
+- **`AuthError` is a 502, not a 401:** the token is the server's own
+  configuration (`TS_PROJECTS_TOKEN`), not something the caller sent.
+- **5xx messages are generic.** Upstream and unexpected errors can contain
+  URLs or internal detail, so the client gets the fixed text above, and the
+  original error is logged to the server's stderr, one line per error
+  (`projects.list failed: ApiError: …`). 4xx errors aren't logged.
+- Error bodies never contain a stack trace or file paths, whatever `NODE_ENV`
+  says (`isDev: false`).
 
 ## Examples
 

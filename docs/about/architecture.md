@@ -120,25 +120,28 @@ sequenceDiagram
 The core throws **domain errors** that describe what went wrong and carry no
 transport detail (no exit code, no HTTP status):
 [`packages/core/src/schemas/errors.ts`](../../packages/core/src/schemas/errors.ts).
-Each controller decides how to report them. The CLI maps them with
-`exitCodeFor` in
-[`apps/cli/src/cli/exit-codes.ts`](../../apps/cli/src/cli/exit-codes.ts):
+Each controller decides how to report them: the CLI with `exitCodeFor` in
+[`apps/cli/src/cli/exit-codes.ts`](../../apps/cli/src/cli/exit-codes.ts), the
+API with `toTRPCError` in
+[`apps/api/src/errors.ts`](../../apps/api/src/errors.ts) (D-049):
 
-| Error                  | Raised by                                    | CLI exit code |
-| ---------------------- | -------------------------------------------- | ------------- |
-| `NotFoundError`        | core (unknown workspace)                     | 3             |
-| `AuthError`            | core (token rejected); CLI (no token found)  | 4             |
-| `ConflictError`        | core (defined; nothing throws it yet)        | 5             |
-| `ApiError`             | core (network, timeout, bad response)        | 1             |
-| `UsageError`           | CLI only (bad flag, missing `--config` file) | 2             |
-| `ConfigError`          | CLI only (bad config file)                   | 1             |
-| `CliError` with a code | CLI only                                     | that code     |
-| anything else          | —                                            | 1             |
+| Error                  | Raised by                                    | CLI exit code | API (HTTP) |
+| ---------------------- | -------------------------------------------- | ------------- | ---------- |
+| `NotFoundError`        | core (unknown workspace)                     | 3             | 404        |
+| `AuthError`            | core (token rejected); CLI (no token found)  | 4             | 502        |
+| `ConflictError`        | core (defined; nothing throws it yet)        | 5             | 409        |
+| `ApiError`             | core (network, timeout, bad response)        | 1             | 502        |
+| `UsageError`           | CLI only (bad flag, missing `--config` file) | 2             | —          |
+| `ConfigError`          | CLI only (bad config file)                   | 1             | —          |
+| `CliError` with a code | CLI only                                     | that code     | —          |
+| invalid API input      | API only (contract validation)               | —             | 400        |
+| anything else          | —                                            | 1             | 500        |
 
-The API doesn't map domain errors yet: today `NotFoundError` comes back as
-tRPC `INTERNAL_SERVER_ERROR` (500). Mapping them to tRPC/HTTP codes (for
-example `NotFoundError` → 404) in the API's own module, without touching the
-core, is the next API step.
+`AuthError` differs on purpose: in the CLI the user supplies the token, so
+it's theirs to fix (exit 4); in the API the token is server configuration,
+so the API's caller sees an upstream failure (502), not "log in" (401). The
+API's 5xx responses carry a generic message, and the original error goes to
+the server log.
 
 ## Swapping the Data Source
 
@@ -213,8 +216,6 @@ procedure calls the same projects service as the CLI.
 
 Planned, not built yet:
 
-- **API error mapping**: domain errors to tRPC/HTTP codes, and readable
-  validation messages.
 - **`apps/web`**: React. It imports only the API's router **type**
   (`AppRouter`), never runtime code; a boundary rule will enforce that.
 

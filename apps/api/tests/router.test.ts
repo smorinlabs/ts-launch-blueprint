@@ -40,6 +40,13 @@ describe('projects.list (tRPC caller)', () => {
     await expect(caller.projects.list({ limit: 0 })).rejects.toBeInstanceOf(TRPCError);
   });
 
+  it('maps an unknown workspace to NOT_FOUND (the middleware runs for the caller too)', async () => {
+    await expect(caller.projects.list({ workspaceName: 'nope' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Workspace not found: nope',
+    });
+  });
+
   it('returns output that matches the core contract', async () => {
     expect(ListProjectsOutputSchema.safeParse(await caller.projects.list()).success).toBe(true);
   });

@@ -494,3 +494,22 @@ the old one.
   6. **Typecheck**: `apps/api` has its own `tsconfig.json` with `isolatedDeclarations` and `declaration` off, the root `tsconfig.json` excludes it, and `scripts/typecheck.sh` runs each such app config as a second pass (found by glob, so deleting an app never breaks it). The spike showed `isolatedDeclarations` can't type a tRPC router, even with only `export type AppRouter = typeof appRouter` exported (TS9010/TS9013); the per-app config passes.
   7. **Build**: tsdown with `dts: false` (nothing consumes the app's types; a web client imports `AppRouter` from source), the core bundled as for the CLI; `apps/api/package.json` has no `version` (only the published CLI is versioned).
 - Why: A clone-and-run API that needs credentials before it answers would fail the "runs without cloud credentials" goal, so the template's API answers on the demo data out of the box. Turning `isolatedDeclarations` off only for an app that emits no declarations keeps it (and tsdown's fast `.d.ts` path) for the core and the published CLI.
+
+## D-049: API error mapping — domain errors to HTTP codes, generic 5xx, readable validation, `[api-core-via-create-core]` (builds on D-043, D-048)
+- Ref: maintainer decision 2026-10; ticket P2-3; spike 2026-10-20 (real tRPC v11 over HTTP)
+- Options: (1) one mapping module in `apps/api`, applied by a tRPC middleware on the base procedure (2) map in each procedure (3) map in the core
+- Decision: (1). `toTRPCError` in `apps/api/src/errors.ts`:
+  | Domain error | tRPC code | HTTP | Client message |
+  |---|---|---|---|
+  | `NotFoundError` | `NOT_FOUND` | 404 | the domain message |
+  | `ConflictError` | `CONFLICT` | 409 | the domain message |
+  | `AuthError` | `BAD_GATEWAY` | 502 | generic |
+  | `ApiError` | `BAD_GATEWAY` | 502 | generic |
+  | a `TRPCError` (e.g. input validation) | unchanged | unchanged | unchanged |
+  | anything else | `INTERNAL_SERVER_ERROR` | 500 | generic |
+  1. **`AuthError` is a 502, not a 401** (unlike the CLI's exit 4): in the CLI the user supplies the token, but in the API it is server configuration (`TS_PROJECTS_TOKEN`) and the caller didn't authenticate at all, so a 401 would wrongly tell them to log in. When the API gets its own auth, that gets 401.
+  2. **Generic 5xx messages** (upstream and unexpected errors can carry URLs, hostnames or secrets); the original error is logged to stderr once per 5xx via `trpcServer`'s `onError` (`<procedure> failed: <name>: <message>`), and 4xx aren't logged. Structured logs replace this in the observability work.
+  3. **Readable validation errors**: an `errorFormatter` turns a `BAD_REQUEST` with schema issues into one `path: message` line per issue (`input` for an empty path), plus `data.issues: { path, message }[]`; `isDev: false` stays, so no stack.
+  4. **The middleware maps only errors from the procedure body.** A thrown domain or unexpected error arrives as `INTERNAL_SERVER_ERROR` with the original as `cause`, and is mapped; tRPC's own errors (input validation's `BAD_REQUEST`, whose `cause` is the ZodError) pass through unchanged. The spike showed that mapping `result.error.cause ?? result.error` for every failure turns a validation 400 into a 500. New procedures built from `publicProcedure` get the mapping automatically.
+  5. **`[api-core-via-create-core]`** (oxlint): `apps/api/src/**` may not import `createHttpProjectsRepository`, `createInMemoryProjectsRepository` or `createProjectsService`; the API gets its services from `createCore`, keeping the composition root the only place that picks implementations. Its override repeats the two `[app-core-entry-only]` patterns, because it replaces the `apps/*/src/**` override's options. The CLI's `createApiClient` compatibility wrapper is deliberately not covered.
+- Why: the core stays transport-free (D-039), each controller owns its own reporting, and nothing the client sees on a 5xx can leak upstream or internal detail.

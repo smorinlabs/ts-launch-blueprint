@@ -97,6 +97,14 @@ describe('API end-to-end (built server)', () => {
     expect(await response.json()).toEqual({ status: 'ok' });
   });
 
+  it('an unknown workspace -> 404 NOT_FOUND', async () => {
+    const input = encodeURIComponent(JSON.stringify({ workspaceName: 'nope' }));
+    const response = await fetch(`${baseUrl}/trpc/projects.list?input=${input}`);
+    expect(response.status).toBe(404);
+    const body = (await response.json()) as { error: { data: { code: string } } };
+    expect(body.error.data.code).toBe('NOT_FOUND');
+  });
+
   it('GET /trpc/projects.list -> the 4 demo projects with no token', async () => {
     const response = await fetch(`${baseUrl}/trpc/projects.list`);
     expect(response.status).toBe(200);
