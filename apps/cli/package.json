@@ -33,14 +33,14 @@
     "build": "tsdown && node scripts/copy-package-files.mjs"
   },
   "dependencies": {
-    "@inquirer/prompts": "^8.5.2",
+    "@inquirer/prompts": "^8.7.4",
     "cli-table3": "^0.6.5",
     "clipboardy": "^5.3.1",
     "commander": "^15.0.0",
     "picocolors": "^1.1.1",
     "smol-toml": "^1.9.1",
     "yocto-spinner": "^1.2.2",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@ts-launch-blueprint/core": "workspace:*"
