@@ -1,4 +1,4 @@
-// Build config (D-012(1)): tsdown (exact-pinned 0.22.x) bundles the CLI and the
+// Build config (D-012(1)): tsdown (exact-pinned in the root package.json) bundles the CLI and the
 // library entry; dts via the fast oxc path (isolatedDeclarations, D-025).
 // The shebang in src/cli.ts is preserved by tsdown and the output made
 // executable. tsc --noEmit remains the separate typecheck gate.

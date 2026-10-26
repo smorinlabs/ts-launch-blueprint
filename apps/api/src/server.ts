@@ -1,6 +1,6 @@
 // Process entry for the API (thin; excluded from coverage like the CLI's
 // src/cli.ts, and exercised by the e2e test): config -> logger -> createCore
-// -> serve, plus graceful shutdown on SIGTERM/SIGINT (src/shutdown.ts, D-050).
+// -> metrics -> serve, plus graceful shutdown on SIGTERM/SIGINT (src/shutdown.ts, D-050).
 // Everything after config is logged as JSON (D-051); a config error comes
 // before the logger exists, so it is the one plain stderr line.
 import { serve } from '@hono/node-server';
@@ -9,6 +9,7 @@ import { createCore } from '@ts-launch-blueprint/core';
 import { createApp } from './app.js';
 import { resolveApiConfig } from './config.js';
 import { createLogger } from './logger.js';
+import { createMetrics } from './metrics.js';
 import { createShutdown } from './shutdown.js';
 
 let config;
@@ -29,7 +30,8 @@ const core =
       });
 
 const { port, source } = config;
-const app = createApp({ core, logger, gcpProjectId: config.gcpProjectId });
+const metrics = config.metricsEnabled ? createMetrics({ collectDefaults: true }) : undefined;
+const app = createApp({ core, logger, gcpProjectId: config.gcpProjectId, metrics });
 const server = serve({ fetch: app.fetch, port }, () => {
   logger.info(
     { port, source },

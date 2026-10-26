@@ -28,7 +28,8 @@ const CLOUD_TRACE = /^([0-9a-f]{32})(?:\/(\d{1,20}))?(?:;o=\d)?$/i;
 const MAX_SPAN_ID = 2n ** 64n - 1n;
 // traceparent: VERSION-TRACE_ID-PARENT_ID-FLAGS (W3C Trace Context).
 const TRACEPARENT = /^[0-9a-f]{2}-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}$/i;
-const PROBE_PATHS = new Set(['/healthz', '/readyz']);
+// Probes and scrapes are frequent and routine: DEBUG, not INFO.
+const PROBE_PATHS = new Set(['/healthz', '/readyz', '/metrics']);
 
 /** The caller's x-request-id when it is safe to log and echo, else a new UUID. */
 export function requestIdFrom(header: string | undefined): string {

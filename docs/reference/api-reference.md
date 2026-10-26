@@ -29,12 +29,13 @@ on stderr and a non-zero exit. A port that is already in use exits 1 with one
 
 ## Endpoints
 
-| Method | Path                  | What it does                                               |
-| ------ | --------------------- | ---------------------------------------------------------- |
-| `GET`  | `/healthz`            | Liveness: `200 {"status":"ok"}` while the process is up    |
-| `GET`  | `/readyz`             | Readiness: `200 {"status":"ready"}` once the core is built |
-| `GET`  | `/trpc/projects.list` | tRPC query: list projects (optional input, see below)      |
-| any    | anything else         | `404`                                                      |
+| Method | Path                  | What it does                                                                                         |
+| ------ | --------------------- | ---------------------------------------------------------------------------------------------------- |
+| `GET`  | `/healthz`            | Liveness: `200 {"status":"ok"}` while the process is up                                              |
+| `GET`  | `/readyz`             | Readiness: `200 {"status":"ready"}` once the core is built                                           |
+| `GET`  | `/trpc/projects.list` | tRPC query: list projects (optional input, see below)                                                |
+| `GET`  | `/metrics`            | Prometheus metrics (unless `METRICS_ENABLED=false`); see [Observability](./observability.md#metrics) |
+| any    | anything else         | `404`                                                                                                |
 
 ### `projects.list`
 
@@ -110,6 +111,7 @@ the server generates a UUID. The same ID is on the request's log lines.
 | `TS_PROJECTS_TOKEN`   | Required with `TS_PROJECTS_SOURCE=http`; checked at startup                          |
 | `TS_PROJECTS_API_URL` | Optional API root override for the `http` source                                     |
 | `LOG_LEVEL`           | `debug`, `info` (default), `warn`, `error` or `silent`                               |
+| `METRICS_ENABLED`     | `true` (default) or `false`; `false` turns `/metrics` off (404)                      |
 | `GCP_PROJECT_ID`      | Optional; when set, trace fields use Cloud Logging's full trace name                 |
 
 The CLI reads the same `TS_PROJECTS_SOURCE`, but its default is `http`; see
@@ -128,9 +130,9 @@ just docker-run     # docker run --rm -p 8080:8080 ts-launch-blueprint-api
 just smoke          # in another terminal; or: just smoke https://your-service-url
 ```
 
-`just smoke` runs `scripts/smoke-api.sh`, the same 5 checks CI runs against
+`just smoke` runs `scripts/smoke-api.sh`, the same 6 checks CI runs against
 the image (`/healthz`, `/readyz`, `projects.list`, an unknown workspace →
-404, an unknown path → 404). Pass the URL positionally: `just smoke https://…`.
+404, an unknown path → 404, `/metrics`). Pass the URL positionally: `just smoke https://…`.
 
 ### Shutdown
 
@@ -143,4 +145,4 @@ exits 1. CI checks that `docker stop` on the image exits 0.
 
 - [Architecture](../about/architecture.md): how the API and the CLI share the core
 - [Architecture Boundary Rules](./boundary-rules.md), including how to remove the API
-- [Observability](./observability.md): the API's JSON logs
+- [Observability](./observability.md): the API's JSON logs and metrics

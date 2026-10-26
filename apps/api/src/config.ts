@@ -17,6 +17,9 @@ export const LOG_LEVEL_ENV_VAR = 'LOG_LEVEL';
  * doesn't set one by default). */
 export const GCP_PROJECT_ENV_VAR = 'GCP_PROJECT_ID';
 
+/** Metrics endpoint switch: true (default) or false. */
+export const METRICS_ENABLED_ENV_VAR = 'METRICS_ENABLED';
+
 /** The levels LOG_LEVEL accepts. */
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error', 'silent'] as const;
 /** A LOG_LEVEL value. */
@@ -35,6 +38,7 @@ interface BaseConfig {
   port: number;
   logLevel: LogLevel;
   gcpProjectId: string | undefined;
+  metricsEnabled: boolean;
 }
 
 /** The effective API configuration. */
@@ -51,6 +55,16 @@ function parseLogLevel(value: string | undefined): LogLevel {
     throw new ConfigError(`Invalid LOG_LEVEL "${value}": expected one of ${LOG_LEVELS.join(', ')}`);
   }
   return level;
+}
+
+function parseMetricsEnabled(value: string | undefined): boolean {
+  if (value === undefined || value === '' || value === 'true') {
+    return true;
+  }
+  if (value === 'false') {
+    return false;
+  }
+  throw new ConfigError(`Invalid METRICS_ENABLED "${value}": expected "true" or "false"`);
 }
 
 function parsePort(value: string | undefined): number {
@@ -80,6 +94,7 @@ export function resolveApiConfig(env: Record<string, string | undefined>): ApiCo
     port: parsePort(env['PORT']),
     logLevel: parseLogLevel(env[LOG_LEVEL_ENV_VAR]),
     gcpProjectId: env[GCP_PROJECT_ENV_VAR] === '' ? undefined : env[GCP_PROJECT_ENV_VAR],
+    metricsEnabled: parseMetricsEnabled(env[METRICS_ENABLED_ENV_VAR]),
   };
   const source = parseSource(env[SOURCE_ENV_VAR]);
   if (source === 'memory') {

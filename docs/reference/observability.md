@@ -1,7 +1,7 @@
 # Observability
 
 How the API (`apps/api`) reports what it's doing. This page covers **logs**
-(D-051); metrics and traces will be added here later. The CLI isn't covered:
+(D-051) and **metrics** (D-052); traces will be added here later. The CLI isn't covered:
 its stderr output is for people (see the [CLI Reference](./cli-reference.md)).
 
 ## Logs
@@ -37,8 +37,11 @@ what to write.
 
 - **Every request:** one `request completed` line, at `INFO` for 2xx–4xx and
   `ERROR` for 5xx.
-- **Health probes** (`/healthz`, `/readyz`): logged at `DEBUG`, so Cloud
-  Run's frequent probes write nothing at the default level.
+- **Health probes and scrapes** (`/healthz`, `/readyz`, `/metrics`): logged at
+  `DEBUG`, so Cloud Run's frequent probes and a scraper's requests write
+  nothing at the default level. This goes by path, so with
+  `METRICS_ENABLED=false` a request to `/metrics` (a 404) is logged at `DEBUG`
+  too.
 - **5xx from a procedure:** one extra `procedure failed` line at `ERROR`, with
   the same `requestId` and the original error. The client still gets only a
   generic message (D-049). 4xx write no error line.
@@ -88,6 +91,72 @@ The raw JSON is for machines. For readable output, pipe it through
 
 ```bash
 just api | pnpm exec pino-pretty
+```
+
+## Metrics
+
+`GET /metrics` serves [Prometheus](https://prometheus.io/) text format
+(`prom-client`), readable by any Prometheus-compatible scraper, including
+Google Cloud Managed Service for Prometheus. Like logging, metrics live in
+the controller; the core has none.
+
+| Name                            | Type      | Labels                      | Meaning                                                                                                 |
+| ------------------------------- | --------- | --------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `http_requests_total`           | counter   | `method`, `route`, `status` | Requests handled                                                                                        |
+| `http_request_duration_seconds` | histogram | `method`, `route`, `status` | Time from request start to response                                                                     |
+| `trpc_errors_total`             | counter   | `procedure`, `code`         | tRPC errors (4xx and 5xx) by procedure and code                                                         |
+| default Node metrics            | various   | —                           | `process_cpu_seconds_total`, `process_resident_memory_bytes`, `nodejs_eventloop_lag_seconds`, heap, GC… |
+
+Duration buckets (seconds): `0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5`.
+`status` is the numeric status as a string (`"200"`). `/metrics` itself
+isn't counted.
+
+### Route Labels
+
+`route` is always a **route pattern, never the raw path**: a label per URL
+(`/nope/123`, `/nope/456`, scanner traffic) would create a new time series
+for each one and grow memory without bound.
+
+| Request                                                                                            | `route`               |
+| -------------------------------------------------------------------------------------------------- | --------------------- |
+| `/healthz`, `/readyz`                                                                              | the path itself       |
+| `/trpc/projects.list` (also with `?batch=1`)                                                       | `/trpc/projects.list` |
+| a batch of known procedures (`/trpc/a,b?batch=1`)                                                  | `/trpc/batch`         |
+| an unknown or empty procedure (`/trpc/doesNotExist`, `/trpc`, `/trpc/`), or a batch containing one | `/trpc/unknown`       |
+| anything that matched no route (a 404)                                                             | `unmatched`           |
+
+Batching stays on: tRPC's `httpBatchLink` client sends `?batch=1` even for
+a single call. Per-procedure detail inside a batch shows in
+`trpc_errors_total`. Its `procedure` label is a known procedure name or
+`unknown`, never a name the caller sent. tRPC errors are counted including
+4xx (a rising `NOT_FOUND` rate is worth seeing), although only 5xx are
+logged.
+
+### Turning It Off
+
+`METRICS_ENABLED` is `true` (default) or `false`. With `false`, `/metrics`
+is a 404 and nothing is measured; any other value stops the server at
+startup.
+
+`/metrics` has no authentication. It holds operational numbers only, never
+request data, but a public Cloud Run service exposes it to anyone. Use
+`METRICS_ENABLED=false` or a private service if that matters; this will be
+decided with the deploy.
+
+### Querying
+
+```bash
+curl -s localhost:8080/metrics | grep http_requests_total
+```
+
+Example PromQL:
+
+```text
+# Request rate by route
+sum(rate(http_requests_total[5m])) by (route)
+
+# p95 latency by route
+histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))
 ```
 
 ## See Also

@@ -11,6 +11,7 @@ describe('resolveApiConfig', () => {
       source: 'memory',
       logLevel: 'info',
       gcpProjectId: undefined,
+      metricsEnabled: true,
     });
   });
 
@@ -20,6 +21,7 @@ describe('resolveApiConfig', () => {
       source: 'memory',
       logLevel: 'info',
       gcpProjectId: undefined,
+      metricsEnabled: true,
     });
   });
 
@@ -54,6 +56,7 @@ describe('resolveApiConfig', () => {
       baseUrl: 'http://127.0.0.1:1/api',
       logLevel: 'info',
       gcpProjectId: undefined,
+      metricsEnabled: true,
     });
     expect(resolveApiConfig({ TS_PROJECTS_SOURCE: 'http', TS_PROJECTS_TOKEN: 't' })).toEqual({
       port: 8080,
@@ -62,6 +65,7 @@ describe('resolveApiConfig', () => {
       baseUrl: undefined,
       logLevel: 'info',
       gcpProjectId: undefined,
+      metricsEnabled: true,
     });
   });
 
@@ -79,5 +83,19 @@ describe('resolveApiConfig', () => {
   it('reads an optional GCP_PROJECT_ID (empty means unset)', () => {
     expect(resolveApiConfig({ GCP_PROJECT_ID: 'my-proj' }).gcpProjectId).toBe('my-proj');
     expect(resolveApiConfig({ GCP_PROJECT_ID: '' }).gcpProjectId).toBeUndefined();
+  });
+
+  it('METRICS_ENABLED defaults to true (unset or empty) and accepts true or false', () => {
+    expect(resolveApiConfig({}).metricsEnabled).toBe(true);
+    expect(resolveApiConfig({ METRICS_ENABLED: '' }).metricsEnabled).toBe(true);
+    expect(resolveApiConfig({ METRICS_ENABLED: 'true' }).metricsEnabled).toBe(true);
+    expect(resolveApiConfig({ METRICS_ENABLED: 'false' }).metricsEnabled).toBe(false);
+  });
+
+  it.each(['yes', '0', 'TRUE'])('rejects METRICS_ENABLED=%s with a clear message', (value) => {
+    expect(() => resolveApiConfig({ METRICS_ENABLED: value })).toThrow(ConfigError);
+    expect(() => resolveApiConfig({ METRICS_ENABLED: value })).toThrow(
+      `Invalid METRICS_ENABLED "${value}": expected "true" or "false"`
+    );
   });
 });

@@ -124,6 +124,16 @@ describe('API end-to-end (built server)', () => {
     expect(body.error.data.code).toBe('NOT_FOUND');
   });
 
+  it('GET /metrics -> the request counter and the default Node metrics (D-052)', async () => {
+    await fetch(`${baseUrl}/trpc/projects.list`);
+    const response = await fetch(`${baseUrl}/metrics`);
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(text).toContain('http_requests_total{method="GET",route="/trpc/projects.list"');
+    expect(text).toContain('http_request_duration_seconds_bucket');
+    expect(text).toContain('process_cpu_seconds_total');
+  });
+
   it('GET /trpc/projects.list -> the 4 demo projects with no token', async () => {
     const response = await fetch(`${baseUrl}/trpc/projects.list`);
     expect(response.status).toBe(200);
@@ -187,6 +197,8 @@ describe('API process lifecycle (built server)', () => {
       try {
         const response = await fetch(`${server.url}/trpc/projects.list`);
         expect(response.status).toBe(200);
+        // prom-client (and its @opentelemetry/api dependency) is bundled too.
+        expect((await fetch(`${server.url}/metrics`)).status).toBe(200);
       } finally {
         server.child.kill('SIGTERM');
       }
