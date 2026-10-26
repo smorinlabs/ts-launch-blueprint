@@ -13,15 +13,19 @@ the core's in-memory demo data, so it answers with **no token and no server**
 just api                       # build, then start on PORT (default 8080)
 ```
 
-The server prints one line when it's ready:
+The server logs JSON lines to stdout (D-051); the first says it's ready:
 
-```
-ts-launch-blueprint api listening on :8080 (source: memory)
+```text
+{"severity":"INFO","time":"…","service":"ts-launch-blueprint-api","port":8080,"source":"memory","message":"ts-launch-blueprint api listening on :8080 (source: memory)"}
 ```
 
-A configuration error (a bad `PORT`, a bad `TS_PROJECTS_SOURCE`, or the
-`http` source without a token) stops it at startup, with the message on
-stderr and a non-zero exit.
+For readable output locally, pipe it: `just api | pnpm exec pino-pretty`.
+See [Observability](./observability.md) for the log fields.
+
+A configuration error (a bad `PORT`, `TS_PROJECTS_SOURCE` or `LOG_LEVEL`, or
+the `http` source without a token) stops it at startup, with a plain message
+on stderr and a non-zero exit. A port that is already in use exits 1 with one
+`CRITICAL` log line.
 
 ## Endpoints
 
@@ -72,8 +76,11 @@ Domain errors from the core are mapped in `apps/api/src/errors.ts` (D-049):
   configuration (`TS_PROJECTS_TOKEN`), not something the caller sent.
 - **5xx messages are generic.** Upstream and unexpected errors can contain
   URLs or internal detail, so the client gets the fixed text above, and the
-  original error is logged to the server's stderr, one line per error
-  (`projects.list failed: ApiError: …`). 4xx errors aren't logged.
+  original error is logged as one JSON `procedure failed` line on stdout,
+  with the request's `requestId` (see [Observability](./observability.md)).
+  4xx errors aren't logged.
+- **Errors outside tRPC** (a plain Hono route that throws) return `500`
+  with `{"error":"Internal server error"}`, not the tRPC envelope.
 - Error bodies never contain a stack trace or file paths, whatever `NODE_ENV`
   says (`isDev: false`).
 
@@ -90,6 +97,10 @@ curl -s localhost:8080/trpc/projects.list | jq '.result.data.projects'
 
 The encoded input above is `{"workspaceName":"engineering"}`.
 
+Every response carries an `x-request-id` header. A safe incoming
+`x-request-id` (1–128 characters of `A-Z a-z 0-9 . _ -`) is reused; otherwise
+the server generates a UUID. The same ID is on the request's log lines.
+
 ## Environment Variables
 
 | Variable              | Effect                                                                               |
@@ -98,6 +109,8 @@ The encoded input above is `{"workspaceName":"engineering"}`.
 | `TS_PROJECTS_SOURCE`  | `memory` (**default for the API**: demo data, no token) or `http` (the projects API) |
 | `TS_PROJECTS_TOKEN`   | Required with `TS_PROJECTS_SOURCE=http`; checked at startup                          |
 | `TS_PROJECTS_API_URL` | Optional API root override for the `http` source                                     |
+| `LOG_LEVEL`           | `debug`, `info` (default), `warn`, `error` or `silent`                               |
+| `GCP_PROJECT_ID`      | Optional; when set, trace fields use Cloud Logging's full trace name                 |
 
 The CLI reads the same `TS_PROJECTS_SOURCE`, but its default is `http`; see
 the [CLI Reference](./cli-reference.md).
@@ -130,3 +143,4 @@ exits 1. CI checks that `docker stop` on the image exits 0.
 
 - [Architecture](../about/architecture.md): how the API and the CLI share the core
 - [Architecture Boundary Rules](./boundary-rules.md), including how to remove the API
+- [Observability](./observability.md): the API's JSON logs
