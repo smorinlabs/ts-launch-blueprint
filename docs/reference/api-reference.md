@@ -104,15 +104,19 @@ the server generates a UUID. The same ID is on the request's log lines.
 
 ## Environment Variables
 
-| Variable              | Effect                                                                               |
-| --------------------- | ------------------------------------------------------------------------------------ |
-| `PORT`                | Port to listen on (default `8080`, Cloud Run's default); an integer from 1 to 65535  |
-| `TS_PROJECTS_SOURCE`  | `memory` (**default for the API**: demo data, no token) or `http` (the projects API) |
-| `TS_PROJECTS_TOKEN`   | Required with `TS_PROJECTS_SOURCE=http`; checked at startup                          |
-| `TS_PROJECTS_API_URL` | Optional API root override for the `http` source                                     |
-| `LOG_LEVEL`           | `debug`, `info` (default), `warn`, `error` or `silent`                               |
-| `METRICS_ENABLED`     | `true` (default) or `false`; `false` turns `/metrics` off (404)                      |
-| `GCP_PROJECT_ID`      | Optional; when set, trace fields use Cloud Logging's full trace name                 |
+| Variable                             | Effect                                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
+| `PORT`                               | Port to listen on (default `8080`, Cloud Run's default); an integer from 1 to 65535  |
+| `TS_PROJECTS_SOURCE`                 | `memory` (**default for the API**: demo data, no token) or `http` (the projects API) |
+| `TS_PROJECTS_TOKEN`                  | Required with `TS_PROJECTS_SOURCE=http`; checked at startup                          |
+| `TS_PROJECTS_API_URL`                | Optional API root override for the `http` source                                     |
+| `LOG_LEVEL`                          | `debug`, `info` (default), `warn`, `error` or `silent`                               |
+| `METRICS_ENABLED`                    | `true` (default) or `false`; `false` turns `/metrics` off (404)                      |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`        | Optional; turns tracing on, exporting to `<endpoint>/v1/traces` (OTLP HTTP/JSON)     |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Optional full traces URL; wins over the base endpoint                                |
+| `OTEL_SERVICE_NAME`                  | The traces' `service.name` (default `ts-launch-blueprint-api`)                       |
+| `OTEL_TRACES_SAMPLER_ARG`            | Sampling ratio for new traces, `0` to `1` (default `1`)                              |
+| `GCP_PROJECT_ID`                     | Optional; when set, trace fields use Cloud Logging's full trace name                 |
 
 The CLI reads the same `TS_PROJECTS_SOURCE`, but its default is `http`; see
 the [CLI Reference](./cli-reference.md).
@@ -145,4 +149,4 @@ exits 1. CI checks that `docker stop` on the image exits 0.
 
 - [Architecture](../about/architecture.md): how the API and the CLI share the core
 - [Architecture Boundary Rules](./boundary-rules.md), including how to remove the API
-- [Observability](./observability.md): the API's JSON logs and metrics
+- [Observability](./observability.md): the API's JSON logs, metrics and traces

@@ -14,7 +14,7 @@
 const CORE_SRC = '^packages/core/src/';
 const ANY_SRC = '^(packages|apps)/[^/]+/src/';
 const FRAMEWORKS =
-  '(^|node_modules/)(commander|@inquirer/[^/]+|cli-table3|yocto-spinner|clipboardy|picocolors|smol-toml|hono|@hono/[^/]+|@trpc/[^/]+|react)(/|$)';
+  '(^|node_modules/)(commander|@inquirer/[^/]+|cli-table3|yocto-spinner|clipboardy|picocolors|smol-toml|hono|@hono/[^/]+|@trpc/[^/]+|react|pino|pino-pretty|prom-client|@prometheus-io/[^/]+|@opentelemetry/[^/]+)(/|$)';
 const CONCRETE_REPOSITORY = `${CORE_SRC}repositories/(http|in-memory)-[^/]+\\.repository\\.ts$`;
 
 /** @type {import('dependency-cruiser').IConfiguration} */
@@ -31,7 +31,7 @@ module.exports = {
     {
       name: 'core-no-framework-import',
       comment:
-        '[core-no-framework-import] The core imports no CLI/web/API framework; keep commander, hono, react and friends in the apps.',
+        '[core-no-framework-import] The core imports no CLI/web/API framework or observability library; keep commander, hono, react, pino, prom-client, OpenTelemetry and friends in the apps.',
       severity: 'error',
       from: { path: CORE_SRC },
       to: { path: FRAMEWORKS },

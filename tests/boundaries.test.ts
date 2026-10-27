@@ -182,6 +182,19 @@ const FORBIDDEN: [string, ForbiddenCase][] = [
     },
   ],
   [
+    'core importing an observability library (@opentelemetry/api)',
+    {
+      tag: 'core-no-framework-import',
+      tools: ['oxlint', 'depcruise'],
+      files: () => [
+        probe(
+          `${CORE}/__boundary-probe-observability.ts`,
+          "import { trace } from '@opentelemetry/api';\nexport const probe: unknown = trace;\n"
+        ),
+      ],
+    },
+  ],
+  [
     'core importing from apps/cli/src',
     {
       tag: 'core-no-app-import',

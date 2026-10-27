@@ -83,9 +83,14 @@
                   "@hono/*",
                   "@trpc/*",
                   "react",
-                  "react/*"
+                  "react/*",
+                  "pino",
+                  "pino-pretty",
+                  "prom-client",
+                  "@prometheus-io/*",
+                  "@opentelemetry/*"
                 ],
-                "message": "[core-no-framework-import] The core imports no CLI/web/API framework; keep it in the apps."
+                "message": "[core-no-framework-import] The core imports no CLI/web/API framework or observability library; keep it in the apps."
               },
               {
                 "group": ["**/apps/**", "ts-launch-blueprint", "ts-launch-blueprint/*"],
@@ -121,9 +126,14 @@
                   "@hono/*",
                   "@trpc/*",
                   "react",
-                  "react/*"
+                  "react/*",
+                  "pino",
+                  "pino-pretty",
+                  "prom-client",
+                  "@prometheus-io/*",
+                  "@opentelemetry/*"
                 ],
-                "message": "[core-no-framework-import] The core imports no CLI/web/API framework; keep it in the apps."
+                "message": "[core-no-framework-import] The core imports no CLI/web/API framework or observability library; keep it in the apps."
               },
               {
                 "group": ["**/apps/**", "ts-launch-blueprint", "ts-launch-blueprint/*"],
@@ -159,9 +169,14 @@
                   "@hono/*",
                   "@trpc/*",
                   "react",
-                  "react/*"
+                  "react/*",
+                  "pino",
+                  "pino-pretty",
+                  "prom-client",
+                  "@prometheus-io/*",
+                  "@opentelemetry/*"
                 ],
-                "message": "[core-no-framework-import] The core imports no CLI/web/API framework; keep it in the apps."
+                "message": "[core-no-framework-import] The core imports no CLI/web/API framework or observability library; keep it in the apps."
               },
               {
                 "group": ["**/apps/**", "ts-launch-blueprint", "ts-launch-blueprint/*"],
@@ -201,9 +216,14 @@
                   "@hono/*",
                   "@trpc/*",
                   "react",
-                  "react/*"
+                  "react/*",
+                  "pino",
+                  "pino-pretty",
+                  "prom-client",
+                  "@prometheus-io/*",
+                  "@opentelemetry/*"
                 ],
-                "message": "[core-no-framework-import] The core imports no CLI/web/API framework; keep it in the apps."
+                "message": "[core-no-framework-import] The core imports no CLI/web/API framework or observability library; keep it in the apps."
               },
               {
                 "group": ["**/apps/**", "ts-launch-blueprint", "ts-launch-blueprint/*"],

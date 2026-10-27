@@ -12,6 +12,7 @@ describe('resolveApiConfig', () => {
       logLevel: 'info',
       gcpProjectId: undefined,
       metricsEnabled: true,
+      tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
     });
   });
 
@@ -22,6 +23,7 @@ describe('resolveApiConfig', () => {
       logLevel: 'info',
       gcpProjectId: undefined,
       metricsEnabled: true,
+      tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
     });
   });
 
@@ -57,6 +59,7 @@ describe('resolveApiConfig', () => {
       logLevel: 'info',
       gcpProjectId: undefined,
       metricsEnabled: true,
+      tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
     });
     expect(resolveApiConfig({ TS_PROJECTS_SOURCE: 'http', TS_PROJECTS_TOKEN: 't' })).toEqual({
       port: 8080,
@@ -66,6 +69,7 @@ describe('resolveApiConfig', () => {
       logLevel: 'info',
       gcpProjectId: undefined,
       metricsEnabled: true,
+      tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
     });
   });
 
@@ -90,6 +94,65 @@ describe('resolveApiConfig', () => {
     expect(resolveApiConfig({ METRICS_ENABLED: '' }).metricsEnabled).toBe(true);
     expect(resolveApiConfig({ METRICS_ENABLED: 'true' }).metricsEnabled).toBe(true);
     expect(resolveApiConfig({ METRICS_ENABLED: 'false' }).metricsEnabled).toBe(false);
+  });
+
+  it('tracing is off with no OTLP endpoint, with the default service name and ratio', () => {
+    expect(resolveApiConfig({}).tracing).toEqual({
+      tracesUrl: undefined,
+      serviceName: 'ts-launch-blueprint-api',
+      sampleRatio: 1,
+    });
+    expect(resolveApiConfig({ OTEL_EXPORTER_OTLP_ENDPOINT: '' }).tracing.tracesUrl).toBeUndefined();
+  });
+
+  it.each([
+    ['http://localhost:4318', 'http://localhost:4318/v1/traces'],
+    ['http://localhost:4318/', 'http://localhost:4318/v1/traces'],
+    ['https://collector.example/otlp//', 'https://collector.example/otlp/v1/traces'],
+  ])('OTEL_EXPORTER_OTLP_ENDPOINT=%s turns tracing on at %s', (endpoint, tracesUrl) => {
+    expect(resolveApiConfig({ OTEL_EXPORTER_OTLP_ENDPOINT: endpoint }).tracing.tracesUrl).toBe(
+      tracesUrl
+    );
+  });
+
+  it('OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is used as-is and wins over the base endpoint', () => {
+    const tracing = resolveApiConfig({
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'http://base:4318',
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'http://traces:4318/custom',
+    }).tracing;
+    expect(tracing.tracesUrl).toBe('http://traces:4318/custom');
+  });
+
+  it.each([
+    ['OTEL_EXPORTER_OTLP_ENDPOINT', 'not a url'],
+    ['OTEL_EXPORTER_OTLP_ENDPOINT', 'ftp://collector:21'],
+    ['OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'grpc://collector:4317'],
+  ])('rejects %s=%s', (name, value) => {
+    expect(() => resolveApiConfig({ [name]: value })).toThrow(
+      `Invalid ${name} "${value}": expected an http(s) URL`
+    );
+  });
+
+  it('OTEL_SERVICE_NAME overrides the service name (empty means the default)', () => {
+    expect(resolveApiConfig({ OTEL_SERVICE_NAME: 'my-api' }).tracing.serviceName).toBe('my-api');
+    expect(resolveApiConfig({ OTEL_SERVICE_NAME: '' }).tracing.serviceName).toBe(
+      'ts-launch-blueprint-api'
+    );
+  });
+
+  it.each([
+    ['0', 0],
+    ['0.25', 0.25],
+    ['1', 1],
+    ['', 1],
+  ])('accepts OTEL_TRACES_SAMPLER_ARG=%j as %d', (value, ratio) => {
+    expect(resolveApiConfig({ OTEL_TRACES_SAMPLER_ARG: value }).tracing.sampleRatio).toBe(ratio);
+  });
+
+  it.each(['1.5', '-0.1', 'half', '.5'])('rejects OTEL_TRACES_SAMPLER_ARG=%s', (value) => {
+    expect(() => resolveApiConfig({ OTEL_TRACES_SAMPLER_ARG: value })).toThrow(
+      `Invalid OTEL_TRACES_SAMPLER_ARG "${value}": expected a number from 0 to 1`
+    );
   });
 
   it.each(['yes', '0', 'TRUE'])('rejects METRICS_ENABLED=%s with a clear message', (value) => {

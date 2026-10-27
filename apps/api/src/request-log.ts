@@ -5,7 +5,10 @@
 // line after the handler. Only the path is logged, never the query string
 // (tRPC input travels in ?input=). A thrown handler error doesn't reach this
 // middleware: Hono turns it into a 500, so the line is written from
-// c.res.status, with c.error's name when set.
+// c.res.status, with c.error's name when set. With tracing on (D-053), the
+// trace and span IDs come from the active server span instead of the headers,
+// since the tracing middleware wraps this one.
+import { isSpanContextValid, trace as otelTrace, TraceFlags } from '@opentelemetry/api';
 import type { MiddlewareHandler } from 'hono';
 
 import type { Logger } from './logger.js';
@@ -79,6 +82,22 @@ export function traceFields(
   return fields;
 }
 
+/** Trace fields from the active span (tracing on), else from the headers. */
+function requestTraceFields(
+  headers: { cloudTrace: string | undefined; traceparent: string | undefined },
+  gcpProjectId: string | undefined
+): Record<string, string | boolean> {
+  const active = otelTrace.getActiveSpan()?.spanContext();
+  if (active === undefined || !isSpanContextValid(active)) {
+    return traceFields(traceFrom(headers), gcpProjectId);
+  }
+  return {
+    ...traceFields({ traceId: active.traceId, spanId: active.spanId }, gcpProjectId),
+    'logging.googleapis.com/trace_sampled':
+      (active.traceFlags & TraceFlags.SAMPLED) === TraceFlags.SAMPLED,
+  };
+}
+
 /** The middleware: request ID, trace fields, child logger, one line per request. */
 export function requestLog(options: {
   logger: Logger;
@@ -87,13 +106,15 @@ export function requestLog(options: {
   return async (c, next) => {
     const started = performance.now();
     const requestId = requestIdFrom(c.req.header('x-request-id'));
-    const trace = traceFrom({
-      cloudTrace: c.req.header('x-cloud-trace-context'),
-      traceparent: c.req.header('traceparent'),
-    });
     const logger = options.logger.child({
       requestId,
-      ...traceFields(trace, options.gcpProjectId),
+      ...requestTraceFields(
+        {
+          cloudTrace: c.req.header('x-cloud-trace-context'),
+          traceparent: c.req.header('traceparent'),
+        },
+        options.gcpProjectId
+      ),
     });
     c.set('requestId', requestId);
     c.set('logger', logger);

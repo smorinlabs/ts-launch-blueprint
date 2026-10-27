@@ -1,5 +1,6 @@
 // Graceful shutdown (D-050): on SIGTERM (Cloud Run, `docker stop`) or SIGINT,
-// stop accepting connections, let in-flight requests finish, then exit 0. A
+// stop accepting connections, let in-flight requests finish, run the optional
+// flush (pending trace spans, D-053), then exit 0. A
 // safety timer exits 1 if closing hangs; it is unref'd so it never keeps the
 // process alive on its own. Node runs as PID 1 in a container, where default
 // signal handling doesn't apply, so this explicit handler is what makes the
@@ -9,6 +10,9 @@
 export interface ShutdownDeps {
   /** Stop accepting connections; calls back once in-flight requests finish. */
   close: (done: (err?: Error) => void) => void;
+  /** Runs after close and before exit (e.g. flush trace spans); a rejection
+   * exits 1. Still under the safety timer. */
+  flush?: () => Promise<void>;
   exit: (code: number) => void;
   log: (line: string) => void;
   /** Schedules the safety exit; returns a handle with `unref`. */
@@ -17,6 +21,22 @@ export interface ShutdownDeps {
 
 /** How long closing may take before the process exits 1. */
 export const SHUTDOWN_TIMEOUT_MS = 10_000;
+
+/** Run the flush, then exit with `code`, or 1 if the flush rejects. */
+async function flushThenExit(
+  deps: ShutdownDeps,
+  flush: () => Promise<void>,
+  code: number
+): Promise<void> {
+  try {
+    await flush();
+  } catch (err) {
+    deps.log(`shutdown flush failed: ${err instanceof Error ? err.message : String(err)}`);
+    deps.exit(1);
+    return;
+  }
+  deps.exit(code);
+}
 
 /** Build the signal handler: call it with the signal name. */
 export function createShutdown(deps: ShutdownDeps): (signal: string) => void {
@@ -33,7 +53,13 @@ export function createShutdown(deps: ShutdownDeps): (signal: string) => void {
       deps.exit(1);
     }, SHUTDOWN_TIMEOUT_MS).unref();
     deps.close((err) => {
-      deps.exit(err === undefined ? 0 : 1);
+      const code = err === undefined ? 0 : 1;
+      if (deps.flush === undefined) {
+        deps.exit(code);
+        return;
+      }
+      // Flushed even when closing failed: those spans are still worth sending.
+      void flushThenExit(deps, deps.flush, code);
     });
   };
 }

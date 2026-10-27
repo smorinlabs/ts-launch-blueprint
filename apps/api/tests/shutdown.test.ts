@@ -93,3 +93,64 @@ describe('createShutdown', () => {
     }
   });
 });
+
+/** A shutdown whose close succeeds (or fails) and whose flush is `flush`,
+ * recording the order of close, flush and exit. */
+function flushHarness(
+  flush: () => Promise<void>,
+  closeError?: Error
+): { shutdown: (signal: string) => void; events: string[]; fireTimer: () => void } {
+  const events: string[] = [];
+  let timer: (() => void) | undefined;
+  const shutdown = createShutdown({
+    close: (done) => {
+      events.push('close');
+      done(closeError);
+    },
+    flush: async () => {
+      events.push('flush');
+      await flush();
+    },
+    exit: (code) => events.push(`exit ${code}`),
+    log: (line) => events.push(line),
+    setTimer: (callback) => {
+      timer = callback;
+      return { unref: () => {} };
+    },
+  });
+  return { shutdown, events, fireTimer: () => timer?.() };
+}
+
+describe('createShutdown with a flush (D-053)', () => {
+  it('closes, then flushes, then exits 0', async () => {
+    const h = flushHarness(async () => {});
+    h.shutdown('SIGTERM');
+    await vi.waitFor(() => expect(h.events).toContain('exit 0'));
+    expect(h.events).toEqual(['shutting down (SIGTERM)', 'close', 'flush', 'exit 0']);
+  });
+
+  it('exits 1 when the flush rejects', async () => {
+    const h = flushHarness(async () => {
+      throw new Error('collector unreachable');
+    });
+    h.shutdown('SIGTERM');
+    await vi.waitFor(() => expect(h.events).toContain('exit 1'));
+    expect(h.events).toContain('shutdown flush failed: collector unreachable');
+  });
+
+  it('still flushes when closing failed, then exits 1', async () => {
+    const h = flushHarness(async () => {}, new Error('close failed'));
+    h.shutdown('SIGTERM');
+    await vi.waitFor(() => expect(h.events).toContain('exit 1'));
+    expect(h.events).toEqual(['shutting down (SIGTERM)', 'close', 'flush', 'exit 1']);
+  });
+
+  it('a hanging flush still hits the safety timer', () => {
+    const h = flushHarness(() => new Promise<void>(() => {}));
+    h.shutdown('SIGTERM');
+    expect(h.events).not.toContain('exit 0');
+    h.fireTimer();
+    expect(h.events).toContain('exit 1');
+    expect(h.events).toContain(`shutdown timed out after ${SHUTDOWN_TIMEOUT_MS}ms`);
+  });
+});

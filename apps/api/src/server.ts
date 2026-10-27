@@ -1,6 +1,6 @@
 // Process entry for the API (thin; excluded from coverage like the CLI's
-// src/cli.ts, and exercised by the e2e test): config -> logger -> createCore
-// -> metrics -> serve, plus graceful shutdown on SIGTERM/SIGINT (src/shutdown.ts, D-050).
+// src/cli.ts, and exercised by the e2e test): config -> logger -> tracing ->
+// createCore -> metrics -> serve, plus graceful shutdown on SIGTERM/SIGINT (src/shutdown.ts, D-050).
 // Everything after config is logged as JSON (D-051); a config error comes
 // before the logger exists, so it is the one plain stderr line.
 import { serve } from '@hono/node-server';
@@ -11,6 +11,7 @@ import { resolveApiConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { createMetrics } from './metrics.js';
 import { createShutdown } from './shutdown.js';
+import { createTracing, displayEndpoint } from './tracing.js';
 
 let config;
 try {
@@ -21,6 +22,14 @@ try {
 }
 
 const logger = createLogger({ level: config.logLevel });
+const { tracesUrl, serviceName, sampleRatio } = config.tracing;
+const tracing = createTracing({ tracesUrl, serviceName, sampleRatio });
+if (tracesUrl !== undefined) {
+  logger.info(
+    { sampleRatio },
+    `tracing enabled (endpoint: ${displayEndpoint(tracesUrl)}, sample ratio: ${sampleRatio})`
+  );
+}
 const core =
   config.source === 'memory'
     ? createCore({ source: 'memory' })
@@ -31,7 +40,7 @@ const core =
 
 const { port, source } = config;
 const metrics = config.metricsEnabled ? createMetrics({ collectDefaults: true }) : undefined;
-const app = createApp({ core, logger, gcpProjectId: config.gcpProjectId, metrics });
+const app = createApp({ core, logger, gcpProjectId: config.gcpProjectId, metrics, tracing });
 const server = serve({ fetch: app.fetch, port }, () => {
   logger.info(
     { port, source },
@@ -49,6 +58,7 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 
 const shutdown = createShutdown({
   close: (done) => server.close(done),
+  flush: () => tracing.shutdown(),
   exit: (code) => process.exit(code),
   log: (line) => logger.info(line),
 });
