@@ -17,13 +17,20 @@ import {
   UPSTREAM_AUTH_MESSAGE,
   UPSTREAM_ERROR_MESSAGE,
 } from '../src/errors.js';
+import { captureLogger, type LogLine } from './log-capture.js';
 
-/** Captured 5xx log lines (the default logger would write to stderr). */
-const logged: string[] = [];
-const app = createApp({
-  core: createCore({ source: 'memory' }),
-  logError: (line) => logged.push(line),
-});
+/** The `procedure failed` lines, as `<procedure> failed: <name>: <message>`. */
+function procedureFailures(lines: LogLine[]): string[] {
+  return lines
+    .filter((line) => line.message === 'procedure failed')
+    .map((line) => {
+      const err = line['err'] as { name: string; message: string };
+      return `${String(line['procedure'])} failed: ${err.name}: ${err.message}`;
+    });
+}
+
+const captured = captureLogger();
+const app = createApp({ core: createCore({ source: 'memory' }), logger: captured.logger });
 
 /** GET projects.list on `target`, with an optional tRPC input (URL-encoded JSON). */
 async function listProjects(input?: unknown, target = app): Promise<Response> {
@@ -32,13 +39,16 @@ async function listProjects(input?: unknown, target = app): Promise<Response> {
 }
 
 /** An app whose service always rejects with `err`, plus its captured logs. */
-function failingApp(err: unknown): { app: ReturnType<typeof createApp>; logs: string[] } {
-  const logs: string[] = [];
+function failingApp(err: unknown): {
+  app: ReturnType<typeof createApp>;
+  lines: LogLine[];
+} {
+  const { logger, lines } = captureLogger();
   const rejecting = async (): Promise<never> => {
     throw err;
   };
   const core = { projects: { listProjects: rejecting } } as unknown as Core;
-  return { app: createApp({ core, logError: (line) => logs.push(line) }), logs };
+  return { app: createApp({ core, logger }), lines };
 }
 
 interface TrpcError {
@@ -97,13 +107,13 @@ describe('GET /trpc/projects.list', () => {
   });
 
   it('an unknown workspace -> 404 NOT_FOUND with the domain message, not logged', async () => {
-    logged.length = 0;
+    captured.lines.length = 0;
     const response = await listProjects({ workspaceName: 'nope' });
     expect(response.status).toBe(404);
     const body = (await response.json()) as TrpcError;
     expect(body.error.data.code).toBe('NOT_FOUND');
     expect(body.error.message).toBe('Workspace not found: nope');
-    expect(logged).toEqual([]);
+    expect(procedureFailures(captured.lines)).toEqual([]);
   });
 });
 
@@ -130,26 +140,28 @@ describe('domain errors from the service (fake core)', () => {
   ])(
     '%s -> 502 BAD_GATEWAY with a generic message, original logged',
     async (_label, err, message) => {
-      const { app: failing, logs } = failingApp(err);
+      const { app: failing, lines } = failingApp(err);
       const response = await listProjects(undefined, failing);
       expect(response.status).toBe(502);
       const body = (await response.json()) as TrpcError;
       expect(body.error.data.code).toBe('BAD_GATEWAY');
       expect(body.error.message).toBe(message);
       expect(JSON.stringify(body)).not.toContain('upstream.example');
-      expect(logs).toEqual([`projects.list failed: ${err.name}: ${err.message}`]);
+      expect(procedureFailures(lines)).toEqual([
+        `projects.list failed: ${err.name}: ${err.message}`,
+      ]);
     }
   );
 
   it('an unexpected Error -> 500 with a generic message; the secret is only logged', async () => {
-    const { app: failing, logs } = failingApp(new Error('db password=hunter2'));
+    const { app: failing, lines } = failingApp(new Error('db password=hunter2'));
     const response = await listProjects(undefined, failing);
     expect(response.status).toBe(500);
     const body = (await response.json()) as TrpcError;
     expect(body.error.data.code).toBe('INTERNAL_SERVER_ERROR');
     expect(body.error.message).toBe(INTERNAL_ERROR_MESSAGE);
     expect(JSON.stringify(body)).not.toContain('hunter2');
-    expect(logs).toEqual(['projects.list failed: Error: db password=hunter2']);
+    expect(procedureFailures(lines)).toEqual(['projects.list failed: Error: db password=hunter2']);
   });
 });
 
@@ -159,22 +171,27 @@ async function rejectWithBoom(): Promise<never> {
 }
 
 describe('logging and edge cases', () => {
-  it('the default logger writes one line to stderr for a 5xx', async () => {
+  it('a 5xx writes nothing to stderr or console.error: it is all JSON log lines', async () => {
     const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
+      const { logger, lines } = captureLogger();
       const core = { projects: { listProjects: rejectWithBoom } } as unknown as Core;
-      const response = await listProjects(undefined, createApp({ core }));
+      const response = await listProjects(undefined, createApp({ core, logger }));
       expect(response.status).toBe(500);
-      expect(write).toHaveBeenCalledWith('projects.list failed: Error: boom\n');
+      expect(procedureFailures(lines)).toEqual(['projects.list failed: Error: boom']);
+      expect(write).not.toHaveBeenCalled();
+      expect(consoleError).not.toHaveBeenCalled();
     } finally {
       write.mockRestore();
+      consoleError.mockRestore();
     }
   });
 
   it('logs a thrown non-Error value as text', async () => {
-    const { app: failing, logs } = failingApp('just a string');
+    const { app: failing, lines } = failingApp('just a string');
     expect((await listProjects(undefined, failing)).status).toBe(500);
-    expect(logs).toEqual(['projects.list failed: Error: just a string']);
+    expect(procedureFailures(lines)).toEqual(['projects.list failed: Error: just a string']);
   });
 
   it('a wrong input type -> 400 with the issue path reported as "input"', async () => {

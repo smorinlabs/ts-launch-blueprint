@@ -6,10 +6,14 @@ import { initTRPC } from '@trpc/server';
 import type { Core } from '@ts-launch-blueprint/core';
 
 import { toTRPCError } from './errors.js';
+import type { Logger } from './logger.js';
 
-/** Per-request context: the shared core (services over a repository). */
+/** Per-request context: the shared core (services over a repository), plus
+ * the request's ID and child logger (set by the request middleware). */
 export interface ApiContext {
   core: Core;
+  requestId?: string | undefined;
+  logger?: Logger | undefined;
 }
 
 /** One field-level problem in a 400 response (`error.data.issues`). */

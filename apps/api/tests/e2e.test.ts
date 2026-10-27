@@ -90,10 +90,11 @@ async function startServer(
 
 let child: ChildProcess;
 let baseUrl: string;
+let serverStdout: () => string;
 
 beforeAll(async () => {
   buildIfStale();
-  ({ child, url: baseUrl } = await startServer(SERVER, ROOT));
+  ({ child, url: baseUrl, stdout: serverStdout } = await startServer(SERVER, ROOT));
 }, 120_000);
 
 afterAll(() => {
@@ -101,6 +102,14 @@ afterAll(() => {
 });
 
 describe('API end-to-end (built server)', () => {
+  it('the startup line is one JSON log line at INFO (D-051)', () => {
+    const first = serverStdout().split('\n')[0] ?? '';
+    const line = JSON.parse(first) as Record<string, unknown>;
+    expect(line['severity']).toBe('INFO');
+    expect(line['message']).toContain('listening on');
+    expect(line['service']).toBe('ts-launch-blueprint-api');
+  });
+
   it('GET /healthz -> 200 {status: ok}', async () => {
     const response = await fetch(`${baseUrl}/healthz`);
     expect(response.status).toBe(200);
@@ -113,6 +122,16 @@ describe('API end-to-end (built server)', () => {
     expect(response.status).toBe(404);
     const body = (await response.json()) as { error: { data: { code: string } } };
     expect(body.error.data.code).toBe('NOT_FOUND');
+  });
+
+  it('GET /metrics -> the request counter and the default Node metrics (D-052)', async () => {
+    await fetch(`${baseUrl}/trpc/projects.list`);
+    const response = await fetch(`${baseUrl}/metrics`);
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(text).toContain('http_requests_total{method="GET",route="/trpc/projects.list"');
+    expect(text).toContain('http_request_duration_seconds_bucket');
+    expect(text).toContain('process_cpu_seconds_total');
   });
 
   it('GET /trpc/projects.list -> the 4 demo projects with no token', async () => {
@@ -137,6 +156,39 @@ describe('API process lifecycle (built server)', () => {
     expect(server.stdout()).toContain('shutting down (SIGTERM)');
   });
 
+  it('exits 1 with one CRITICAL JSON line and no stack when the port is taken', async () => {
+    const port = new URL(baseUrl).port;
+    const second = spawn(process.execPath, [SERVER], {
+      cwd: ROOT,
+      env: { PATH: process.env['PATH'] ?? '', PORT: port },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    second.stdout?.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    second.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    const code = await new Promise<number | null>((resolve) => {
+      second.once('exit', resolve);
+    });
+    expect(code).toBe(1);
+    const lines = stdout
+      .split('\n')
+      .filter((text) => text !== '')
+      .map((text) => JSON.parse(text) as Record<string, unknown>);
+    expect(lines).toContainEqual(
+      expect.objectContaining({
+        severity: 'CRITICAL',
+        code: 'EADDRINUSE',
+        message: `port ${port} is already in use`,
+      })
+    );
+    expect(stdout + stderr).not.toMatch(/\n\s+at /);
+  });
+
   it('runs from a folder with only dist/ (no node_modules): every dependency is bundled', async () => {
     const folder = mkdtempSync(join(tmpdir(), 'ts-api-dist-only-'));
     try {
@@ -145,6 +197,8 @@ describe('API process lifecycle (built server)', () => {
       try {
         const response = await fetch(`${server.url}/trpc/projects.list`);
         expect(response.status).toBe(200);
+        // prom-client (and its @opentelemetry/api dependency) is bundled too.
+        expect((await fetch(`${server.url}/metrics`)).status).toBe(200);
       } finally {
         server.child.kill('SIGTERM');
       }

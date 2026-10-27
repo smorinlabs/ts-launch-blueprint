@@ -72,3 +72,11 @@ expect_status "GET projects.list (unknown workspace)" 404 "/trpc/projects.list?i
 
 # 5. An unknown path is a 404.
 expect_status "GET /nope" 404 /nope
+
+# 6. /metrics, on by default (METRICS_ENABLED, D-052).
+status="$(fetch /metrics)"
+if [ "$status" = 200 ] && grep -q '^http_requests_total' "$body_file"; then
+  pass "GET /metrics -> 200 with http_requests_total"
+else
+  fail "GET /metrics -> $status (expected 200 with http_requests_total)"
+fi

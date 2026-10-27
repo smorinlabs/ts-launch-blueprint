@@ -143,6 +143,10 @@ so the API's caller sees an upstream failure (502), not "log in" (401). The
 API's 5xx responses carry a generic message, and the original error goes to
 the server log.
 
+Logging is a controller concern too: the API writes structured JSON logs
+(D-051, [Observability](../reference/observability.md)), and the core stays
+logging-free, so it reports failures only by throwing.
+
 ## Swapping the Data Source
 
 `createCore` takes the data source as configuration:

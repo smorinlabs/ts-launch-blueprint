@@ -11,6 +11,19 @@ export const TOKEN_ENV_VAR = 'TS_PROJECTS_TOKEN';
 export const API_URL_ENV_VAR = 'TS_PROJECTS_API_URL';
 /** Cloud Run's default port. */
 export const DEFAULT_PORT = 8080;
+/** Log level: debug | info (default) | warn | error | silent. */
+export const LOG_LEVEL_ENV_VAR = 'LOG_LEVEL';
+/** Optional GCP project, for Cloud Logging's full trace name (Cloud Run
+ * doesn't set one by default). */
+export const GCP_PROJECT_ENV_VAR = 'GCP_PROJECT_ID';
+
+/** Metrics endpoint switch: true (default) or false. */
+export const METRICS_ENABLED_ENV_VAR = 'METRICS_ENABLED';
+
+/** The levels LOG_LEVEL accepts. */
+export const LOG_LEVELS = ['debug', 'info', 'warn', 'error', 'silent'] as const;
+/** A LOG_LEVEL value. */
+export type LogLevel = (typeof LOG_LEVELS)[number];
 
 /** A configuration problem, reported at startup. */
 export class ConfigError extends Error {
@@ -20,10 +33,39 @@ export class ConfigError extends Error {
   }
 }
 
+/** Settings shared by both data sources. */
+interface BaseConfig {
+  port: number;
+  logLevel: LogLevel;
+  gcpProjectId: string | undefined;
+  metricsEnabled: boolean;
+}
+
 /** The effective API configuration. */
 export type ApiConfig =
-  | { port: number; source: 'memory' }
-  | { port: number; source: 'http'; token: string; baseUrl: string | undefined };
+  | (BaseConfig & { source: 'memory' })
+  | (BaseConfig & { source: 'http'; token: string; baseUrl: string | undefined });
+
+function parseLogLevel(value: string | undefined): LogLevel {
+  if (value === undefined || value === '') {
+    return 'info';
+  }
+  const level = LOG_LEVELS.find((candidate) => candidate === value);
+  if (level === undefined) {
+    throw new ConfigError(`Invalid LOG_LEVEL "${value}": expected one of ${LOG_LEVELS.join(', ')}`);
+  }
+  return level;
+}
+
+function parseMetricsEnabled(value: string | undefined): boolean {
+  if (value === undefined || value === '' || value === 'true') {
+    return true;
+  }
+  if (value === 'false') {
+    return false;
+  }
+  throw new ConfigError(`Invalid METRICS_ENABLED "${value}": expected "true" or "false"`);
+}
 
 function parsePort(value: string | undefined): number {
   if (value === undefined || value === '') {
@@ -48,10 +90,15 @@ function parseSource(value: string | undefined): 'http' | 'memory' {
 
 /** Resolve the API configuration; throws ConfigError on a bad value. */
 export function resolveApiConfig(env: Record<string, string | undefined>): ApiConfig {
-  const port = parsePort(env['PORT']);
+  const base: BaseConfig = {
+    port: parsePort(env['PORT']),
+    logLevel: parseLogLevel(env[LOG_LEVEL_ENV_VAR]),
+    gcpProjectId: env[GCP_PROJECT_ENV_VAR] === '' ? undefined : env[GCP_PROJECT_ENV_VAR],
+    metricsEnabled: parseMetricsEnabled(env[METRICS_ENABLED_ENV_VAR]),
+  };
   const source = parseSource(env[SOURCE_ENV_VAR]);
   if (source === 'memory') {
-    return { port, source };
+    return { ...base, source };
   }
   const token = env[TOKEN_ENV_VAR];
   if (token === undefined || token === '') {
@@ -60,5 +107,5 @@ export function resolveApiConfig(env: Record<string, string | undefined>): ApiCo
     );
   }
   const baseUrl = env[API_URL_ENV_VAR];
-  return { port, source, token, baseUrl: baseUrl === '' ? undefined : baseUrl };
+  return { ...base, source, token, baseUrl: baseUrl === '' ? undefined : baseUrl };
 }
