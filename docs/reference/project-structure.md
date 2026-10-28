@@ -1,8 +1,8 @@
 # Project Structure
 
 TS Launch Blueprint is a pnpm workspace (D-040): a shared core library
-in `packages/core`, and the apps that use it in `apps/` (the CLI today;
-an API and a web app later). Each part has its own `package.json`, and
+in `packages/core`, and the apps that use it in `apps/` (the CLI, the API
+and the web app). Each part has its own `package.json`, and
 deleting an app is deleting its folder. Repo-level checks live in
 `tests/` and documentation in `docs/`. This section walks through the
 actual directory layout and the purpose of each file.
@@ -19,6 +19,7 @@ ts-launch-blueprint/
 ├── packages/core/                  # Shared core library (schemas, repositories, services)
 ├── apps/cli/                       # The ts-projects CLI — the published npm package
 ├── apps/api/                       # Hono + tRPC API (private, not published)
+├── apps/web/                       # React + Vite web app (private, not published)
 ├── tests/                          # Repo-level meta-tests (repo-hygiene)
 ├── docs/                           # Documentation (this tree)
 ├── .github/                        # GitHub Actions workflows, issue/PR templates
@@ -83,6 +84,18 @@ ts-launch-blueprint/
 │   ├── tests/                       # Router, app, config and e2e tests
 │   ├── tsconfig.json                # Own tsconfig: isolatedDeclarations off (D-048)
 │   └── tsdown.config.ts             # Build (bundler) configuration
+├── apps/web/                        # @ts-launch-blueprint/web (private, not published)
+│   ├── src/
+│   │   ├── App.tsx                  # The page: projects.list -> loading / error / list
+│   │   ├── config.ts                # API base URL (VITE_API_URL, default same origin)
+│   │   ├── main.tsx                 # Thin browser entry: mount <App/> in the providers
+│   │   ├── providers.tsx            # TanStack Query + the typed tRPC client
+│   │   └── trpc.ts                  # createTRPCContext<AppRouter> (type-only import)
+│   ├── tests/                       # Component, type, config and bundle tests
+│   ├── index.html                   # Vite's HTML entry
+│   ├── tsconfig.json                # Own tsconfig: browser options, isolatedDeclarations off (D-054)
+│   ├── vite.config.ts               # React plugin; dev proxy /trpc -> :8080
+│   └── vitest.config.ts             # Vitest project `web` (jsdom)
 ├── tests/
 │   └── repo-hygiene.test.ts         # Meta-tests (config drift, doc/link consistency)
 ├── scripts/
@@ -144,6 +157,15 @@ controller over the core. `src/router.ts` holds the tRPC router
 and `src/server.ts` the thin process entry. It has its own `tsconfig.json`
 with `isolatedDeclarations` off (D-048). `just api` builds and starts it; see
 the [API Reference](./api-reference.md).
+
+### `apps/web/`
+
+The React + Vite web app (`@ts-launch-blueprint/web`, private). It calls the
+API through a typed tRPC client (`src/trpc.ts`) and imports only the API's
+`AppRouter` type, through the API's types-only `./router` export. Its own
+`tsconfig.json` has browser options and `isolatedDeclarations` off (D-054).
+`just web` starts the Vite dev server (with `just api` running); see the
+[Web App reference](./web-app.md).
 
 ### `tests/` and each package's `tests/`
 

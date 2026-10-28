@@ -35,7 +35,8 @@ Every rule's message starts with a tag. Search for the tag on this page.
 | `[service-type-only-repository]`            | `services/**` → `repositories/**` imports are `import type` only; the repository is injected.                                                                                                                                                                                                                                           | dependency-cruiser          |
 | `[concrete-repository-in-composition-only]` | Inside `packages/core/src`, only `composition.ts` and the `index.ts` entry import a concrete repository.                                                                                                                                                                                                                                | dependency-cruiser          |
 | `[app-core-entry-only]`                     | `apps/**` imports the core only as `@ts-launch-blueprint/core`: no relative path into `packages/`, no `@ts-launch-blueprint/core/<subpath>`.                                                                                                                                                                                            | oxlint + dependency-cruiser |
-| `[app-no-cross-app-import]`                 | One app never imports another app.                                                                                                                                                                                                                                                                                                      | dependency-cruiser          |
+| `[app-no-cross-app-import]`                 | One app never imports another app, except the web app's one type-only edge below.                                                                                                                                                                                                                                                       | dependency-cruiser          |
+| `[web-types-only-from-api]`                 | `apps/web/**` imports nothing from another app but `import type { AppRouter } from '@ts-launch-blueprint/api/router'`: no value import of it, no other API file, no other app.                                                                                                                                                          | dependency-cruiser          |
 | `[api-core-via-create-core]`                | `apps/api/src/**` doesn't import `createHttpProjectsRepository`, `createInMemoryProjectsRepository` or `createProjectsService`; the API builds its core with `createCore` (in `server.ts`). The CLI is deliberately not covered: its public `createApiClient` wrapper (`apps/cli/src/api.ts`) builds a repository and service directly. | oxlint                      |
 | `[no-cycle]`                                | No import cycles anywhere, type-only cycles included. oxlint's `import/no-cycle` also fails, but its message is fixed and carries no tag.                                                                                                                                                                                               | dependency-cruiser + oxlint |
 | `[not-to-unresolvable]`                     | Every import resolves (a typo'd path fails here, not only in `tsc`).                                                                                                                                                                                                                                                                    | dependency-cruiser          |
@@ -45,10 +46,8 @@ Every rule's message starts with a tag. Search for the tag on this page.
 The rules apply to `src/` files only. Tests (`**/tests/**`) may import their
 own package's `src/` directly.
 
-**Planned** (added with the apps that need them):
-
-- `[web-types-only-from-api]`: the web app may import only the `AppRouter`
-  _type_ from the API, never runtime code. Added when `apps/web` lands.
+The API's `package.json` exposes `./router` with only a `types` condition,
+so dependency-cruiser resolves it with the `types` condition name (D-054).
 
 ## Reading a Failure
 
@@ -86,16 +85,28 @@ boundary rule; fix the import.**
 
 ## Where Each Check Runs
 
-| Check                                              | Local                               | Git hook                              | CI                                              |
-| -------------------------------------------------- | ----------------------------------- | ------------------------------------- | ----------------------------------------------- |
-| oxlint rules                                       | `just lint`, `just all`             | pre-commit `lint` (staged files)      | `Lint` step, hook-suite step                    |
-| dependency-cruiser rules                           | `just check-boundaries`, `just all` | pre-commit `boundaries` (whole graph) | `Architecture boundaries` step, hook-suite step |
-| Proof tests (`tests/boundaries.test.ts`)           | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
-| `[no-path-alias]`                                  | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
-| Removable app (`just check-removable cli` / `api`) | on demand                           | —                                     | `Removable app check` step                      |
+| Check                                                          | Local                               | Git hook                              | CI                                              |
+| -------------------------------------------------------------- | ----------------------------------- | ------------------------------------- | ----------------------------------------------- |
+| oxlint rules                                                   | `just lint`, `just all`             | pre-commit `lint` (staged files)      | `Lint` step, hook-suite step                    |
+| dependency-cruiser rules                                       | `just check-boundaries`, `just all` | pre-commit `boundaries` (whole graph) | `Architecture boundaries` step, hook-suite step |
+| Proof tests (`tests/boundaries.test.ts`)                       | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
+| `[no-path-alias]`                                              | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
+| Removable app (`just check-removable cli` / `api web` / `web`) | on demand                           | —                                     | `Removable app check` step                      |
 
 `just check-removable` is not part of `just all`: it reinstalls dependencies
 in a temp copy, so it needs the network and takes a while.
+
+## Removing an App
+
+`just check-removable <app>...` takes one or more apps, positionally, and
+removes them together. `apps/web` uses the API's router type, so:
+
+- **The CLI** or **the web app** can be removed on its own:
+  `just check-removable cli`, `just check-removable web`.
+- **The API** goes together with the web app (`just check-removable api
+web`), or you replace the web app's client first.
+
+CI runs all three.
 
 ## Removing the CLI
 
@@ -131,17 +142,38 @@ nothing, and `[core-no-app-import]` keeps it that way.
 
 ## Removing the API
 
-`just check-removable api` proves the same for `apps/api`. A real delete then
-needs:
+`just check-removable api web` proves the same for `apps/api`, together with
+`apps/web`, which needs the API's router type. A real delete then needs:
 
-1. `rm -rf apps/api`, then `pnpm install` (updates `pnpm-lock.yaml`).
-2. `tsconfig.json`: remove the `"exclude": ["apps/api/**"]` entry.
+1. Remove the web app first (below), or give it another client.
+2. `rm -rf apps/api`, then `pnpm install` (updates `pnpm-lock.yaml`).
+3. `tsconfig.json`: remove `apps/api/**` from `"exclude"`.
    `scripts/typecheck.sh` finds app tsconfigs by glob, so it needs no edit.
-3. `vitest.config.ts`: remove the `apps/api/src/server.ts` coverage exclusion.
-4. `Justfile`: remove the `api` recipe. `build` builds whatever apps exist.
-5. `.github/workflows/ci.yml`: remove the `Removable app check (apps/api)` step.
-6. Docs that describe the API (`docs/reference/api-reference.md`, the README's
+4. `vitest.config.ts`: remove the `apps/api/src/server.ts` coverage exclusion.
+5. `Justfile`: remove the `api` recipe. `build` builds whatever apps exist.
+6. `.github/workflows/ci.yml`: remove the `Removable app check (apps/api +
+apps/web)` step.
+7. Docs that describe the API (`docs/reference/api-reference.md`, the README's
    "Run the API" lines).
+
+## Removing the Web App
+
+`just check-removable web` proves the core, the CLI and the API work without
+`apps/web`. A real delete then needs:
+
+1. `rm -rf apps/web`, then `pnpm install` (updates `pnpm-lock.yaml`).
+2. `tsconfig.json`: remove `apps/web/**` from `"exclude"`.
+3. `vitest.config.ts`: remove the `apps/web/src/main.tsx` coverage exclusion.
+4. `.oxlintrc.json`: remove the `apps/web/src/**` override.
+   `.dependency-cruiser.cjs`: the two web rules and the `pathNot` on
+   `app-no-cross-app-import` can go (they no longer match anything).
+5. `apps/api/package.json`: the `./router` types-only export can stay or go.
+6. `Justfile`: remove the `web` recipe.
+7. `.github/workflows/ci.yml`: remove the `Removable app check (apps/web)`
+   step.
+8. `tests/boundaries.test.ts`: the `apps/web` probe cases.
+9. Docs that describe the web app (`docs/reference/web-app.md`, the README's
+   "Run the web app" lines).
 
 ## See Also
 

@@ -81,6 +81,15 @@ just api                                      # listens on :8080
 curl -s localhost:8080/trpc/projects.list     # in another terminal
 ```
 
+Run the web app (React + Vite, a typed tRPC client over the API) next to it:
+
+```bash
+just api                                      # terminal 1
+just web                                      # terminal 2: open the URL it prints
+```
+
+See the [Web App reference](./docs/reference/web-app.md).
+
 Optionally, `just test-bun` runs the non-e2e tests under [Bun](https://bun.sh)
 as an advisory forward-compatibility signal (D-036) — installs stay pnpm-only
 and the published package is unchanged; see
