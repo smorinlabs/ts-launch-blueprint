@@ -1,7 +1,7 @@
 # Observability
 
 How the API (`apps/api`) reports what it's doing. This page covers **logs**
-(D-051) and **metrics** (D-052); traces will be added here later. The CLI isn't covered:
+(D-051), **metrics** (D-052) and **traces** (D-053). The CLI isn't covered:
 its stderr output is for people (see the [CLI Reference](./cli-reference.md)).
 
 ## Logs
@@ -75,6 +75,11 @@ by Cloud Run) or W3C `traceparent` (`00-<trace>-<span>-<flags>`), its lines
 get the trace fields above, so Cloud Logging groups them under the trace.
 The full trace name needs the project ID, which Cloud Run doesn't set by
 default: set `GCP_PROJECT_ID` explicitly. A malformed header is ignored.
+
+With [tracing](#traces) on, the IDs come from the active server span
+instead (the span continues an incoming `traceparent`), and lines also get
+`logging.googleapis.com/trace_sampled`. An `x-cloud-trace-context` header
+alone isn't continued by the span; Cloud Run sends `traceparent` as well.
 
 ### Never Logged
 
@@ -159,7 +164,79 @@ sum(rate(http_requests_total[5m])) by (route)
 histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))
 ```
 
+## Traces
+
+**Off by default.** With no OTLP endpoint configured, no tracing SDK starts
+and nothing changes. Set `OTEL_EXPORTER_OTLP_ENDPOINT` and the API exports
+spans over **OTLP HTTP/JSON** to `<endpoint>/v1/traces`, so any OTLP backend
+works: Jaeger, an OpenTelemetry Collector, or Cloud Trace through a
+collector. Spans are manual (no auto-instrumentation: the server is one
+bundle, so there are no modules to patch), and the core has none.
+
+| Variable                             | Effect                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`        | Turns tracing on; an `http(s)` URL, `/v1/traces` added (trailing `/` ok) |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | The full traces URL, used as-is; wins over the base endpoint             |
+| `OTEL_SERVICE_NAME`                  | `service.name` (default `ts-launch-blueprint-api`)                       |
+| `OTEL_TRACES_SAMPLER_ARG`            | Sampling ratio for new traces, `0` to `1` (default `1`)                  |
+
+Other `OTEL_*` variables aren't read. In particular there's **no
+`OTEL_EXPORTER_OTLP_HEADERS`**: for a backend that needs auth headers, run
+an OpenTelemetry Collector next to the API and let it handle auth.
+
+### Spans
+
+| Span               | Kind     | Attributes                                                                   |
+| ------------------ | -------- | ---------------------------------------------------------------------------- |
+| `<METHOD> <route>` | server   | `http.request.method`, `http.route`, `url.path`, `http.response.status_code` |
+| `trpc <procedure>` | internal | `rpc.system` (`trpc`), `rpc.method`                                          |
+
+- One server span per request. Its name and `http.route` use the [route
+  patterns](#route-labels) from the metrics (`/trpc/projects.list`,
+  `/trpc/batch`, `/trpc/unknown`, `unmatched`), never the raw path.
+- One `trpc <procedure>` child span per procedure call, so a batch shows
+  each call.
+- An incoming W3C `traceparent` is continued: same trace ID, with the
+  caller's span as parent.
+- `/healthz`, `/readyz` and `/metrics` get no span.
+- **Status:** 5xx is `ERROR` with `error.type` (the thrown error's name or
+  the status code on the server span; the tRPC code, such as `BAD_GATEWAY`,
+  on the procedure span). 4xx stays `UNSET`: the caller's fault, per
+  OpenTelemetry's HTTP server convention.
+
+**Never on a span:** the query string (tRPC input travels in `?input=`),
+headers, bodies, or a 5xx error's message. Traces often go to a third-party
+backend; the detail stays in the server log.
+
+### Sampling
+
+`OTEL_TRACES_SAMPLER_ARG` sets the share of **new** traces recorded. A
+request that arrives with a sampled `traceparent` (flags `01`) is always
+recorded, and an unsampled one never is (parent-based sampling), so a trace
+across services isn't cut in half.
+
+### Shutdown
+
+Spans are exported in batches. On `SIGTERM`, after in-flight requests
+finish, the server flushes the pending spans before exiting, within the
+10-second shutdown limit, so the last requests before Cloud Run stops an
+instance aren't lost.
+
+### Viewing Traces Locally
+
+With Docker, run Jaeger, which accepts OTLP/HTTP on port 4318:
+
+```bash
+docker run --rm -p 16686:16686 -p 4318:4318 jaegertracing/jaeger:2.22.0
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 just api   # another terminal
+curl -s localhost:8080/trpc/projects.list > /dev/null
+# then open http://localhost:16686 and pick the ts-launch-blueprint-api service
+```
+
+Exporting to Cloud Trace (through a collector or Google's OTLP endpoint)
+will be set up with the deploy.
+
 ## See Also
 
 - [API Reference](./api-reference.md): endpoints and environment variables
-- [Architecture](../about/architecture.md): why logging stays out of the core
+- [Architecture](../about/architecture.md): why logs, metrics and traces stay out of the core

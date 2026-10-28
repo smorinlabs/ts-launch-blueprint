@@ -4,7 +4,8 @@
 // HTTP codes by every procedure (src/errors.ts, D-049); 5xx are logged with the
 // original error, since their client message is generic. With a metrics
 // instance, requests and tRPC errors are counted and served at /metrics
-// (src/metrics.ts, D-052).
+// (src/metrics.ts, D-052). With tracing on, every request gets a server span
+// that wraps the rest (src/tracing.ts, D-053).
 import { trpcServer } from '@hono/trpc-server';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import type { Core } from '@ts-launch-blueprint/core';
@@ -14,6 +15,7 @@ import type { Logger } from './logger.js';
 import { METRICS_PATH, type Metrics, procedureLabel } from './metrics.js';
 import { requestLog, type RequestLogVariables } from './request-log.js';
 import { appRouter } from './router.js';
+import type { Tracing } from './tracing.js';
 
 /** Build the HTTP app over an already-built core and a logger. */
 export function createApp(deps: {
@@ -21,13 +23,20 @@ export function createApp(deps: {
   logger: Logger;
   gcpProjectId?: string | undefined;
   metrics?: Metrics | undefined;
+  tracing?: Tracing | undefined;
 }): Hono<{ Variables: RequestLogVariables }> {
   const app = new Hono<{ Variables: RequestLogVariables }>();
 
-  // First: request ID, trace fields, child logger, one line per request.
+  // First, when on: the server span, so the request log and metrics run
+  // inside it (the log takes its trace and span IDs from it).
+  if (deps.tracing?.enabled === true) {
+    app.use('*', deps.tracing.httpMiddleware());
+  }
+
+  // Then: request ID, trace fields, child logger, one line per request.
   app.use('*', requestLog({ logger: deps.logger, gcpProjectId: deps.gcpProjectId }));
 
-  // Second: request count and duration by route pattern, plus the scrape
+  // Then: request count and duration by route pattern, plus the scrape
   // endpoint. Without a metrics instance (METRICS_ENABLED=false), neither.
   const { metrics } = deps;
   if (metrics !== undefined) {

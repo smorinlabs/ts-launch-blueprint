@@ -143,9 +143,12 @@ so the API's caller sees an upstream failure (502), not "log in" (401). The
 API's 5xx responses carry a generic message, and the original error goes to
 the server log.
 
-Logging is a controller concern too: the API writes structured JSON logs
-(D-051, [Observability](../reference/observability.md)), and the core stays
-logging-free, so it reports failures only by throwing.
+Observability is a controller concern too: the API writes structured JSON
+logs, serves metrics and records traces (D-051 to D-053,
+[Observability](../reference/observability.md)), and the core stays free of
+all three, so it reports failures only by throwing. The
+`[core-no-framework-import]` rule enforces it: the core can't import `pino`,
+`prom-client` or `@opentelemetry/*`.
 
 ## Swapping the Data Source
 

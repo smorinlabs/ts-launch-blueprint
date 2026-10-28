@@ -4,6 +4,7 @@
 // already skips it (matched per Vitest project).
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import { cpSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { createServer as createHttpServer, type Server } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -67,12 +68,13 @@ function freePort(): Promise<number> {
  * the in-memory default applies); resolves once it logs its startup line. */
 async function startServer(
   server: string,
-  cwd: string
+  cwd: string,
+  extraEnv: Record<string, string> = {}
 ): Promise<{ child: ChildProcess; url: string; stdout: () => string }> {
   const port = await freePort();
   const started = spawn(process.execPath, [server], {
     cwd,
-    env: { PATH: process.env['PATH'] ?? '', PORT: String(port) },
+    env: { PATH: process.env['PATH'] ?? '', PORT: String(port), ...extraEnv },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stdout = '';
@@ -187,6 +189,46 @@ describe('API process lifecycle (built server)', () => {
       })
     );
     expect(stdout + stderr).not.toMatch(/\n\s+at /);
+  });
+
+  it('with an OTLP endpoint, flushes spans to the collector on SIGTERM and exits 0', async () => {
+    // A tiny OTLP/HTTP collector: records each POST body.
+    const bodies: { path: string | undefined; body: string }[] = [];
+    const collector: Server = createHttpServer((req, res) => {
+      let body = '';
+      req.on('data', (chunk: Buffer) => {
+        body += chunk.toString();
+      });
+      req.on('end', () => {
+        bodies.push({ path: req.url, body });
+        res.writeHead(200, { 'content-type': 'application/json' }).end('{}');
+      });
+    });
+    const collectorPort = await freePort();
+    await new Promise<void>((resolve) => {
+      collector.listen(collectorPort, '127.0.0.1', resolve);
+    });
+    try {
+      const server = await startServer(SERVER, ROOT, {
+        OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${collectorPort}`,
+      });
+      expect(server.stdout()).toContain('tracing enabled (endpoint: http://127.0.0.1:');
+      await fetch(`${server.url}/trpc/projects.list`);
+      const exited = new Promise<number | null>((resolve) => {
+        server.child.once('exit', (code) => resolve(code));
+      });
+      server.child.kill('SIGTERM');
+      expect(await exited).toBe(0);
+      // The batch processor's delay is 5 s: only the shutdown flush sends it this soon.
+      const traces = bodies.filter((entry) => entry.path === '/v1/traces');
+      expect(traces.length).toBeGreaterThan(0);
+      const body = traces.map((entry) => entry.body).join('');
+      expect(body).toContain('"resourceSpans"');
+      expect(body).toContain('ts-launch-blueprint-api');
+      expect(body).toContain('GET /trpc/projects.list');
+    } finally {
+      collector.close();
+    }
   });
 
   it('runs from a folder with only dist/ (no node_modules): every dependency is bundled', async () => {

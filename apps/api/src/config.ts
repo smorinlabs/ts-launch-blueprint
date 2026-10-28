@@ -20,6 +20,17 @@ export const GCP_PROJECT_ENV_VAR = 'GCP_PROJECT_ID';
 /** Metrics endpoint switch: true (default) or false. */
 export const METRICS_ENABLED_ENV_VAR = 'METRICS_ENABLED';
 
+/** OTLP base endpoint; its presence turns tracing on (`/v1/traces` added). */
+export const OTLP_ENDPOINT_ENV_VAR = 'OTEL_EXPORTER_OTLP_ENDPOINT';
+/** OTLP traces endpoint, used as-is; wins over the base endpoint. */
+export const OTLP_TRACES_ENDPOINT_ENV_VAR = 'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT';
+/** The traces' `service.name`. */
+export const SERVICE_NAME_ENV_VAR = 'OTEL_SERVICE_NAME';
+/** Sampling ratio for new traces, 0 to 1. */
+export const SAMPLER_ARG_ENV_VAR = 'OTEL_TRACES_SAMPLER_ARG';
+/** `service.name` when OTEL_SERVICE_NAME isn't set. */
+export const DEFAULT_SERVICE_NAME = 'ts-launch-blueprint-api';
+
 /** The levels LOG_LEVEL accepts. */
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error', 'silent'] as const;
 /** A LOG_LEVEL value. */
@@ -33,12 +44,20 @@ export class ConfigError extends Error {
   }
 }
 
+/** Tracing settings; `tracesUrl` undefined means tracing is off. */
+export interface TracingConfig {
+  tracesUrl: string | undefined;
+  serviceName: string;
+  sampleRatio: number;
+}
+
 /** Settings shared by both data sources. */
 interface BaseConfig {
   port: number;
   logLevel: LogLevel;
   gcpProjectId: string | undefined;
   metricsEnabled: boolean;
+  tracing: TracingConfig;
 }
 
 /** The effective API configuration. */
@@ -65,6 +84,51 @@ function parseMetricsEnabled(value: string | undefined): boolean {
     return false;
   }
   throw new ConfigError(`Invalid METRICS_ENABLED "${value}": expected "true" or "false"`);
+}
+
+function parseOtlpUrl(name: string, value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new ConfigError(`Invalid ${name} "${value}": expected an http(s) URL`);
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new ConfigError(`Invalid ${name} "${value}": expected an http(s) URL`);
+  }
+  return value;
+}
+
+function parseSampleRatio(value: string | undefined): number {
+  if (value === undefined || value === '') {
+    return 1;
+  }
+  const ratio = /^\d+(\.\d+)?$/.test(value) ? Number(value) : Number.NaN;
+  if (!(ratio >= 0 && ratio <= 1)) {
+    throw new ConfigError(
+      `Invalid ${SAMPLER_ARG_ENV_VAR} "${value}": expected a number from 0 to 1`
+    );
+  }
+  return ratio;
+}
+
+function parseTracing(env: Record<string, string | undefined>): TracingConfig {
+  const traces = env[OTLP_TRACES_ENDPOINT_ENV_VAR];
+  const base = env[OTLP_ENDPOINT_ENV_VAR];
+  let tracesUrl: string | undefined;
+  if (traces !== undefined && traces !== '') {
+    tracesUrl = parseOtlpUrl(OTLP_TRACES_ENDPOINT_ENV_VAR, traces);
+  } else if (base !== undefined && base !== '') {
+    // Trailing slashes dropped: `http://host:4318/` must not give `//v1/traces`.
+    tracesUrl = `${parseOtlpUrl(OTLP_ENDPOINT_ENV_VAR, base).replace(/\/+$/, '')}/v1/traces`;
+  }
+  const serviceName = env[SERVICE_NAME_ENV_VAR];
+  return {
+    tracesUrl,
+    serviceName:
+      serviceName === undefined || serviceName === '' ? DEFAULT_SERVICE_NAME : serviceName,
+    sampleRatio: parseSampleRatio(env[SAMPLER_ARG_ENV_VAR]),
+  };
 }
 
 function parsePort(value: string | undefined): number {
@@ -95,6 +159,7 @@ export function resolveApiConfig(env: Record<string, string | undefined>): ApiCo
     logLevel: parseLogLevel(env[LOG_LEVEL_ENV_VAR]),
     gcpProjectId: env[GCP_PROJECT_ENV_VAR] === '' ? undefined : env[GCP_PROJECT_ENV_VAR],
     metricsEnabled: parseMetricsEnabled(env[METRICS_ENABLED_ENV_VAR]),
+    tracing: parseTracing(env),
   };
   const source = parseSource(env[SOURCE_ENV_VAR]);
   if (source === 'memory') {
