@@ -20,7 +20,7 @@
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@trpc/server": "^11.19.0",
     "@ts-launch-blueprint/core": "workspace:*",
-    "hono": "^4.13.13",
+    "hono": "^4.13.14",
     "pino": "^10.4.0",
     "prom-client": "^15.1.3"
   },
