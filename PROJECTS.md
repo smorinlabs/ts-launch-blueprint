@@ -44,3 +44,5 @@ file plus those.
 ## Project index
 
 <!-- One row per project. Scoped / in-progress / done first; ideas last. -->
+
+- [?] **P01** — [Switch press-verify to template-press v5.0.0](projects/P01-switch-press-verify-to-template-press-v5-.md) — Replace temporary template-press git SHA pin with PyPI v5.0.0 once released
