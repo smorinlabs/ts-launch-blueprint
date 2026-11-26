@@ -12,6 +12,7 @@ extra_exclude_files = [
   "pnpm-lock.yaml",
   ".release-please-manifest.json",
   "README.md",
+  "PROJECTS.md",
   "docs/about/index.md",
   "docs/about/philosophy.md",
   "docs/tutorials/full-project-setup.md",
@@ -77,6 +78,10 @@ file = "README.md"
 stub_file = "press/stubs/readme.md"
 
 [[reset]]
+file = "PROJECTS.md"
+stub_file = "press/stubs/projects.md"
+
+[[reset]]
 file = "docs/about/index.md"
 stub_file = "press/stubs/about-index.md"
 
@@ -120,6 +125,10 @@ reason = "template live-press acceptance test generates a child project and must
 [[remove]]
 dir = "docs/port"
 reason = "template-only port history; child repositories start their own records"
+
+[[remove]]
+dir = "projects"
+reason = "template project history; child repositories start their own"
 
 [[remove]]
 dir = "assets/images/logos"
