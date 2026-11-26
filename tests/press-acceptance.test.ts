@@ -176,10 +176,18 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
         'tests/contributors-automation.test.ts',
         'tests/press-acceptance.test.ts',
         'docs/port',
+        'projects',
         'assets/images/logos',
       ]) {
         expect(existsSync(join(target, removed)), `expected removed: ${removed}`).toBe(false);
       }
+
+      // .project-harness config ships intact into stamped child repositories.
+      expect(
+        readFileSync(join(target, '.project-harness', 'project-harness.config.json'), 'utf8')
+      ).toBe(
+        readFileSync(join(REPO_ROOT, '.project-harness', 'project-harness.config.json'), 'utf8')
+      );
 
       // 5. Resets and aligned 0.1.0 version surface.
       const rootPkg = JSON.parse(readFileSync(join(target, 'package.json'), 'utf8')) as {
@@ -213,6 +221,7 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
 
       for (const [page, stub] of [
         ['README.md', 'press/stubs/readme.md'],
+        ['PROJECTS.md', 'press/stubs/projects.md'],
         ['docs/about/index.md', 'press/stubs/about-index.md'],
         ['docs/about/philosophy.md', 'press/stubs/project-philosophy.md'],
         ['docs/tutorials/full-project-setup.md', 'press/stubs/application-setup.md'],
