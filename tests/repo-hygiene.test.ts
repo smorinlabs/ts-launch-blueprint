@@ -491,7 +491,7 @@ describe('release, versioning & packaging (S5: D-021, D-012)', () => {
   });
 });
 
-describe('community files & contributors automation (S6a: D-022(11), D-024(9))', () => {
+describe('community files (S6a: D-022(11), D-024(9))', () => {
   const ISSUE_TEMPLATE_DIR = join(REPO_ROOT, '.github', 'ISSUE_TEMPLATE');
   const issueTemplateFiles = readdirSync(ISSUE_TEMPLATE_DIR).filter((name) =>
     name.endsWith('.yml')
@@ -510,52 +510,21 @@ describe('community files & contributors automation (S6a: D-022(11), D-024(9))',
     expect(parsed).not.toBeNull();
   });
 
-  it('CONTRIBUTORS.md contains the contributors-please marker comments', () => {
-    const contributors = readFileSync(join(REPO_ROOT, 'CONTRIBUTORS.md'), 'utf8');
-    expect(contributors).toContain('<!-- contributors-please:start -->');
-    expect(contributors).toContain('<!-- contributors-please:end -->');
-  });
-
-  it('.contributors.yml marker config matches the markers actually in CONTRIBUTORS.md', () => {
-    const config = parse(readFileSync(join(REPO_ROOT, '.contributors.yml'), 'utf8')) as {
-      in_place_marker_start: string;
-      in_place_marker_end: string;
-    };
-    const contributors = readFileSync(join(REPO_ROOT, 'CONTRIBUTORS.md'), 'utf8');
-    expect(contributors).toContain(config.in_place_marker_start);
-    expect(contributors).toContain(config.in_place_marker_end);
-  });
-
-  it('update-contributors.yml parses, declares explicit permissions, and calls contributors-please-action', () => {
-    const file = join(REPO_ROOT, '.github', 'workflows', 'update-contributors.yml');
-    const raw = readFileSync(file, 'utf8');
-    const parsed = parse(raw) as {
-      permissions: Record<string, string>;
-      jobs: Record<string, { permissions?: Record<string, string> }>;
-    };
-    expect(Object.prototype.hasOwnProperty.call(parsed, 'permissions')).toBe(true);
-    const jobPermissions = Object.values(parsed.jobs)[0]?.permissions;
-    expect(jobPermissions).toBeDefined();
-    expect(raw).toContain('smorinlabs/contributors-please-action@');
-  });
-
   it('FUNDING.yml contains a github funding entry', () => {
     const funding = parse(readFileSync(join(REPO_ROOT, '.github', 'FUNDING.yml'), 'utf8')) as {
       github: string;
     };
-    expect(funding.github).toBe('smorin');
+    expect(funding.github).toBeTypeOf('string');
+    expect(funding.github.length).toBeGreaterThan(0);
   });
 
   it('no shipped file references the replaced update_contributors.py script', () => {
     const candidateFiles = [
       'Justfile',
       'package.json',
-      'CONTRIBUTORS.md',
-      '.contributors.yml',
       '.github/CONTRIBUTING.md',
       '.github/SECURITY.md',
       '.github/pull_request_template.md',
-      '.github/workflows/update-contributors.yml',
       ...issueTemplateFiles.map((f) => `.github/ISSUE_TEMPLATE/${f}`),
     ];
     for (const relPath of candidateFiles) {

@@ -22,6 +22,7 @@ ts-launch-blueprint/
 ├── tests/                          # Repo-level meta-tests (repo-hygiene)
 ├── docs/                           # Documentation (this tree)
 ├── .github/                        # GitHub Actions workflows, issue/PR templates
+├── press/                          # template-press source identity, rules, and reset stubs
 ├── Justfile                        # Command surface (build/test/lint/release/...)
 ├── Makefile                        # Bootstrap: check-deps / install-node / install-just
 ├── package.json                    # Private workspace root (shared dev tooling, scripts)
@@ -35,13 +36,14 @@ ts-launch-blueprint/
 ts-launch-blueprint/
 ├── .github/
 │   ├── ISSUE_TEMPLATE/              # Issue templates (feature/docs/bug)
-│   ├── workflows/                   # CI, CodeQL, dependency-review, release-please, publish
+│   ├── workflows/                   # CI, CodeQL, dependency-review, difftree, press-verify, release, publish
 │   ├── CODE_OF_CONDUCT.md
 │   ├── CONTRIBUTING.md
 │   ├── dependabot.yml
 │   ├── FUNDING.yml
 │   ├── pull_request_template.md
 │   └── SECURITY.md
+├── press/                           # template-press config (press-source.toml, press-rules.toml, stubs/)
 ├── docs/                            # Flattened CommonMark documentation tree (D-023)
 │   ├── about/                       # Project context and philosophy
 │   ├── contributing/                # Contribution guidelines, incl. cla/ (CLA docs)
@@ -161,9 +163,16 @@ All documentation, as plain CommonMark/GFM (no Sphinx, no MyST — see
 
 ### `.github/`
 
-GitHub Actions workflows (CI, CodeQL, dependency review, release-please,
-publish) and community files (issue templates, PR template,
-CODE_OF_CONDUCT, CONTRIBUTING, SECURITY, dependabot, FUNDING).
+GitHub Actions workflows (CI, CodeQL, dependency review, difftree PR comments,
+`press-verify`, release-please, publish) and community files (issue templates,
+PR template, CODE_OF_CONDUCT, CONTRIBUTING, SECURITY, dependabot, FUNDING).
+
+### `press/`
+
+`template-press` configuration: `press-source.toml` (current repository
+identity), `press-rules.toml` (language declaration, `keep_names`, replace/edit/
+regenerate/reset/remove rules), `press-answers.example.toml`, and `stubs/` for
+files reset on stamp. Stamped child repositories also carry `press-receipt.toml`.
 
 ### `Justfile`
 

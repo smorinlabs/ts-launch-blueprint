@@ -106,18 +106,21 @@ the exit-code contract — and
 [docs/reference/cli-reference.md](../reference/cli-reference.md) for
 the command reference.
 
-### 7. Configure the Project (If Using This as a Template)
+### 7. Stamp a New Project with `template-press`
 
-If you're starting a new project from this blueprint rather than
-working on it directly, update the rename seam:
+If you're starting a new project from this blueprint rather than working on it
+directly, use [template-press](https://github.com/smorinlabs/template-press) to
+rebrand all workspace packages, `Justfile` variables, CLI binary names, and
+environment variable prefixes in one verified pass:
 
-- `package.json` — `name`, `description`, `repository`, `bin` entry
-- `Justfile` — the `ts_package_name`, `repo_name`, and `command_name`
-  variables at the top of the file (they drive `just pack-check` and
-  `just run`)
-- Environment variable prefix (`TS_PROJECTS_*`) and config file name,
-  if you want a different namespace — see
-  [docs/reference/configuration-files.md](../reference/configuration-files.md)
+1. Copy `press/press-answers.example.toml` outside the repository and edit it
+   with your destination identity.
+2. Run `press rebrand --target . --config ../press-answers.toml --dry-run` to
+   preview the plan, then run without `--dry-run` to apply it.
+3. Run `just all` and `just press-verify` to confirm every gate is green.
+
+See [Setting Up Development](../tasks/setting-up-development.md#customization-for-new-projects)
+for the exact commands.
 
 ### 8. Keep Developing
 

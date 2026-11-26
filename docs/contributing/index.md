@@ -51,14 +51,19 @@ When you open a pull request, the **CLA Assistant Bot** will check if you've sig
 
 ## Tracking Contributors
 
-This project uses automated contributor tracking to track contributors in [`CONTRIBUTORS.md`](https://github.com/smorin/ts-launch-blueprint/blob/main/CONTRIBUTORS.md). The list updates when:
+Contributor automation is optional. A stamped application starts without
+`CONTRIBUTORS.md`, `.contributors.yml`, or the `update-contributors.yml`
+workflow; its Git history still records every contribution.
 
-1. A push is made to the main branch.
-2. A pull request is merged.
-3. Manually, using the following command:
-   ```bash
-   just contributors
-   ```
+To opt in locally, run the retained helper from the repository root:
+
+```bash
+just contributors
+```
+
+This invokes `contributors-please` to initialize or refresh contributor state
+from Git history and render `CONTRIBUTORS.md`. It does not install a GitHub
+Actions workflow or configure repository credentials.
 
 ## Code of Conduct
 

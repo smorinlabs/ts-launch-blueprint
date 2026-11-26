@@ -1,0 +1,15 @@
+# Copy this file outside the target repository (for example to
+# ../press-answers.toml), replace the values with your new project's identity,
+# and run:
+#   press rebrand --target . --config ../press-answers.toml --dry-run
+#   press rebrand --target . --config ../press-answers.toml
+
+[answers]
+package_name = "acme_widget"
+repo_name = "acme-widget"
+app_name = "acme_cli"
+author = "Example Author"
+email = "author@example.com"
+owner = "example-org"
+display_name = "Acme Widget"
+cli_name = "acme-cli"

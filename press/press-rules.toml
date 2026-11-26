@@ -1,0 +1,126 @@
+# This repository is a template-press target. Comments here must stay free of
+# literal source-identity tokens because press control files are not rewritten
+# and ship verbatim into pressed child repositories.
+
+[rules]
+languages = ["node"]
+# Independent external repositories referenced by retained workflows and docs.
+# Child repositories MUST inherit .github/workflows/difftree-pr-comment.yml
+# intact without rewriting its action owner or removing the workflow.
+keep_names = ["smorinlabs/difftree-action", "smorinlabs/template-press"]
+extra_exclude_files = [
+  "pnpm-lock.yaml",
+  ".release-please-manifest.json",
+  "README.md",
+  "docs/about/index.md",
+  "docs/about/philosophy.md",
+  "docs/tutorials/full-project-setup.md",
+]
+
+# Compound tokens that join cli_name with a separator cannot be matched by the
+# exact-name cli_name row (and would otherwise trip the sibling preflight).
+[[replace]]
+pattern = "{cli_name}_config.toml"
+reason = "CLI config filename joins cli_name with _config.toml"
+
+[[replace]]
+pattern = "{cli_name}-cli-"
+files = ["apps/cli/tests/**"]
+reason = "temporary directory prefix in CLI tests"
+
+[[replace]]
+pattern = "{cli_name}-test-"
+files = ["apps/cli/tests/**"]
+reason = "temporary directory prefix in config tests"
+
+[[replace]]
+pattern = "{cli_name}-source-"
+files = ["apps/cli/tests/**"]
+reason = "temporary directory prefix in source tests"
+
+[[replace]]
+pattern = "{cli_name}-e2e-"
+files = ["apps/cli/tests/**"]
+reason = "temporary directory prefix in end-to-end tests"
+
+# Fresh child repositories start at 0.1.0 with root, CLI, and release-please
+# manifest versions aligned.
+[[edit]]
+file = "package.json"
+command = ["node", "scripts/reset-version.mjs", "package.json"]
+expect = '"version": "0.1.0"'
+
+[[edit]]
+file = "apps/cli/package.json"
+command = ["node", "scripts/reset-version.mjs", "apps/cli/package.json"]
+expect = '"version": "0.1.0"'
+
+# Regenerate the pnpm lockfile under the destination workspace package names.
+# Boundary-safe content scan avoids false positives on base64 integrity hashes.
+[[regenerate]]
+file = "pnpm-lock.yaml"
+command = ["pnpm", "install", "--lockfile-only"]
+env = ["npm_config_store_dir"]
+scan = "boundary"
+
+# Reset blueprint release history and template-framing documentation.
+[[reset]]
+file = "CHANGELOG.md"
+stub = "# Changelog\n"
+
+[[reset]]
+file = ".release-please-manifest.json"
+stub = "{\n  \".\": \"0.1.0\"\n}\n"
+
+[[reset]]
+file = "README.md"
+stub_file = "press/stubs/readme.md"
+
+[[reset]]
+file = "docs/about/index.md"
+stub_file = "press/stubs/about-index.md"
+
+[[reset]]
+file = "docs/about/philosophy.md"
+stub_file = "press/stubs/project-philosophy.md"
+
+[[reset]]
+file = "docs/tutorials/full-project-setup.md"
+stub_file = "press/stubs/application-setup.md"
+
+# Template-only maintenance workflows, contributor state, port history, and
+# acceptance tests are removed from pressed child repositories.
+# Note: .github/workflows/difftree-pr-comment.yml is deliberately NOT removed;
+# child repositories inherit it intact via [rules] keep_names above.
+
+[[remove]]
+file = ".github/workflows/template-receipt-guard.yml"
+reason = "template-only receipt guard; a pressed child repository legitimately commits its receipt"
+
+[[remove]]
+file = ".github/workflows/update-contributors.yml"
+reason = "app-secret-gated maintenance workflow; child repositories opt in explicitly"
+
+[[remove]]
+file = ".contributors.yml"
+reason = "template contributor automation configuration"
+
+[[remove]]
+file = "CONTRIBUTORS.md"
+reason = "template contributor roster; a child repository starts its own"
+
+[[remove]]
+file = "tests/contributors-automation.test.ts"
+reason = "pins the removed contributor workflow and state files"
+
+[[remove]]
+file = "tests/press-acceptance.test.ts"
+reason = "template live-press acceptance test generates a child project and must not recurse"
+
+[[remove]]
+dir = "docs/port"
+reason = "template-only port history; child repositories start their own records"
+
+[[remove]]
+dir = "assets/images/logos"
+reason = "template logo placeholder; child repositories supply their own artwork"
