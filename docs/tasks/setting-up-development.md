@@ -114,25 +114,31 @@ just pre-commit-run
 
 ## Customization for New Projects
 
-When using this repository as a template for a new project, update the
-following template-rename seam (D-029) instead of hand-editing scattered
-strings:
+This repository is configured as a
+[template-press](https://github.com/smorinlabs/template-press) target
+(`press/press-source.toml` and `press/press-rules.toml`). Instead of manually
+editing scattered package names, `Justfile` variables, and manifests, stamp a
+fresh repository with `press rebrand`:
 
-1. **Justfile name variables** — at the top of the
-   [`Justfile`](../../Justfile):
+1. Copy `press/press-answers.example.toml` outside the repository (for example
+   to `../press-answers.toml`) and fill in your destination identity
+   (`package_name`, `repo_name`, `app_name`, `cli_name`, `display_name`,
+   `owner`, `author`, and `email`).
+2. Verify tools, preview the plan, and apply the rebrand:
 
-   ```just
-   ts_package_name := "ts-launch-blueprint"
-   repo_name := "ts-launch-blueprint"
-   command_name := "ts-projects"
+   ```bash
+   uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
+     press check-tools --target .
+   uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
+     press rebrand --target . --config ../press-answers.toml --dry-run
+   uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
+     press rebrand --target . --config ../press-answers.toml
    ```
 
-   These drive the release/pack-check recipes (tarball name, installed
-   `bin` name, smoke-test assertions) — change them once here rather than
-   at each call site.
-
-2. **`package.json`**: `name`, `description`, `repository.url`, and the
-   `bin` map's key (currently `ts-projects`).
+   This rewrites all identity surfaces (including workspace packages, CLI binary
+   name, environment variable prefixes, and `Justfile` variables), resets
+   versions to `0.1.0`, regenerates `pnpm-lock.yaml`, removes template-only
+   files, and keeps `.github/workflows/difftree-pr-comment.yml` intact.
 
 3. **Node.js version floor**: update `.nvmrc` and the `engines`
    field in `package.json` together if you need a different Node floor

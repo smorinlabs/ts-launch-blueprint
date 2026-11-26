@@ -4,17 +4,18 @@ This guide explains how testing, linting, security scanning, and releases are au
 
 ## Workflow Overview
 
-The repository ships seven workflows under `.github/workflows/`:
+The repository ships the following workflows under `.github/workflows/`:
 
-| Workflow                  | File                          | Trigger                                        |
-| ------------------------- | ----------------------------- | ---------------------------------------------- |
-| CI                        | `ci.yml`                      | push to `main`, pull requests targeting `main` |
-| CodeQL Advanced           | `codeql.yml`                  | push/PR to `main`, weekly schedule             |
-| Dependency review         | `dependency-review.yml`       | pull requests targeting `main`                 |
-| Manual PR Security Review | `manual-pr-security-scan.yml` | `workflow_dispatch` (manual)                   |
-| Release Please            | `release-please.yml`          | push to `main`, `workflow_dispatch`            |
-| Publish                   | `publish.yml`                 | push of a `v*` tag                             |
-| Update Contributors       | `update-contributors.yml`     | weekly schedule, `workflow_dispatch`           |
+| Workflow                  | File                          | Trigger                                                       |
+| ------------------------- | ----------------------------- | ------------------------------------------------------------- |
+| CI                        | `ci.yml`                      | push to `main`, pull requests targeting `main`                |
+| CodeQL Advanced           | `codeql.yml`                  | push/PR to `main`, weekly schedule                            |
+| Dependency review         | `dependency-review.yml`       | pull requests targeting `main`                                |
+| Difftree PR Comment       | `difftree-pr-comment.yml`     | pull requests (`opened`, `reopened`, `synchronize`, `edited`) |
+| Manual PR Security Review | `manual-pr-security-scan.yml` | `workflow_dispatch` (manual)                                  |
+| Press Verify              | `press-verify.yml`            | pull requests, `merge_group`, push to `main`                  |
+| Release Please            | `release-please.yml`          | push to `main`, `workflow_dispatch`                           |
+| Publish                   | `publish.yml`                 | `workflow_dispatch` (from a `v*` tag; D-045)                  |
 
 ### CI (`ci.yml`)
 
@@ -65,9 +66,22 @@ Normally triggered by a `v*` tag push; **paused during the V1 restructure (D-045
 - `verify` — cheap, unprivileged: asserts the tag descends from `main`, asserts `tag == package.json version == manifest version`, runs `just all`, builds, and asserts the packed file list is exactly `dist/**` plus the root whitelist (`package.json`, `README.md`, `LICENSE`, `CHANGELOG.md`).
 - `publish` — runs only inside the protected `npm` GitHub environment (human-approved), mints an OIDC token, and runs `npm publish` via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) — no long-lived `NPM_TOKEN` anywhere.
 
-### Update Contributors (`update-contributors.yml`)
+### Difftree PR Comment (`difftree-pr-comment.yml`)
 
-Weekly (Mondays 06:17 UTC) plus manual dispatch. Runs [`smorinlabs/contributors-please-action`](https://github.com/smorinlabs/contributors-please-action) in `mode: pull-request`, which generates, commits, and opens/updates a bot PR against `CONTRIBUTORS.md` from the committed `.contributors.jsonl` ledger — a single action replacing the source's separate generation script plus `create-pull-request` step.
+Posts an ASCII diff-tree summary of each pull request's changes as a single,
+self-updating PR comment using `smorinlabs/difftree-action` (SHA-pinned per
+D-022(9)). This workflow is retained intact when stamping child repositories
+via `[rules] keep_names = ["smorinlabs/difftree-action"]` in
+`press/press-rules.toml`.
+
+### Press Verify (`press-verify.yml`)
+
+Runs `template-press`'s hermetic `press verify` check on pull requests,
+`merge_group`, and pushes to `main`, ensuring the repository presses cleanly
+with no surviving source-identity leaks. This workflow ships to stamped child
+repositories as their own drift guard. (The template repository additionally
+runs `template-receipt-guard.yml` and `update-contributors.yml`, which
+`press rebrand` removes in stamped child repositories.)
 
 ## Running the Gates Locally
 

@@ -1,0 +1,35 @@
+# TEMPLATE-ONLY (press-removed in pressed child repositories): a press receipt
+# committed to the template itself would disarm every child repository's guard.
+# This lives apart from press-verify.yml so that workflow ships to child
+# repositories with no template-only logic.
+name: template-receipt-guard
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: template-receipt-guard-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  no-committed-receipt:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: No committed receipt in the template
+        run: |
+          if [ -f press/press-receipt.toml ]; then
+            echo "::error::press-receipt.toml committed in the template — it would disarm every child repository's guard. Revert."
+            exit 1
+          fi

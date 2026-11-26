@@ -2,7 +2,7 @@
 
 ## Setup
 
-GitHub Actions automates testing, security scanning, and releases. The TS Launch Blueprint project includes seven pre-configured workflows in [`.github/workflows/`](https://github.com/smorinlabs/ts-launch-blueprint/tree/main/.github/workflows): `ci.yml`, `codeql.yml`, `dependency-review.yml`, `manual-pr-security-scan.yml`, `release-please.yml`, `publish.yml`, and `update-contributors.yml`.
+GitHub Actions automates testing, security scanning, press verification, and releases. The TS Launch Blueprint project includes pre-configured workflows in [`.github/workflows/`](https://github.com/smorinlabs/ts-launch-blueprint/tree/main/.github/workflows): `ci.yml`, `codeql.yml`, `dependency-review.yml`, `difftree-pr-comment.yml`, `manual-pr-security-scan.yml`, `press-verify.yml`, `release-please.yml`, and `publish.yml` (plus blueprint-only maintenance workflows that `press rebrand` removes in stamped child repositories).
 
 For the trigger/job breakdown of each workflow, see [Using CI/CD](../tasks/using-ci-cd.md); for the release-tag → publish flow specifically, see [the release runbook](../maintainers-release.md). This page covers the workflows as a group: shape, pinning, and permissions conventions.
 
@@ -52,7 +52,7 @@ jobs:
       - run: pnpm exec lefthook run pre-commit --all-files
 ```
 
-The other six workflows follow the same shape (deny-all baseline `permissions`, least-privilege per-job grants, `actions/checkout` with `persist-credentials: false`) but are scoped to a single concern each: static analysis (`codeql.yml`), dependency vulnerability review on PRs (`dependency-review.yml`), a manual environment-gated deep security scan (`manual-pr-security-scan.yml`), the Conventional-Commits-driven release PR (`release-please.yml`), the tag-triggered npm publish (`publish.yml`), and the weekly contributors-list bot PR (`update-contributors.yml`). See [Using CI/CD](../tasks/using-ci-cd.md) for what each one does.
+The other shipped workflows follow the same shape (deny-all baseline `permissions`, least-privilege per-job grants, `actions/checkout` with `persist-credentials: false`) scoped to a single concern each: static analysis (`codeql.yml`), dependency vulnerability review on PRs (`dependency-review.yml`), ASCII PR diff-tree comments (`difftree-pr-comment.yml`), a manual environment-gated deep security scan (`manual-pr-security-scan.yml`), hermetic `template-press` verification (`press-verify.yml`), the Conventional-Commits-driven release PR (`release-please.yml`), and npm publishing (`publish.yml`). See [Using CI/CD](../tasks/using-ci-cd.md) for what each one does.
 
 ## Action Pinning Policy
 
@@ -63,7 +63,7 @@ Every third-party action reference in this repository follows one of two rules:
   ```yaml
   - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
   ```
-  This covers `extractions/setup-just`, `google/osv-scanner-action/osv-scanner-action`, `googleapis/release-please-action`, and `smorinlabs/contributors-please-action`. [Dependabot's `github-actions` ecosystem](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#package-ecosystem) keeps these SHAs fresh via automated PRs.
+  This covers `pnpm/action-setup`, `extractions/setup-just`, `oven-sh/setup-bun`, `astral-sh/setup-uv`, `google/osv-scanner-action/osv-scanner-action`, `googleapis/release-please-action`, and `smorinlabs/difftree-action`. [Dependabot's `github-actions` ecosystem](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#package-ecosystem) keeps these SHAs fresh via automated PRs.
 
 **SHA-pin exception within the "official action" bucket**: `actions/dependency-review-action` is an official `actions/*` action but is nonetheless pinned to a full SHA (`@a1d282b...` / `# v5.0.0`), because this action publishes **no floating major tag at all** (no `v5`, and no `v4` either — the Python source repo's `@v4` reference carried this exact latent resolution bug and would never have resolved). Only exact point-release tags exist upstream, so a SHA pin is the only reliable reference; Dependabot still keeps it current.
 

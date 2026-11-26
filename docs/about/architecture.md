@@ -239,7 +239,6 @@ internal (D-047). The core public-API test
   how to read a failure, and how to remove an app.
 - [Project Structure](../reference/project-structure.md): the full directory
   layout.
-- Decisions D-039 to D-045 in
-  [`docs/port/TS_PORT_DECISIONS.md`](../port/TS_PORT_DECISIONS.md): the
-  layers, the workspace, the boundary tools, the API stack, the runtime and
-  the publishing pause.
+- Architecture decisions D-039 to D-045 (recorded in the blueprint's
+  `docs/port/TS_PORT_DECISIONS.md` history): the layers, the workspace, the
+  boundary tools, the API stack, the runtime, and the publishing pause.

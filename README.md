@@ -9,9 +9,10 @@ baseline. It is the TypeScript port of
 [py-launch-blueprint](https://github.com/smorinlabs/py-launch-blueprint),
 built in tested vertical slices (see `docs/port/TS_PORT_PLAN.md`).
 
-Zero-config development environment with type safety built in: clone it,
-rename a few seam variables, and you have a linted, formatted,
-type-checked, tested, and release-automated TypeScript project.
+Zero-config development environment with type safety built in: stamp it with
+[template-press](https://github.com/smorinlabs/template-press) and you have a
+linted, formatted, type-checked, tested, and release-automated TypeScript
+project.
 
 ## Features
 
@@ -47,17 +48,29 @@ the principles behind it.
 
 ## Quickstart
 
-This repository is a _template_: clone it, rename the seam variables, and
-build on top of `ts-projects` or delete it and start fresh.
+This repository is a _template_: stamp a new repository from it with
+[template-press](https://github.com/smorinlabs/template-press) (which rewrites
+every identity surface, resets blueprint history and prose, regenerates
+`pnpm-lock.yaml`, and keeps `.github/workflows/difftree-pr-comment.yml` intact),
+then build on top of `ts-projects` or delete it and start fresh.
 
 ```bash
-git clone https://github.com/smorinlabs/ts-launch-blueprint.git
-cd ts-launch-blueprint
+# 1. Create a repo from this template (or clone it) and prepare an answers file
+git clone https://github.com/smorinlabs/ts-launch-blueprint.git my-project
+cd my-project
+cp press/press-answers.example.toml ../press-answers.toml
+# Edit ../press-answers.toml with your package_name, repo_name, app_name,
+# cli_name, display_name, owner, author, and email.
 
-# Rename the template for your own project: edit the seam variables at the
-# top of the Justfile (ts_package_name, repo_name, command_name), then
-# update package.json's name/bin/repository fields to match.
+# 2. Preview and apply the rebrand with template-press (requires uv)
+uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
+  press check-tools --target .
+uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
+  press rebrand --target . --config ../press-answers.toml --dry-run
+uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
+  press rebrand --target . --config ../press-answers.toml
 
+# 3. Install dependencies, hooks, and verify every quality gate
 make check      # verify the foundational tools (just, node) are installed
 just install    # install shell analyzers, dependencies, and git hooks
 export PATH="$HOME/.local/bin:$PATH" # make installed analyzers available

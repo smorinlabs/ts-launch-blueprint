@@ -1,0 +1,50 @@
+# Press drift guard: `press verify` hermetically self-presses a sandbox copy
+# and scans for surviving source identity. Any added identity-bearing file that
+# presses dirty fails this check (exit 1); config errors exit 2.
+#
+# This workflow deliberately SHIPS to pressed child repositories — a child repo
+# is itself a valid press target, and this is its drift guard too. The
+# template-only receipt guard lives in template-receipt-guard.yml, which the
+# press removes in child repositories.
+name: press-verify
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: press-verify-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  press-verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Third-party action -> full-SHA pin + version comment (D-022(9)); kept
+      # fresh by the Dependabot github-actions ecosystem.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          github-token: ${{ github.token }}
+
+      # Pinned to the template-press main commit providing Node targets,
+      # pnpm-lock.yaml exemption, and [rules] keep_names (post-v4.1.0; v5.0.0
+      # is not yet published on PyPI). Protected from owner rewriting via
+      # [rules] keep_names = ["smorinlabs/template-press"]. Switch to
+      # `uvx --from template-press==5.0.0 press verify` once v5.0.0 ships.
+      - name: Run press verify
+        run: >-
+          uvx --from
+          "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb"
+          press verify

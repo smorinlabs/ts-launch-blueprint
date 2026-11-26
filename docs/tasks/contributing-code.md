@@ -91,26 +91,25 @@ If you're filing a bug report, attach the output of `just debug-info` (OS, Node/
 
 ## Contributors
 
-This project uses [contributors-please](https://github.com/smorinlabs/contributors-please) to automatically track and maintain our [CONTRIBUTORS.md](../../CONTRIBUTORS.md) file. The list of contributors is automatically updated when:
-
-1. The weekly `update-contributors` workflow runs (Mondays, or on-demand via `workflow_dispatch`).
-2. Manually using the `just contributors` command.
+Contributor automation is optional. Stamped applications start without the
+template's contributor roster, `.contributors.yml`, or `update-contributors.yml`
+workflow. Run the retained `just contributors` helper whenever you want to
+initialize or refresh a local `CONTRIBUTORS.md` roster from Git history — see
+[Tracking Contributors](../contributing/index.md#tracking-contributors).
 
 ### Manual Update
 
 To manually update the contributors list:
 
 ```bash
-pnpm dlx contributors-please
+just contributors
 ```
 
 ### How Contributors are Tracked
 
-Contributors are tracked based on git commit history, recorded in `.contributors.jsonl` and rendered via `.contributors.yml`. The system:
+Contributors are tracked from Git commit history when you opt in. The system:
 
 - Counts commits per contributor
 - Shows contribution statistics
-- Excludes certain email domains (e.g., noreply.github.com)
+- Excludes certain email domains (e.g., `noreply.github.com`)
 - Sorts contributors by number of commits
-
-For more details, see the [contributors-please documentation](https://github.com/smorinlabs/contributors-please).
