@@ -230,7 +230,8 @@ Vite (D-054), calls it through a typed tRPC client; it imports only the
 API's router **type** (`AppRouter`), never runtime code, and
 `[web-types-only-from-api]` enforces that.
 
-Next: the real projects screen in the web app, with styling and routing.
+Its one page is the projects screen (a workspace filter kept in the URL, every
+loading and error state, D-055). Next: a browser test of that screen.
 
 The core exports the `listProjects` contract schemas
 (`ListProjectsInputSchema`, `ListProjectsOutputSchema`, in

@@ -88,12 +88,15 @@ ts-launch-blueprint/
 │   └── tsdown.config.ts             # Build (bundler) configuration
 ├── apps/web/                        # @ts-launch-blueprint/web (private, not published)
 │   ├── src/
-│   │   ├── App.tsx                  # The page: projects.list -> loading / error / list
+│   │   ├── App.tsx                  # Page shell: heading + the projects screen
 │   │   ├── config.ts                # API base URL (VITE_API_URL, default same origin)
-│   │   ├── main.tsx                 # Thin browser entry: mount <App/> in the providers
+│   │   ├── main.tsx                 # Thin browser entry: stylesheet, <App/> in the providers
+│   │   ├── projects/                # The projects screen: page, filter, table, states, errors, URL state
 │   │   ├── providers.tsx            # TanStack Query + the typed tRPC client
+│   │   ├── query-client.ts          # createQueryClient(): no 4xx retries, at most 2 otherwise
+│   │   ├── styles.css               # Plain CSS: variables, light/dark
 │   │   └── trpc.ts                  # createTRPCContext<AppRouter> (type-only import)
-│   ├── tests/                       # Component, type, config and bundle tests
+│   ├── tests/                       # Screen, error, retry, URL-state, type, config and bundle tests
 │   ├── index.html                   # Vite's HTML entry
 │   ├── tsconfig.json                # Own tsconfig: browser options, isolatedDeclarations off (D-054)
 │   ├── vite.config.ts               # React plugin; dev proxy /trpc -> :8080
