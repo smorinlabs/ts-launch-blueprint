@@ -53,3 +53,4 @@ file plus those.
 - [?] **P06** — [Turnkey toolchains and unified local setup](projects/P06-turnkey-toolchains-and-unified-local-setup-.md) — Add mise, flox, devcontainer, make bootstrap, just setup, and Justfile DX fixes
 - [?] **P07** — [Template-press fork guard and bootstrap skill](projects/P07-template-press-fork-guard-and-bootstrap-skill-.md) — Add guard.sh, CI bootstrap acceptance, press cleanups, and new-ts-project skill
 - [?] **P08** — [Testing resilience and web browser E2E](projects/P08-testing-resilience-and-web-browser-e2e-.md) — Add Vitest shuffle, fast-check properties, CLI snapshots, and Playwright E2E
+- [?] **P09** — [Production API hardening and GHCR container publish](projects/P09-production-api-hardening-and-ghcr-container-publish-.md) — Add secure headers, CORS, rate limit, readyz, Dockerfile cache, and GHCR deploy
