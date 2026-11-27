@@ -1,0 +1,27 @@
+// @ts-launch-blueprint/web: a browser app, not a library. It imports the
+// API's AppRouter type, so tsc checks the API's router (and what it reaches)
+// with these options: isolatedDeclarations must be off, as for apps/api
+// (D-048), and even this app's own tRPC hooks can't satisfy it. Browser
+// options: DOM lib, Vite's client types, Bundler resolution, React's
+// automatic JSX runtime. The root tsconfig.json excludes apps/web;
+// scripts/typecheck.sh runs this config as a second pass (D-054).
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "isolatedDeclarations": false,
+    "declaration": false,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
+}

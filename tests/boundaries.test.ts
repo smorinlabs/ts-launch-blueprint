@@ -13,6 +13,7 @@ const BIN = join(REPO_ROOT, 'node_modules', '.bin');
 const CORE = 'packages/core/src';
 const CLI = 'apps/cli/src';
 const API = 'apps/api/src';
+const WEB = 'apps/web/src';
 const PROBE_APP = 'apps/__boundary-probe-app';
 const TIMEOUT_MS = 30_000;
 
@@ -273,6 +274,45 @@ const FORBIDDEN: [string, ForbiddenCase][] = [
     },
   ],
   [
+    'apps/web with a value import of the API router',
+    {
+      tag: 'web-types-only-from-api',
+      tools: ['oxlint', 'depcruise'],
+      files: () => [
+        probe(
+          `${WEB}/__boundary-probe-router-value.ts`,
+          "import { appRouter } from '@ts-launch-blueprint/api/router';\nexport const probe: unknown = appRouter;\n"
+        ),
+      ],
+    },
+  ],
+  [
+    'apps/web importing another API file (apps/api/src/app.ts)',
+    {
+      tag: 'web-types-only-from-api',
+      tools: ['oxlint', 'depcruise'],
+      files: () => [
+        probe(
+          `${WEB}/__boundary-probe-api-file.ts`,
+          "import { createApp } from '../../api/src/app.js';\nexport const probe: unknown = createApp;\n"
+        ),
+      ],
+    },
+  ],
+  [
+    'apps/cli importing the API (even its router type)',
+    {
+      tag: 'app-no-cross-app-import',
+      tools: ['depcruise'],
+      files: () => [
+        probe(
+          `${CLI}/__boundary-probe-api.ts`,
+          "import type { AppRouter } from '../../api/src/router.js';\nexport type Probe = AppRouter;\n"
+        ),
+      ],
+    },
+  ],
+  [
     'a two-file cycle',
     {
       tag: 'no-cycle',
@@ -325,6 +365,14 @@ describe.sequential('architecture boundaries (D-042)', () => {
         (dependency) => dependency.resolved === `${CORE}/repositories/projects.repository.ts`
       );
       expect(toInterface?.dependencyTypes).toContain('type-only');
+      // .tsx is parsed, and the web app's AppRouter import resolves (the
+      // 'types' condition) as a type-only edge to the API router.
+      expect(sources).toContain(`${WEB}/App.tsx`);
+      const client = graph.modules.find((module) => module.source === `${WEB}/trpc.ts`);
+      const toRouter = client?.dependencies.find(
+        (dependency) => dependency.resolved === `${API}/router.ts`
+      );
+      expect(toRouter?.dependencyTypes).toContain('type-only');
     },
     TIMEOUT_MS
   );
@@ -433,6 +481,23 @@ describe.sequential('architecture boundaries (D-042)', () => {
           const path = probe(
             `${API}/__boundary-probe-allowed.ts`,
             "import { createCore, NotFoundError } from '@ts-launch-blueprint/core';\nexport const probe: unknown = [createCore, NotFoundError];\n"
+          );
+          expect(outcome(oxlint([path]))).toEqual(PASSED);
+          expect(outcome(depcruise())).toEqual(PASSED);
+        } finally {
+          removeProbes();
+        }
+      },
+      TIMEOUT_MS
+    );
+
+    it(
+      'apps/web with `import type { AppRouter }` from the API router, and its own modules',
+      () => {
+        try {
+          const path = probe(
+            `${WEB}/__boundary-probe-allowed.ts`,
+            "import type { AppRouter } from '@ts-launch-blueprint/api/router';\n\nimport { apiBaseUrl } from './config.js';\n\nexport type Probe = AppRouter;\nexport const probe: unknown = apiBaseUrl;\n"
           );
           expect(outcome(oxlint([path]))).toEqual(PASSED);
           expect(outcome(depcruise())).toEqual(PASSED);

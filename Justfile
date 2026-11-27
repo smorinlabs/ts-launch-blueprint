@@ -139,13 +139,15 @@ alias l := lint
     # Only the groups that exist: after deleting the last app, apps/ is gone.
     pnpm exec depcruise $(ls -d packages apps 2>/dev/null) --config .dependency-cruiser.cjs --output-type err-long
 
-# Prove an app can be deleted and the rest still works (D-040/D-042): copies
-# the repo without apps/<app>, then runs the core's typecheck/tests/boundaries
-# and the root lint/typecheck/check-boundaries. Needs network for the install,
-# so it is NOT part of `just all`; CI runs it as its own step.
+# Prove apps can be deleted and the rest still works (D-040/D-042): copies
+# the repo without the given apps/<app> folders, then runs the core's
+# typecheck/tests/boundaries and the root lint/typecheck/check-boundaries.
+# Positional, one or more: `just check-removable cli`, `just check-removable
+# api web` (the web app needs the API's types, D-054). Needs network for the
+# install, so it is NOT part of `just all`; CI runs it as its own step.
 [group('dev')]
-check-removable app="cli":
-    sh scripts/check-removable.sh {{app}}
+check-removable +apps:
+    sh scripts/check-removable.sh {{apps}}
 
 # Run linter with autofixes applied
 [group('dev')]
@@ -254,6 +256,13 @@ alias pc := pre-commit-run
 @api:
     pnpm --filter @ts-launch-blueprint/api build
     node apps/api/dist/server.js
+
+# Start the web app's Vite dev server (D-054); it proxies /trpc to the API on
+# :8080, so start `just api` in another terminal first.
+# See docs/reference/web-app.md.
+[group('run'), group('quick start')]
+@web:
+    pnpm --filter @ts-launch-blueprint/web dev
 
 # Build the API container image from the repo root (apps/api/Dockerfile, D-050)
 [group('run')]

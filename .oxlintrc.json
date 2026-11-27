@@ -291,6 +291,49 @@
         ]
       }
     },
+    // apps/web: the browser app (D-054). React and jsx-a11y rules here only;
+    // react-in-jsx-scope is for the old JSX transform (React 19 uses the
+    // automatic runtime, tsconfig "jsx": "react-jsx"). From the API it may
+    // import only the AppRouter TYPE ([web-types-only-from-api]); this
+    // override replaces the apps/*/src/** one, so it repeats
+    // [app-core-entry-only].
+    {
+      "files": ["apps/web/src/**"],
+      "plugins": ["react", "jsx-a11y"],
+      "rules": {
+        "react/react-in-jsx-scope": "off",
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@ts-launch-blueprint/api/router",
+                "allowTypeImports": true,
+                "message": "[web-types-only-from-api] The web app imports only the AppRouter type: use `import type { AppRouter } from '@ts-launch-blueprint/api/router'`."
+              },
+              {
+                "name": "@ts-launch-blueprint/api",
+                "message": "[web-types-only-from-api] The web app imports nothing from the API but the AppRouter type from @ts-launch-blueprint/api/router."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["**/packages/**"],
+                "message": "[app-core-entry-only] Apps import the core only as @ts-launch-blueprint/core, never by a relative path into packages/."
+              },
+              {
+                "group": ["@ts-launch-blueprint/core/**"],
+                "message": "[app-core-entry-only] Apps import the core only as @ts-launch-blueprint/core, never a @ts-launch-blueprint/core/<subpath>."
+              },
+              {
+                "group": ["**/apps/**", "**/api/src/**", "**/cli/src/**"],
+                "message": "[web-types-only-from-api] The web app imports nothing from another app but the AppRouter type from @ts-launch-blueprint/api/router."
+              }
+            ]
+          }
+        ]
+      }
+    },
     {
       "files": ["**/tests/**", "**/*.test.ts"],
       "rules": {

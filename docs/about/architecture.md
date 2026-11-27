@@ -6,7 +6,7 @@ automatically; see [Architecture Boundary Rules](../reference/boundary-rules.md)
 
 ## Overview
 
-The repo is a pnpm workspace with three parts:
+The repo is a pnpm workspace with four parts:
 
 - **The core library** (`packages/core`, `@ts-launch-blueprint/core`): the
   data shapes, data access and business rules. It knows nothing about who
@@ -15,6 +15,9 @@ The repo is a pnpm workspace with three parts:
   package): one controller that calls the core.
 - **The API** (`apps/api`, Hono + tRPC): a second controller over the same
   core. See the [API Reference](../reference/api-reference.md).
+- **The web app** (`apps/web`, React + Vite): a browser client of the API.
+  It imports only the API's router **type**, so it gets end-to-end types
+  with none of the server's code. See the [Web App](../reference/web-app.md).
 
 The goal is a ready web template: the CLI and the API run the same business
 logic, and each part can be removed on its own. Delete an app and the rest
@@ -55,7 +58,10 @@ flowchart TB
   concrete["Concrete repositories<br/>http-projects · in-memory-projects"]
   schemas["Schemas (shared by every layer)<br/>shapes · converters · domain errors"]
 
+  web["Web app<br/>apps/web"]
+
   apps --> entry
+  web -. "import type AppRouter<br/>(apps/api's router only)" .-> apps
   entry --> composition
   composition --> services
   composition --> concrete
@@ -219,12 +225,12 @@ Deliberate differences:
 ## What's Next
 
 Built: **`apps/api`**, Hono + tRPC (D-043, D-048). Its `projects.list`
-procedure calls the same projects service as the CLI.
+procedure calls the same projects service as the CLI. **`apps/web`**, React +
+Vite (D-054), calls it through a typed tRPC client; it imports only the
+API's router **type** (`AppRouter`), never runtime code, and
+`[web-types-only-from-api]` enforces that.
 
-Planned, not built yet:
-
-- **`apps/web`**: React. It imports only the API's router **type**
-  (`AppRouter`), never runtime code; a boundary rule will enforce that.
+Next: the real projects screen in the web app, with styling and routing.
 
 The core exports the `listProjects` contract schemas
 (`ListProjectsInputSchema`, `ListProjectsOutputSchema`, in

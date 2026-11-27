@@ -119,10 +119,17 @@ jobs:
         if: matrix.node-version == '24.x'
         run: just check-removable cli
 
-      - name: Removable app check (apps/api)
+      # apps/web uses the API's router type (D-054), so removing the API
+      # removes the web app with it.
+      - name: Removable app check (apps/api + apps/web)
         # Once per run, not per Node version: it reinstalls in a temp copy.
         if: matrix.node-version == '24.x'
-        run: just check-removable api
+        run: just check-removable api web
+
+      - name: Removable app check (apps/web)
+        # Once per run, not per Node version: it reinstalls in a temp copy.
+        if: matrix.node-version == '24.x'
+        run: just check-removable web
 
       # --- Dual enforcement: re-run the WHOLE hook suite on all files, mirroring
       #     the source's `just pre-commit-run` step (D-022(1)). ---

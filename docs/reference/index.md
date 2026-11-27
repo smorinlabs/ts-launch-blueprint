@@ -7,5 +7,6 @@ Welcome to the Reference section of the TS Launch Blueprint documentation. This 
 - [Architecture Boundary Rules](boundary-rules.md)
 - [CLI Reference](cli-reference.md)
 - [API Reference](api-reference.md)
+- [Web App](web-app.md)
 - [Observability](observability.md)
 - [Versioning](versioning.md)

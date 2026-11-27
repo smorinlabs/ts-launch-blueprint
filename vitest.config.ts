@@ -16,7 +16,7 @@ const config: ReturnType<typeof defineConfig> = defineConfig({
     ],
     coverage: {
       provider: 'v8',
-      include: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts'],
+      include: ['packages/*/src/**/*.{ts,tsx}', 'apps/*/src/**/*.{ts,tsx}'],
       // apps/cli/src/cli.ts is a thin process entry (argv/exit only) exercised
       // by the S3 subprocess tier, not unit-coverable (claim-npm
       // adapter-exclusion precedent, D-019(3)).
@@ -28,12 +28,16 @@ const config: ReturnType<typeof defineConfig> = defineConfig({
       // apps/api/src/server.ts is the API's thin process entry (config ->
       // createCore -> serve), exercised by the API e2e test (same D-019(3)
       // thin-entry exclusion as the CLI's src/cli.ts).
+      // apps/web/src/main.tsx is the web app's thin browser entry (mount
+      // <App/> in the providers); the providers and the page are tested in
+      // jsdom (same D-019(3) thin-entry exclusion).
       // **/__boundary-probe-*: temporary files written by tests/boundaries.test.ts,
       // in case a crashed run leaves one behind.
       exclude: [
         'apps/cli/src/cli.ts',
         'apps/cli/src/cli/adapters.ts',
         'apps/api/src/server.ts',
+        'apps/web/src/main.tsx',
         '**/__boundary-probe-*',
         '**/__boundary-probe-*/**',
       ],

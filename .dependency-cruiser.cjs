@@ -100,8 +100,26 @@ module.exports = {
       comment:
         '[app-no-cross-app-import] One app never imports another app; share code through the core.',
       severity: 'error',
-      from: { path: '^apps/([^/]+)/' },
+      // apps/web is covered by the two web rules below: its one allowed
+      // cross-app edge is the API's AppRouter type (D-054).
+      from: { path: '^apps/([^/]+)/', pathNot: '^apps/web/' },
       to: { path: '^apps/', pathNot: '^apps/$1/' },
+    },
+    {
+      name: 'web-types-only-from-api',
+      comment:
+        "[web-types-only-from-api] The web app imports the API only as a type: `import type { AppRouter } from '@ts-launch-blueprint/api/router'`.",
+      severity: 'error',
+      from: { path: '^apps/web/' },
+      to: { path: '^apps/api/', dependencyTypesNot: ['type-only'] },
+    },
+    {
+      name: 'web-api-router-only',
+      comment:
+        '[web-types-only-from-api] The web app imports nothing from another app but the API router type (apps/api/src/router.ts).',
+      severity: 'error',
+      from: { path: '^apps/web/' },
+      to: { path: '^apps/', pathNot: '^apps/(web/|api/src/router\\.ts$)' },
     },
     {
       name: 'no-cycle',
@@ -133,7 +151,12 @@ module.exports = {
     tsConfig: { fileName: 'tsconfig.json' },
     enhancedResolveOptions: {
       exportsFields: ['exports'],
-      conditionNames: ['import', 'default'],
+      // 'types' resolves the API's types-only `./router` export (D-054), so
+      // the web app's `import type { AppRouter }` edge is found and marked
+      // type-only. Side effect: most npm edges now resolve to their .d.ts
+      // entry instead of the JS one; the rules match package paths, so none
+      // is affected.
+      conditionNames: ['import', 'default', 'types'],
     },
   },
 };
