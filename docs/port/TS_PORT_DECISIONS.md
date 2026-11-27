@@ -581,3 +581,16 @@ the old one.
   8. **Removable apps with a dependent**: `scripts/check-removable.sh` and `just check-removable +apps` take several apps. CI runs `cli`, `api web` (the web app needs the API's types; replaces `api`) and `web`.
   9. Styling, routing and the real projects screen are deferred to P4-2; a browser e2e to P4-3.
 - Why: one `import type` gives the browser the API's exact types with no server code or generated client to keep in sync, and the boundary rules plus the bundle test make sure it stays a type-only edge.
+
+## D-055: Web projects screen — URL-state filter, error kinds and retries, plain accessible CSS (builds on D-049, D-054)
+- Ref: maintainer decision 2026-11; ticket P4-2
+- Options: (1) plain CSS and React state, filter in the URL without a router (2) a UI library and a router now (3) a client-side filter over the full list
+- Decision: (1).
+  1. **No UI, router or state library**: plain CSS (`src/styles.css`) with variables, light and dark (`prefers-color-scheme`), a system font, a 60rem column, and a table that scrolls inside its wrapper on narrow screens. A template user swaps in CSS modules, Tailwind or a component library, and adds a router with the first second page.
+  2. **Submit-based filter**: Enter or Apply sets it, Clear removes it; no per-keystroke queries, so no debouncing. The text is trimmed (blank means none); matching stays in the core (case-insensitive), and no filter sends no input (D-048). The form isn't re-mounted when the filter changes (that would drop keyboard focus after Enter); it follows the applied value with React's adjust-state-on-prop-change pattern.
+  3. **URL state without a router**: `?workspace=<name>`, read with `URLSearchParams` on load and written with `history.replaceState` (a filter change isn't a page to go back to), in one hook, `useWorkspaceParam()`. Filtered views can be linked and reloaded.
+  4. **Error kinds**: `errorKind()` reads the `TRPCClientError`'s `data.code`/`data.httpStatus` (D-049): `NOT_FOUND` → `not-found` (offer Clear filter), other 4xx → `bad-request` (no action), 5xx, network or unknown → `server` (offer Try again). Messages are the API's `error.message`, already safe for clients (D-049).
+  5. **Retries**: `createQueryClient()` never retries a 4xx and retries other failures at most twice (TanStack's default is 3 retries with backoff, which held a 404 on "Loading…" for seconds). A 404 shows at once; a 5xx makes up to 3 requests before Try again.
+  6. **Accessibility**: a visible label, a table caption with `th scope="col"`, `<output>` (implicit `status`) for loading and empty, `role="alert"` for errors, an `aria-live="polite"` count, `:focus-visible` outlines, keyboard-only use; jsx-a11y prefers the native elements (`<output>` over `role="status"`), and `import/no-unassigned-import` allows the stylesheet import.
+  7. Types come from the router (`ProjectsListOutput` = `inferRouterOutputs<AppRouter>['projects']['list']`); no `Project` type is redefined. Test dependencies: `@testing-library/user-event` 14.6.13 and `@testing-library/dom` (its peer, and `@testing-library/react`'s), now explicit.
+- Why: the first screen a template user sees should show the patterns they copy (typed query, error kinds, URL state, accessible markup) without choosing their UI stack for them.

@@ -3,8 +3,12 @@
 // the bundle ([web-types-only-from-api]). Batching is on (httpBatchLink): the
 // API labels several calls in one request /trpc/batch (D-052).
 import { createTRPCClient, httpBatchLink, type TRPCClient } from '@trpc/client';
+import type { inferRouterOutputs } from '@trpc/server';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import type { AppRouter } from '@ts-launch-blueprint/api/router';
+
+/** What projects.list returns, straight from the router: never redefined here. */
+export type ProjectsListOutput = inferRouterOutputs<AppRouter>['projects']['list'];
 
 /** The React provider and hook for the typed client (TanStack Query). */
 export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();

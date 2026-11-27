@@ -302,6 +302,8 @@
       "plugins": ["react", "jsx-a11y"],
       "rules": {
         "react/react-in-jsx-scope": "off",
+        // main.tsx imports the stylesheet for its side effect (D-055).
+        "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
         "no-restricted-imports": [
           "error",
           {

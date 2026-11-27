@@ -6,8 +6,9 @@ tRPC client** with [TanStack Query](https://tanstack.com/query). It imports
 only the API's router **type** (`AppRouter`), never its runtime code, so the
 browser gets end-to-end types with none of the server in its bundle.
 
-Today it has one plain page that lists the projects. Styling, routing and
-the real projects screen come next.
+Its one page is the projects screen: a workspace filter kept in the URL,
+every loading and error state, plain accessible styling (D-055). There's no
+router, UI library or state library yet; add your own as the app grows.
 
 ## Running It
 
@@ -18,9 +19,9 @@ just api   # terminal 1: the API on :8080 (demo data, no token)
 just web   # terminal 2: the Vite dev server; open the URL it prints
 ```
 
-The page shows `Loading projects…`, then the 4 demo projects as
-`name (workspace)`. If the API is down or fails, it shows the API's error
-message (already safe for clients, D-049).
+The page shows `Loading projects…`, then a table of the 4 demo projects and
+`4 projects`. Type `engineering` and press Enter for 2 rows, or `nope` for
+`Workspace not found: nope`.
 
 `pnpm --filter @ts-launch-blueprint/web build` (or `just build`, which builds
 every app) writes the static site to `apps/web/dist/`.
@@ -57,6 +58,70 @@ VITE_API_URL=https://api.example.com pnpm --filter @ts-launch-blueprint/web buil
 
 A different origin needs CORS on the API, which isn't set up yet. That's
 decided with the deploy.
+
+## The Projects Screen
+
+The source is in `src/projects/`: `ProjectsPage.tsx` holds the state and
+the query, `WorkspaceFilter.tsx` the form, `ProjectsTable.tsx` the table and
+count, and `QueryStatus.tsx` the loading, empty and error views.
+
+| State              | What the user sees                                                              |
+| ------------------ | ------------------------------------------------------------------------------- |
+| Loading            | `Loading projects…` (a `status` region; the results area is `aria-busy`)        |
+| Success            | A table (Project, Workspace) and the count (`4 projects`, `1 project`)          |
+| Empty              | `No projects found.`, plus `in workspace "X"` when filtered                     |
+| Not found (404)    | The API's message (`Workspace not found: X`) and **Clear filter**               |
+| Bad input (400)    | The API's validation message; no button (the same input would fail again)       |
+| Server error (5xx) | The API's message (for example `Upstream projects API error`) and **Try again** |
+
+Messages are the API's own `error.message`, already safe for clients
+(D-049). With the demo data you can see success, the filter and the 404 by
+hand; empty and 400 can't happen there (every demo workspace has projects,
+and the screen only sends a workspace name), so they're covered by tests.
+
+**The filter.** Enter or **Apply** applies it, **Clear** removes it; it
+doesn't query on every keystroke. The text is trimmed (blank means no
+filter), and matching is the API's job (case-insensitive), so the screen
+never filters on its own. No filter sends no input at all.
+
+**The URL.** The filter is `?workspace=<name>`: open or reload
+`/?workspace=marketing` and the filtered list loads. Changes use
+`history.replaceState`, so they don't add history entries
+(`src/projects/workspace-param.ts`).
+
+**Retries.** `createQueryClient()` (`src/query-client.ts`) never retries a
+4xx, which can't succeed, and retries other failures at most twice. So a
+404 shows its message at once, and a 5xx takes up to 3 requests before
+**Try again** appears.
+
+**Accessibility.** A visible `Workspace` label, a table caption and column
+headers, `status` and `alert` regions, a politely announced count, visible
+focus outlines, and keyboard-only use (Tab, type, Enter; focus stays in the
+form). The `jsx-a11y` lint rules check the markup.
+
+**Styling.** Plain CSS in `src/styles.css`: variables for colors and
+spacing, light and dark mode (`prefers-color-scheme`), a system font, a
+centered column. The table scrolls inside its wrapper on narrow screens; the
+page doesn't. Swap in CSS modules, Tailwind or a component library if you
+prefer.
+
+## Adding a Screen
+
+Copy the projects screen's pattern:
+
+1. **Query:** `useQuery(trpc.<router>.<procedure>.queryOptions(input))`,
+   typed from `AppRouter`. Need the output type for a prop? Infer it from
+   the router as `src/trpc.ts` does (`ProjectsListOutput`); don't redefine
+   it.
+2. **States:** `isPending` → `<QueryMessage>`, `isError` → `<QueryError>`
+   (it picks Try again or Clear filter from `errorKind`), empty →
+   `<QueryMessage>`, then your view.
+3. **Errors:** `errorKind(error)` (`src/projects/errors.ts`) sorts any
+   failure into `not-found`, `bad-request` or `server`; the retry policy
+   uses the same mapping.
+4. **URL state:** for a value worth linking to, follow `useWorkspaceParam()`
+   (read with `URLSearchParams`, write with `replaceState`). A second page
+   is when to add a router.
 
 ## Adding a Query
 
