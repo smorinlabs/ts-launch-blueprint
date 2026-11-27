@@ -1,0 +1,9 @@
+[identity]
+package_name = "ts_launch_blueprint"
+repo_name = "ts-launch-blueprint"
+app_name = "ts_projects"
+author = "Steve Morin"
+email = "steve.morin@gmail.com"
+owner = "smorinlabs"
+display_name = "TS Launch Blueprint"
+cli_name = "ts-projects"

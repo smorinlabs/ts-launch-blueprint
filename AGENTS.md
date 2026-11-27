@@ -14,10 +14,10 @@ This file is the canonical AI-assistant context hub for this repository
 
 ## Project Overview
 
-ts-launch-blueprint is a production-ready TypeScript project template — the
-TypeScript port of [py-launch-blueprint](https://github.com/smorinlabs/py-launch-blueprint).
-It ships a small example CLI (`ts-projects`) plus the full quality-gate,
-packaging, and repo-hygiene scaffolding a serious npm package needs.
+ts-launch-blueprint is a production-ready TypeScript workspace shipping a shared
+core (`@ts-launch-blueprint/core`), an example CLI (`ts-projects`), an HTTP API
+(`@ts-launch-blueprint/api`), and full quality-gate, packaging, and repo-hygiene
+scaffolding.
 
 - Package name: `ts-launch-blueprint`
 - Command name: `ts-projects`
@@ -63,6 +63,18 @@ install-pnpm`, not bundled with Node — it self-manages to the version
   - `just setup-hooks`: install git hooks + commit-message template
   - `just build`: build the published CLI package into `apps/cli/dist/`
   - `just check-deps` / `just debug-info`: toolchain diagnosis
+  - `just press-verify`: run `template-press`'s hermetic self-press drift guard
+
+### Press Conformance
+
+This repository is a `template-press` target (`press/press-source.toml` and
+`press/press-rules.toml`), enforced in CI by `.github/workflows/press-verify.yml`.
+Any added or renamed file carrying an identity token (`ts-launch-blueprint`,
+`ts_launch_blueprint`, `ts-projects`, `TS_PROJECTS`, author/owner names, or
+`TS Launch Blueprint`) must press cleanly — either via default rewrites or an
+explicit rule in `press/press-rules.toml`. External tool actions retained in
+child repositories (such as `smorinlabs/difftree-action` in
+`.github/workflows/difftree-pr-comment.yml`) are declared in `[rules] keep_names`.
 
 ### Code Quality Tools
 
@@ -126,3 +138,32 @@ checksum-verified ShellCheck 0.11.0 and actionlint 1.7.12. `just all` includes
 `just check-shell` for tracked `.sh`/`.bash` files and `just check-workflows`
 for embedded workflow shell commands. Staged checks run through lefthook;
 CI explicitly provisions both analyzers and repeats the checks.
+
+## project-harness — project workflow skills
+
+This repo uses the `project-harness` plugin. Project state lives
+in `PROJECTS.md` (the trunk) and `projects/P<NN>-*.md` (per-project
+files). When the user mentions a project, plan, milestone, or
+backlog, route through one of:
+
+- `using-project-harness` — bootstrap and orientation
+- `project-next` — what's in progress / next / recently touched
+- `project-add` — capture an idea (≤4 questions, atomic ID reserve)
+- `project-refine` — flesh out / scope / decompose / refine
+  references
+- `project-audit` — verify state matches conventions; fix per
+  finding
+
+**Schema (self-describing for external tools).** Trunk rows use
+the standard markdown-link format
+`- [<glyph>] **P<NN>** — [<title>](projects/P<NN>-<slug>.md)`.
+Every non-`[?]` per-project file has a `**References**` block at
+the top whose first bullet is
+`- **Trunk:** [PROJECTS.md](../PROJECTS.md)` — the back-pointer
+to the trunk — followed by canonical labels (`Spec`, `Design`,
+`Plan`, `Depends on`, `Successor of`, `Tracking`, `Discussion`,
+`Prior art`). Bidirectional links mean a tool that lands on
+either file can navigate to the other without prior knowledge of
+the conventions. See project-audit's references-block format
+(project-audit skill, project-harness plugin) for the full format
+and the discovery helper.
