@@ -57,3 +57,4 @@ file plus those.
 - [?] **P10** — [Core domain depth and API contract snapshots](projects/P10-core-domain-depth-and-api-contract-snapshots-.md) — Add getProject, strict HTTP envelope, pagination, idempotency, and tRPC diff
 - [?] **P11** — [CLI v4 noun-verb and config modernization](projects/P11-cli-v4-noun-verb-and-config-modernization-.md) — Add config init/get/set, doctor bundle, completion, layered config, and pager
 - [?] **P12** — [AI-readiness simplification and review workflows](projects/P12-ai-readiness-simplification-and-review-workflows-.md) — Refresh AGENTS.md hub, add CodeRabbit/Greptile/Claude workflows, and llms.txt
+- [?] **P13** — [Release runbook and governance docs polish](projects/P13-release-runbook-and-governance-docs-polish-.md) — Add PROJECT_SETUP, full RELEASE guide, ADRs, SECURITY/OSS kit, logos and badges
