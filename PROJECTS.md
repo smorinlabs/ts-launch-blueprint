@@ -55,3 +55,4 @@ file plus those.
 - [?] **P08** — [Testing resilience and web browser E2E](projects/P08-testing-resilience-and-web-browser-e2e-.md) — Add Vitest shuffle, fast-check properties, CLI snapshots, and Playwright E2E
 - [?] **P09** — [Production API hardening and GHCR container publish](projects/P09-production-api-hardening-and-ghcr-container-publish-.md) — Add secure headers, CORS, rate limit, readyz, Dockerfile cache, and GHCR deploy
 - [?] **P10** — [Core domain depth and API contract snapshots](projects/P10-core-domain-depth-and-api-contract-snapshots-.md) — Add getProject, strict HTTP envelope, pagination, idempotency, and tRPC diff
+- [?] **P11** — [CLI v4 noun-verb and config modernization](projects/P11-cli-v4-noun-verb-and-config-modernization-.md) — Add config init/get/set, doctor bundle, completion, layered config, and pager
