@@ -50,3 +50,4 @@ file plus those.
 - [?] **P03** — [Slim PR CI and add cross-OS matrix](projects/P03-slim-pr-ci-and-add-cross-os-matrix-.md) — Add merge_group, PR concurrency, change fast paths, ci-ok gate, and 3-OS matrix
 - [?] **P04** — [Secret scanning and scheduled dependency audits](projects/P04-secret-scanning-and-scheduled-dependency-audits-.md) — Add gitleaks, TruffleHog CI, weekly dep-audit, canary, and CodeQL/Dependabot
 - [?] **P05** — [Hook and CI quality gate parity](projects/P05-hook-and-ci-quality-gate-parity-.md) — Mirror commitlint, large-file, codespell, EditorConfig, and lockfile/TOML gates
+- [?] **P06** — [Turnkey toolchains and unified local setup](projects/P06-turnkey-toolchains-and-unified-local-setup-.md) — Add mise, flox, devcontainer, make bootstrap, just setup, and Justfile DX fixes
