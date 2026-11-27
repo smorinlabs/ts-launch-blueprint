@@ -52,3 +52,4 @@ file plus those.
 - [?] **P05** — [Hook and CI quality gate parity](projects/P05-hook-and-ci-quality-gate-parity-.md) — Mirror commitlint, large-file, codespell, EditorConfig, and lockfile/TOML gates
 - [?] **P06** — [Turnkey toolchains and unified local setup](projects/P06-turnkey-toolchains-and-unified-local-setup-.md) — Add mise, flox, devcontainer, make bootstrap, just setup, and Justfile DX fixes
 - [?] **P07** — [Template-press fork guard and bootstrap skill](projects/P07-template-press-fork-guard-and-bootstrap-skill-.md) — Add guard.sh, CI bootstrap acceptance, press cleanups, and new-ts-project skill
+- [?] **P08** — [Testing resilience and web browser E2E](projects/P08-testing-resilience-and-web-browser-e2e-.md) — Add Vitest shuffle, fast-check properties, CLI snapshots, and Playwright E2E
