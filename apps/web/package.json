@@ -9,10 +9,10 @@
     "dev": "vite"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.105.0",
-    "@trpc/client": "11.19.0",
-    "@trpc/server": "11.19.0",
-    "@trpc/tanstack-react-query": "11.19.0",
+    "@tanstack/react-query": "^5.108.4",
+    "@trpc/client": "11.31.2",
+    "@trpc/server": "11.31.2",
+    "@trpc/tanstack-react-query": "11.31.2",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
@@ -22,7 +22,7 @@
     "@ts-launch-blueprint/core": "workspace:*",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "6.1.2",
+    "@vitejs/plugin-react": "6.3.0",
     "jsdom": "30.1.3"
   }
 }
