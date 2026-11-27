@@ -2,12 +2,12 @@
 
 Run coverage thresholds, Codecov OIDC, and pack-check smoke tests on every PR
 
-### Open questions
-
-- Should Codecov OIDC upload run on Node `24.x` only (matching Py's `ubuntu / 3.13` single-cell upload) and skip cleanly on forks/private repos without tokens?
-- Should `vitest.config.ts` emit `lcov` + `html` + `text` reporters so Codecov and a local `just open-coverage-report` recipe share one output directory?
-
 ### Notes
+
+**Decisions (2026-11-27):**
+
+- **Q2.A:** Target package for `pack-check` and npm publishing is `apps/cli` (`ts-launch-blueprint`) only; `packages/core` stays private and bundled.
+- **Defaults:** Upload Codecov OIDC on Node `24.x` only (skipping cleanly without token on forks/private repos), configure `lcov`/`html`/`text` reporters in `vitest.config.ts` alongside `just open-coverage-report`, and finish with a `ci-fix --optimize` closeout pass.
 
 Closes two silent CI wiring bugs vs `py-launch-blueprint` (`v4.2.0`) and `docs/port/TS_PORT_DECISIONS.md`:
 

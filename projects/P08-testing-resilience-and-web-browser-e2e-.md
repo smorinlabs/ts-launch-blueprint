@@ -2,12 +2,13 @@
 
 Add Vitest shuffle, fast-check properties, CLI snapshots, and Playwright E2E
 
-### Open questions
-
-- Should Playwright browser E2E run in `ci.yml` on every web/API PR (with Chromium browser caching) or as a dedicated path-gated job?
-- Should CLI `--help` snapshot tests wait until `P11` (CLI v4 modernization) or land now to lock down current `ts-projects` help output and make `P11` diffs explicit?
-
 ### Notes
+
+**Decisions (2026-11-27):**
+
+- **Q6.A:** Run Playwright Chromium E2E (`web-e2e` on `ubuntu-latest`, Chromium-only, cached, guarded on `apps/web` presence for `check-removable web`) on every PR touching `apps/web`, `apps/api`, `packages/core`, or manifests/lockfile plus `main` pushes, gated into `ci-ok`.
+- **Q3.A:** Land CLI `--help` golden snapshots in `P08` to lock current help output so `P11`'s clean noun-verb cutover diffs explicitly in review.
+- Finish with a `ci-fix --optimize` closeout pass (especially tuning Playwright browser caching and runtime).
 
 Ports Py ADR 0019 testing practices and completes TS's own deferred web E2E ticket (`P4-3`, noted in `D-054(9)` and `docs/about/architecture.md:234`):
 

@@ -5,10 +5,13 @@ Add secure headers, CORS, rate limit, readyz, Dockerfile cache, and GHCR deploy
 ### Open questions
 
 - For rate limiting in Hono (in-memory default for single-instance demo, pluggable store for multi-replica), prefer `hono-rate-limiter` or a minimal zero-dep token-bucket middleware?
-- Should `apps/api/Dockerfile` pin `node:24-slim` by digest (follow-up noted in `D-050(5)`) and let Dependabot Docker ecosystem refresh it?
-- Should non-tRPC HTTP error responses (`404`, `429`, `500`, `503`) adopt RFC 9457 `application/problem+json` (matching Py WEB-01) while keeping tRPC procedures on standard tRPC JSON envelopes (`D-049`)?
 
 ### Notes
+
+**Decisions (2026-11-27):**
+
+- **Defaults:** Return RFC 9457 `application/problem+json` on non-tRPC HTTP errors (`404`, `429`, `500`, `503`) while keeping tRPC procedures on `D-049` JSON envelopes. Pin `apps/api/Dockerfile` `node:24-slim` by digest and add the `docker` ecosystem to `.github/dependabot.yml`.
+- Finish with a `ci-fix --optimize` closeout pass.
 
 Closes the production web-service gaps between `apps/api` and Py's FastAPI service (`docs/design/0002`, ADR 0013):
 

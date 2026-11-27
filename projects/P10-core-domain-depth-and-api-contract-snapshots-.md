@@ -2,13 +2,13 @@
 
 Add getProject, strict HTTP envelope, pagination, idempotency, and tRPC diff
 
-### Open questions
-
-- Should pagination use cursor-based pagination (anticipated by `D-047`'s `{ projects }` wrapper) or page/size pagination (matching Py's `fastapi-pagination`)?
-- Should a max `limit` cap live in `ListProjectsInputSchema` (shared with CLI) or only in an API input wrapper (`D-047` / `D-048(5)`)?
-- Should `Idempotency-Key` middleware ship alongside a first example mutation procedure (e.g. `projects.create`) or as a standalone reusable middleware tested against a fixture route?
-
 ### Notes
+
+**Decisions (2026-11-27):**
+
+- **Q7.A:** Use cursor-based pagination (`cursor?: string` -> `{ projects, nextCursor: string | null }`), extending `D-047` additively, with the max `limit` ceiling enforced in `apps/api` only (leaving `packages/core` and `apps/cli` uncapped).
+- **Q8.A:** Mount standalone `Idempotency-Key` Hono middleware (`POST`/`PUT`/`PATCH`, TTL + LRU, `Idempotency-Replayed: true`) on `apps/api` and verify against fixture `POST` and tRPC mutation routes; keep `packages/core` read-only (`listProjects` + `getProject`).
+- Finish with a `ci-fix --optimize` closeout pass.
 
 Closes domain, validation, and contract-governance gaps across `packages/core` and `apps/api`:
 

@@ -2,13 +2,14 @@
 
 Add PROJECT_SETUP, full RELEASE guide, ADRs, SECURITY/OSS kit, logos and badges
 
-### Open questions
-
-- Which workspace packages should publish to npm when unpausing `D-045` (`apps/cli` only, `packages/core` + `apps/cli`, or template-only)?
-- Should `ts-launch-blueprint` also enroll in Anthropic OSS Scanner (`.oss-scanner/Dockerfile`, `threat_model.md`, matching Py `P09`)?
-- Keep stock `googleapis/release-please-action` (`D-021(1)`) or port Py's custom Bun release runner (`scripts/release_please.cjs`) for local `RELEASE_PLEASE_APPLY=0` previews?
-
 ### Notes
+
+**Decisions (2026-11-27):**
+
+- **Q2.A:** Publish `apps/cli` (`ts-launch-blueprint`) only when unpausing `D-045` (re-enable `v*` trigger on `.github/workflows/publish.yml`); keep `packages/core` private and bundled.
+- **Q11.C:** Include `.oss-scanner/{Dockerfile,threat_model.md}` (with `[[remove]]` rules in `press/press-rules.toml`) alongside the upgraded `.github/SECURITY.md`.
+- **Default:** Keep stock `googleapis/release-please-action` (`D-021(1)`).
+- Finish with a lightweight CI check confirming docs/governance changes stay fast and clean.
 
 Closes remaining documentation, release-ops, governance, and brand maturity gaps vs Py `v4.2.0`:
 

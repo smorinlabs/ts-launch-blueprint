@@ -4,10 +4,14 @@ Refresh AGENTS.md hub, add CodeRabbit/Greptile/Claude workflows, and llms.txt
 
 ### Open questions
 
-- Retire `.cursor/rules/` and `.windsurf/rules/` spokes (following Py ADR 0014 / SIMP-02, since Cursor, Windsurf, and Codex read `AGENTS.md` natively) or retain them with synced references?
 - Ship a Codex repo-local plugin marketplace (`.agents/plugins/marketplace.json`) for TS toolchain skills (e.g. `oxc`/`pnpm`/`vitest`), or wait for upstream TS skill plugins?
 
 ### Notes
+
+**Decisions (2026-11-27):**
+
+- **Q10.A:** Make `AGENTS.md` the sole canonical agent guide, collapse `CLAUDE.md` to `@AGENTS.md` (7 lines, enforced by a meta-test), and delete `.cursor/rules/` and `.windsurf/rules/` after folding their Justfile and doc-template conventions into `AGENTS.md` (Py ADR 0014).
+- Finish with a `ci-fix --optimize` closeout pass.
 
 Ports Py `P02` (SIMP-02 / ADR 0014), AI code-review ecosystem, and LLM discovery files:
 

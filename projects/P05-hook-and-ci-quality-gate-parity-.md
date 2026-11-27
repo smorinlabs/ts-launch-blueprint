@@ -4,12 +4,15 @@ Mirror commitlint, large-file, codespell, EditorConfig, and lockfile/TOML gates
 
 ### Open questions
 
-- Keep TS's strict `50/72` header/body limits in `commitlint.config.mjs` (D-020(2)) or relax `body-max-line-length` and `footer-max-line-length` to `200` (matching Py) so commit bodies with URLs do not fail?
-- For spelling, adopt `codespell` (cross-repo parity with Py) or a JS/TS-native tool (`cspell`) to avoid a Python runtime requirement for local lint?
 - For the 3 `press/*.toml` files, enable `oxfmt` TOML support in `lefthook.yml`, adopt `taplo`, or verify `oxfmt` handles TOML natively and update `docs/tools/formatting.md`?
 - Is `yamllint` (semantic YAML checks like duplicate keys/truthy values) worth adding alongside `oxfmt` YAML formatting?
 
 ### Notes
+
+**Decisions (2026-11-27):**
+
+- **Q9.A:** Adopt Node-native `cspell` (`pnpm` devDependency + `cspell.json` shared with the recommended VS Code extension) across `lefthook.yml`, `Justfile`, and CI. Relax `commitlint.config.mjs` to Py parity (`header-max-length: 100`, `body-max-line-length: 200`, `footer-max-line-length: 200`, superseding `D-020(2)`'s `50/72` clause while keeping `type-enum` synced with `.gitmessage`), plus `commitlint.dependabot.config.mjs` for CI.
+- Finish with a `ci-fix --optimize` closeout pass.
 
 Closes Py ADR 0018 (hook <-> CI parity) and repo-hygiene drift in `ts-launch-blueprint`:
 

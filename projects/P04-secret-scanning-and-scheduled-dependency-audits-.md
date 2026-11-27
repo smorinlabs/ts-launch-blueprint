@@ -5,9 +5,13 @@ Add gitleaks, TruffleHog CI, weekly dep-audit, canary, and CodeQL/Dependabot
 ### Open questions
 
 - Should `dep-audit.yml` run `pnpm audit --audit-level=high`, `osv-scanner`, or both on the weekly schedule, and should it also check external docs links like Py's `weekly-audit`?
-- Should automated Muse audit triage (`audit-triage.yml`, `.github/scripts/muse_audit_triage.py`, `.github/muse-audit-triage/`) be included here, deferred to `P13`, or kept Py-only?
 
 ### Notes
+
+**Decisions (2026-11-27):**
+
+- **Q11.C:** Include automated Muse audit triage (`.github/workflows/audit-triage.yml`, `.github/scripts/muse_audit_triage.py`, `.github/muse-audit-triage/`), gated on `vars.MUSE_CI_ENABLED == 'true'`, org ownership, and `META_MUSE_CI_API_KEY`.
+- Finish with a `ci-fix --optimize` closeout pass.
 
 Ports Py's two-layer secret scanning (ADR-02), scheduled vulnerability monitoring (`dep-audit.yml`, `canary.yml`), and CodeQL/Dependabot hardening:
 

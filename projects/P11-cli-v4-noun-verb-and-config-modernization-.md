@@ -2,14 +2,16 @@
 
 Add config init/get/set, doctor bundle, completion, layered config, and pager
 
-### Open questions
-
-- Keep bare `ts-projects` as the default interactive multi-select alias alongside `ts-projects projects list` / `ts-projects projects get <id>`, or break cleanly to `plbp`-style noun-verb subcommands only?
-- Keep `token` allowed in `0600` user TOML config (current `D-017(1,6)` per `cli-standards` R5.1) or align with Py ADR 0002 (forbid secrets in config files)?
-- Keep `~/.config/<tool>` on Windows (`D-017(3)`) or switch to Windows-native `%APPDATA%`/`%LOCALAPPDATA%` (Py ADR 0011)?
-- Keep `--output` as file sink (`D-033`) or align with Py's `-o/--output <format>` + `--output-file <path>`?
-
 ### Notes
+
+**Decisions (2026-11-27):**
+
+- **Q3.A:** Clean pre-1.0 cutover to a pure `plbp`-style noun-verb hierarchy (`projects list`, `projects get <id>`, `config init|path|get|set`, `doctor [--bundle]`, `completion {bash,zsh,fish}`), with bare `ts-projects` printing help and `projects list` retaining interactive multi-select in TTY mode.
+- **Q4.A:** Align all three CLI contract seams with Py v4 and `cli-standards` (superseding `D-017(1,3)` and `D-033`):
+  - Tokens resolve from `--token` > `TS_PROJECTS_TOKEN` only (never stored in or read from TOML; `0600` file mode kept as defense-in-depth per Py ADR 0002).
+  - `XDG_*` env vars win on all platforms; POSIX/macOS defaults stay `~/.config/ts-projects`, while Windows defaults use `%APPDATA%`/`%LOCALAPPDATA%`/`%PROGRAMDATA%` (Py ADR 0011).
+  - Global `-o/--output {text,json,csv,markdown}`, `--json`, and `--output-file <path>` across all subcommands.
+- Finish with a `ci-fix --optimize` closeout pass.
 
 Largest single-area maturity gap: `apps/cli` ported pre-v3 `py-projects`, whereas Py `v4.2.0` ships the full `gh`-style `plbp` CLI (`docs/design/0001`, ADRs 0003–0012):
 

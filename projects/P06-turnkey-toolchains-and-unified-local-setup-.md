@@ -4,10 +4,15 @@ Add mise, flox, devcontainer, make bootstrap, just setup, and Justfile DX fixes
 
 ### Open questions
 
-- Should `Justfile` port Py's GitHub Actions test-repo trio (`pr-to-testrepo`, `clean-pr-to-testrepo`, `create-test-pr`) as planned in D-024(1), or formally supersede that clause of D-024(1)?
 - Should `just api` gain a watch/reload dev mode (`tsx watch` or `node --watch`) alongside the built-bundle mode?
 
 ### Notes
+
+**Decisions (2026-11-27):**
+
+- **Default:** Formally supersede `D-024(1)`'s unimplemented GitHub Actions test-repo Justfile trio (`pr-to-testrepo`, `clean-pr-to-testrepo`, `create-test-pr`) rather than porting it.
+- Because `P05` adopted Node-native `cspell` (Q9.A), `mise.toml`/`.flox/` need no `codespell` Python binary.
+- Finish with a `ci-fix --optimize` closeout pass.
 
 Ports Py ADR 0005 (`mise` + `flox`), `.devcontainer/`, two-level bootstrap (`make bootstrap` -> `just setup`), and fixes local `Justfile`/`Makefile` drift:
 
