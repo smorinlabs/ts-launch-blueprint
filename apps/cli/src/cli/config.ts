@@ -17,11 +17,11 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { AuthError } from '@ts-launch-blueprint/core';
+import { AuthError, ConfigError } from '@ts-launch-blueprint/core';
 import { parse, stringify } from 'smol-toml';
 import { z } from 'zod';
 
-import { ConfigError, UsageError } from './exit-codes.js';
+import { UsageError } from './exit-codes.js';
 import { configDir } from './xdg-paths.js';
 
 /** Canonical config file name (cli-standards R5.1, D-029). */

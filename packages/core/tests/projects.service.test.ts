@@ -11,7 +11,12 @@ import type {
   ListProjectsQuery,
   ProjectsRepository,
 } from '../src/repositories/projects.repository.js';
-import { NotFoundError } from '../src/schemas/errors.js';
+import {
+  ERROR_CODES,
+  NotFoundError,
+  ProjectNotFoundError,
+  WorkspaceNotFoundError,
+} from '../src/schemas/errors.js';
 import { createProjectsService, DEFAULT_LIMIT } from '../src/services/projects.service.js';
 
 /** The in-memory repository, wrapped to count and record calls. */
@@ -54,15 +59,15 @@ describe('projects service: listProjects', () => {
     expect(projects.every((project) => project.workspace?.name === 'Engineering')).toBe(true);
   });
 
-  it('throws NotFoundError with the exact message for an unknown name', async () => {
+  it('throws WorkspaceNotFoundError (extending NotFoundError, TS006) for an unknown name', async () => {
     const service = createProjectsService({ repository: createInMemoryProjectsRepository() });
     const failure = service.listProjects({ workspaceName: 'Nope' });
     await expect(failure).rejects.toBeInstanceOf(NotFoundError);
-    await expect(
-      createProjectsService({ repository: createInMemoryProjectsRepository() }).listProjects({
-        workspaceName: 'Nope',
-      })
-    ).rejects.toThrow(/^Workspace not found: Nope$/);
+    await expect(failure).rejects.toBeInstanceOf(WorkspaceNotFoundError);
+    await expect(failure).rejects.toMatchObject({
+      code: ERROR_CODES.workspaceNotFound,
+      message: 'Workspace not found: Nope',
+    });
   });
 
   it.each([
@@ -125,11 +130,14 @@ describe('projects service: getProject', () => {
     expect(spy.getProjectIds).toEqual(['p-1']);
   });
 
-  it('throws NotFoundError when repository returns null', async () => {
+  it('throws ProjectNotFoundError (extending NotFoundError, TS005) when repository returns null', async () => {
     const service = createProjectsService({ repository: createInMemoryProjectsRepository() });
-    await expect(service.getProject('missing-id')).rejects.toBeInstanceOf(NotFoundError);
-    await expect(service.getProject('missing-id')).rejects.toThrow(
-      /^Project not found: missing-id$/
-    );
+    const failure = service.getProject('missing-id');
+    await expect(failure).rejects.toBeInstanceOf(NotFoundError);
+    await expect(failure).rejects.toBeInstanceOf(ProjectNotFoundError);
+    await expect(failure).rejects.toMatchObject({
+      code: ERROR_CODES.projectNotFound,
+      message: 'Project not found: missing-id',
+    });
   });
 });

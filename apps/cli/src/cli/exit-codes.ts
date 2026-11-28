@@ -11,7 +11,14 @@
 // token, 3 for API errors, 4 for unexpected exceptions. The port adopts
 // the normative cli-standards ladder instead; the mapping table lives in
 // EXAMPLECLI.md.
-import { AuthError, ConflictError, NotFoundError } from '@ts-launch-blueprint/core';
+import {
+  AuthError,
+  ConfigError,
+  ConflictError,
+  type ErrorCode,
+  InterruptError,
+  NotFoundError,
+} from '@ts-launch-blueprint/core';
 
 /** Exit codes per cli-standards R6.1 (D-016(2)). */
 export const EXIT_CODES = {
@@ -28,29 +35,36 @@ export const EXIT_CODES = {
 /** Union of the R6.1 exit-code values. */
 export type ExitCode = (typeof EXIT_CODES)[keyof typeof EXIT_CODES];
 
+/** Optional structured metadata accepted by CliError and UsageError. */
+export interface CliErrorOptions {
+  readonly hint?: string | undefined;
+  readonly code?: ErrorCode | undefined;
+  readonly cause?: unknown;
+}
+
 /** Base class for all CLI errors that carry an exit code. */
 export class CliError extends Error {
   readonly exitCode: ExitCode;
+  readonly hint?: string | undefined;
+  readonly code?: ErrorCode | undefined;
 
-  constructor(message: string, exitCode: ExitCode = EXIT_CODES.error) {
-    super(message);
+  constructor(message: string, exitCode: ExitCode = EXIT_CODES.error, options?: CliErrorOptions) {
+    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
     this.name = 'CliError';
     this.exitCode = exitCode;
-  }
-}
-
-/** Configuration-related errors (bad file, bad schema) -> exit 1. */
-export class ConfigError extends CliError {
-  constructor(message: string) {
-    super(message, EXIT_CODES.error);
-    this.name = 'ConfigError';
+    if (options?.hint !== undefined) {
+      this.hint = options.hint;
+    }
+    if (options?.code !== undefined) {
+      this.code = options.code;
+    }
   }
 }
 
 /** Usage errors (bad flag/argument, nonexistent --config path) -> exit 2. */
 export class UsageError extends CliError {
-  constructor(message: string) {
-    super(message, EXIT_CODES.usage);
+  constructor(message: string, options?: CliErrorOptions) {
+    super(message, EXIT_CODES.usage, options);
     this.name = 'UsageError';
   }
 }
@@ -60,6 +74,9 @@ export function exitCodeFor(err: unknown): ExitCode {
   if (err instanceof CliError) {
     return err.exitCode;
   }
+  if (err instanceof InterruptError) {
+    return EXIT_CODES.sigint;
+  }
   if (err instanceof NotFoundError) {
     return EXIT_CODES.notFound;
   }
@@ -68,6 +85,9 @@ export function exitCodeFor(err: unknown): ExitCode {
   }
   if (err instanceof ConflictError) {
     return EXIT_CODES.conflict;
+  }
+  if (err instanceof ConfigError) {
+    return EXIT_CODES.error;
   }
   // ApiError and unexpected exceptions -> 1 (source used 4 for unexpected;
   // R6.1 reserves 4 for auth).

@@ -11,7 +11,14 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } fr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { AuthError, ConflictError, DomainError, NotFoundError } from '@ts-launch-blueprint/core';
+import {
+  AuthError,
+  ConfigError,
+  ConflictError,
+  DomainError,
+  ERROR_CODES,
+  NotFoundError,
+} from '@ts-launch-blueprint/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -23,13 +30,7 @@ import {
   TOKEN_ENV_VAR,
   writeUserConfig,
 } from '../src/cli/config.js';
-import {
-  CliError,
-  ConfigError,
-  EXIT_CODES,
-  exitCodeFor,
-  UsageError,
-} from '../src/cli/exit-codes.js';
+import { CliError, EXIT_CODES, exitCodeFor, UsageError } from '../src/cli/exit-codes.js';
 import { configDir } from '../src/cli/xdg-paths.js';
 
 const tempDirs: string[] = [];
@@ -187,6 +188,9 @@ describe('config file quality errors', () => {
       caught = err;
     }
     expect(caught).toBeInstanceOf(ConfigError);
+    expect(caught).toBeInstanceOf(DomainError);
+    expect(caught).not.toHaveProperty('exitCode');
+    expect((caught as ConfigError).code).toBe(ERROR_CODES.config);
     const message = (caught as ConfigError).message;
     expect(message).toContain('Invalid TOML');
     expect(message).toContain(path);
@@ -202,6 +206,9 @@ describe('config file quality errors', () => {
       caught = err;
     }
     expect(caught).toBeInstanceOf(ConfigError);
+    expect(caught).toBeInstanceOf(DomainError);
+    expect(caught).not.toHaveProperty('exitCode');
+    expect((caught as ConfigError).code).toBe(ERROR_CODES.config);
     const message = (caught as ConfigError).message;
     expect(message).toContain(path);
     expect(message).toContain('limit');

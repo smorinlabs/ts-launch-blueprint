@@ -2,7 +2,7 @@
 // calls (the CLI and the API). It reaches data only through a
 // ProjectsRepository, so it runs the same over HTTP or in-memory data.
 import type { ProjectsRepository } from '../repositories/projects.repository.js';
-import { NotFoundError } from '../schemas/errors.js';
+import { ProjectNotFoundError, WorkspaceNotFoundError } from '../schemas/errors.js';
 import type { Project } from '../schemas/project.schema.js';
 import type { ListProjectsOutput } from '../schemas/projects.contract.js';
 
@@ -41,7 +41,7 @@ export function createProjectsService(deps: { repository: ProjectsRepository }):
           (candidate) => candidate.name.toLowerCase() === workspaceName.toLowerCase()
         );
         if (workspace === undefined) {
-          throw new NotFoundError(`Workspace not found: ${workspaceName}`);
+          throw new WorkspaceNotFoundError(`Workspace not found: ${workspaceName}`);
         }
         workspaceGid = workspace.gid;
       }
@@ -55,7 +55,7 @@ export function createProjectsService(deps: { repository: ProjectsRepository }):
     async getProject(id: string): Promise<Project> {
       const project = await repository.getProject(id);
       if (project === null) {
-        throw new NotFoundError(`Project not found: ${id}`);
+        throw new ProjectNotFoundError(`Project not found: ${id}`);
       }
       return project;
     },
