@@ -143,6 +143,7 @@ export function idempotency(options: IdempotencyOptions = {}): MiddlewareHandler
   const maxEntries = options.maxEntries ?? DEFAULT_IDEMPOTENCY_MAX_ENTRIES;
   const now = options.now ?? ((): number => performance.now());
   const store = new Map<string, CacheEntry>();
+  const inFlight = new Map<string, Promise<CacheEntry | null>>();
 
   return async (c, next) => {
     const method = c.req.method.toUpperCase();
@@ -154,61 +155,94 @@ export function idempotency(options: IdempotencyOptions = {}): MiddlewareHandler
 
     const url = new URL(c.req.url);
     const cacheKey = JSON.stringify([method, url.pathname, url.search, key]);
-    const currentTime = now();
     const preHeaders = [...c.res.headers.entries()];
 
-    const cached = store.get(cacheKey);
-    if (cached !== undefined) {
-      if (currentTime - cached.storedAt < ttlMs) {
-        store.delete(cacheKey);
-        store.set(cacheKey, cached);
-        const replayHeaders = buildReplayHeaders(preHeaders, cached.headers);
-        replayHeaders.set(REPLAYED_HEADER, 'true');
-        for (const [name] of preHeaders) {
-          c.res.headers.delete(name);
+    let entry: CacheEntry | undefined;
+    while (true) {
+      const cached = store.get(cacheKey);
+      if (cached !== undefined) {
+        if (now() - cached.storedAt < ttlMs) {
+          store.delete(cacheKey);
+          store.set(cacheKey, cached);
+          entry = cached;
+          break;
         }
-        c.header(REPLAYED_HEADER, undefined);
-        c.res = new Response(responseBodyFor(cached.status, cached.body), {
-          status: cached.status,
-          headers: replayHeaders,
-        });
-        return;
+        store.delete(cacheKey);
       }
-      store.delete(cacheKey);
+
+      const pending = inFlight.get(cacheKey);
+      if (pending !== undefined) {
+        const settled = await pending;
+        if (settled !== null) {
+          entry = settled;
+          break;
+        }
+        continue;
+      }
+
+      break;
     }
 
-    await next();
-
-    const original = c.res;
-    const body = NULL_BODY_STATUSES.has(original.status)
-      ? new ArrayBuffer(0)
-      : await original.arrayBuffer();
-    const initialHeaderPairs = [...original.headers.entries()].filter(
-      ([name]) => name.toLowerCase() !== REPLAYED_HEADER.toLowerCase()
-    );
-    const cacheHeaderPairs = extractRouteHeaders(initialHeaderPairs, preHeaders);
-    const rebuiltHeaders = buildHeaders(initialHeaderPairs);
-    c.header(REPLAYED_HEADER, undefined);
-    c.res = new Response(responseBodyFor(original.status, body), {
-      status: original.status,
-      headers: rebuiltHeaders,
-    });
-    c.res.headers.delete(REPLAYED_HEADER);
-
-    if (original.status >= 200 && original.status < 300 && maxEntries > 0) {
-      store.delete(cacheKey);
-      store.set(cacheKey, {
-        storedAt: now(),
-        status: original.status,
-        headers: cacheHeaderPairs,
-        body,
-      });
-      while (store.size > maxEntries) {
-        const oldest = store.keys().next().value;
-        if (oldest !== undefined) {
-          store.delete(oldest);
-        }
+    if (entry !== undefined) {
+      const replayHeaders = buildReplayHeaders(preHeaders, entry.headers);
+      replayHeaders.set(REPLAYED_HEADER, 'true');
+      for (const [name] of preHeaders) {
+        c.res.headers.delete(name);
       }
+      c.header(REPLAYED_HEADER, undefined);
+      c.res = new Response(responseBodyFor(entry.status, entry.body), {
+        status: entry.status,
+        headers: replayHeaders,
+      });
+      return;
+    }
+
+    let resolvePending!: (value: CacheEntry | null) => void;
+    const pendingPromise = new Promise<CacheEntry | null>((resolve) => {
+      resolvePending = resolve;
+    });
+    inFlight.set(cacheKey, pendingPromise);
+
+    let settledEntry: CacheEntry | null = null;
+    try {
+      await next();
+
+      const original = c.res;
+      const body = NULL_BODY_STATUSES.has(original.status)
+        ? new ArrayBuffer(0)
+        : await original.arrayBuffer();
+      const initialHeaderPairs = [...original.headers.entries()].filter(
+        ([name]) => name.toLowerCase() !== REPLAYED_HEADER.toLowerCase()
+      );
+      const cacheHeaderPairs = extractRouteHeaders(initialHeaderPairs, preHeaders);
+      const rebuiltHeaders = buildHeaders(initialHeaderPairs);
+      c.header(REPLAYED_HEADER, undefined);
+      c.res = new Response(responseBodyFor(original.status, body), {
+        status: original.status,
+        headers: rebuiltHeaders,
+      });
+      c.res.headers.delete(REPLAYED_HEADER);
+
+      if (original.status >= 200 && original.status < 300 && maxEntries > 0) {
+        const newEntry: CacheEntry = {
+          storedAt: now(),
+          status: original.status,
+          headers: cacheHeaderPairs,
+          body,
+        };
+        store.delete(cacheKey);
+        store.set(cacheKey, newEntry);
+        while (store.size > maxEntries) {
+          const oldest = store.keys().next().value;
+          if (oldest !== undefined) {
+            store.delete(oldest);
+          }
+        }
+        settledEntry = newEntry;
+      }
+    } finally {
+      inFlight.delete(cacheKey);
+      resolvePending(settledEntry);
     }
   };
 }

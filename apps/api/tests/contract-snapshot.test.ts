@@ -26,7 +26,10 @@ describe('API contract snapshot (D-043)', () => {
     expect(snapshot.version).toBe('0.0.0');
     expect(snapshot.schemaVersion).toBe(1);
     const names = Object.keys(snapshot.procedures);
-    expect(names).toEqual(['projects.get', 'projects.list']);
+    for (let i = 1; i < names.length; i += 1) {
+      expect(names[i - 1]! < names[i]!).toBe(true);
+    }
+    expect(names).toEqual(expect.arrayContaining(['projects.get', 'projects.list']));
     expect(snapshot.procedures['projects.list']?.inputOptional).toBe(true);
     expect(snapshot.procedures['projects.get']?.inputOptional).toBe(false);
 

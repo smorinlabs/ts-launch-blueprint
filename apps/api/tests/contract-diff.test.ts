@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import {
   type ApiContractSnapshot,
+  assertValidApiContractSnapshot,
   buildApiContractSnapshot,
   detectBreakingContractChanges,
 } from '../src/contract.js';
@@ -135,7 +136,7 @@ describe('detectBreakingContractChanges', () => {
         list: publicProcedure
           .input(
             z
-              .object({
+              .strictObject({
                 limit: z.number().int().positive().max(50).optional(),
               })
               .optional()
@@ -339,7 +340,7 @@ describe('detectBreakingContractChanges', () => {
     const head = router({
       items: router({
         op: publicProcedure
-          .input(z.object({ a: z.string() }))
+          .input(z.strictObject({ a: z.string() }))
           .output(z.object({ role: z.string() }))
           .query(() => ({ role: 'admin' })),
       }),
@@ -605,5 +606,308 @@ describe('detectBreakingContractChanges', () => {
     expect(diff.nonBreaking.some((m) => m.includes('allows additional properties'))).toBe(true);
     expect(diff.nonBreaking.some((m) => m.includes('output narrowed to enum'))).toBe(true);
     expect(diff.nonBreaking.some((m) => m.includes('output narrowed to const literal'))).toBe(true);
+  });
+
+  it('rejects chained input validators and exports request schemas in Zod input mode', () => {
+    const chained = router({
+      items: router({
+        op: publicProcedure
+          .input(z.object({ tenantId: z.string() }))
+          .input(z.object({ id: z.string() }))
+          .query(() => ({ ok: true })),
+      }),
+    });
+    expect(() => snapshotFrom(chained)).toThrow(/chains 2 input validators/);
+
+    const basePlain = router({
+      items: router({
+        op: publicProcedure
+          .input(z.object({ id: z.string(), count: z.number().default(1) }))
+          .query(() => ({ ok: true })),
+      }),
+    });
+    const headStrict = router({
+      items: router({
+        op: publicProcedure
+          .input(z.strictObject({ id: z.string(), count: z.number().default(1) }))
+          .query(() => ({ ok: true })),
+      }),
+    });
+    const baseSnap = snapshotFrom(basePlain);
+    expect(baseSnap.procedures['items.op']?.input).not.toHaveProperty(
+      'additionalProperties',
+      false
+    );
+    expect(baseSnap.procedures['items.op']?.input?.['required']).toEqual(['id']);
+    const diff = detectBreakingContractChanges(baseSnap, snapshotFrom(headStrict));
+    expect(diff.breaking.some((b) => b.reason.includes('additional properties'))).toBe(true);
+  });
+
+  it('handles null-only schemas, integer bound equivalence, patterns, catchalls, tuples, and output bounds', () => {
+    const base = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              nullIn: z.null(),
+              intMin: z.number().int().positive(),
+              floatMin: z.number().positive(),
+              idStr: z.string(),
+              samePattern: z.string().regex(/^[a-z]+$/),
+              tuple: z.tuple([z.string(), z.number()]),
+              loose: z.looseObject({ a: z.string() }),
+              catchall: z.object({ a: z.string() }).catchall(z.string()),
+            })
+          )
+          .output(
+            z.object({
+              nullOut: z.string().nullable(),
+              tags: z.array(z.string()).min(1).max(5),
+              label: z.string().min(2),
+              score: z.number().int().min(1),
+              tuple: z.tuple([z.string()]),
+            })
+          )
+          .query(() => ({
+            nullOut: null,
+            tags: ['a'],
+            label: 'ok',
+            score: 1,
+            tuple: ['x'],
+          })),
+      }),
+    });
+
+    const compatHead = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              nullIn: z.string().nullable(),
+              intMin: z.number().int().min(1),
+              floatMin: z.number().positive(),
+              idStr: z.string(),
+              samePattern: z.string().regex(/^[a-z]+$/),
+              tuple: z.tuple([z.string(), z.number()]),
+              loose: z.looseObject({ a: z.string() }),
+              catchall: z.object({ a: z.string() }).catchall(z.string()),
+            })
+          )
+          .output(
+            z.object({
+              nullOut: z.null(),
+              tags: z.array(z.string()).min(2).max(4),
+              label: z.string().min(3),
+              score: z.number().int().min(2),
+              tuple: z.tuple([z.string()]),
+            })
+          )
+          .query(() => ({
+            nullOut: null,
+            tags: ['a', 'b'],
+            label: 'abc',
+            score: 2,
+            tuple: ['x'],
+          })),
+      }),
+    });
+    expect(
+      detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(compatHead)).breaking
+    ).toEqual([]);
+
+    const breakingHead = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              nullIn: z.string(),
+              intMin: z.number().int().min(2),
+              floatMin: z.number().min(1),
+              idStr: z.string().regex(/^[0-9]+$/),
+              samePattern: z.string().regex(/^[a-z]+$/),
+              tuple: z.tuple([z.number(), z.number()]),
+              loose: z.looseObject({ a: z.string(), note: z.string().optional() }),
+              catchall: z.object({ a: z.string() }).catchall(z.number()),
+            })
+          )
+          .output(
+            z.object({
+              nullOut: z.string().nullable(),
+              tags: z.array(z.string()),
+              label: z.string().min(1),
+              score: z.number().int().min(0),
+              tuple: z.tuple([z.number()]),
+            })
+          )
+          .query(() => ({
+            nullOut: null,
+            tags: [],
+            label: 'a',
+            score: 0,
+            tuple: [1],
+          })),
+      }),
+    });
+    const bad = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(breakingHead));
+    expect(bad.breaking.some((b) => b.path === 'input.nullIn')).toBe(true);
+    expect(bad.breaking.some((b) => b.path === 'input.intMin')).toBe(true);
+    expect(bad.breaking.some((b) => b.path === 'input.floatMin')).toBe(true);
+    expect(bad.breaking.some((b) => b.path === 'input.idStr' && b.reason.includes('pattern'))).toBe(
+      true
+    );
+    expect(bad.breaking.some((b) => b.path === 'input.tuple[0]')).toBe(true);
+    expect(bad.breaking.some((b) => b.path === 'input.loose.note')).toBe(true);
+    expect(bad.breaking.some((b) => b.path === 'input.catchall.*')).toBe(true);
+    expect(
+      bad.breaking.some((b) => b.path === 'output.tags' && b.reason.includes('minItems'))
+    ).toBe(true);
+    expect(
+      bad.breaking.some((b) => b.path === 'output.label' && b.reason.includes('minLength'))
+    ).toBe(true);
+    expect(
+      bad.breaking.some((b) => b.path === 'output.score' && b.reason.includes('minimum'))
+    ).toBe(true);
+    expect(bad.breaking.some((b) => b.path === 'output.tuple[0]')).toBe(true);
+  });
+
+  it('validates snapshot document structure before comparison', () => {
+    expect(() =>
+      assertValidApiContractSnapshot(
+        { schemaVersion: 1, version: '0.0.0', procedures: {} },
+        'empty'
+      )
+    ).not.toThrow();
+    expect(() =>
+      assertValidApiContractSnapshot({ schemaVersion: 1, version: 1, procedures: {} }, 'bad')
+    ).toThrow(/expected string version/);
+    expect(() =>
+      assertValidApiContractSnapshot({ schemaVersion: 1, version: '0.0.0', procedures: [] }, 'bad')
+    ).toThrow(/expected procedures object/);
+    expect(() =>
+      assertValidApiContractSnapshot({ schemaVersion: 2, version: '0.0.0', procedures: {} }, 'bad')
+    ).toThrow(/unsupported schemaVersion/);
+    expect(() => assertValidApiContractSnapshot(null, 'bad')).toThrow(/expected JSON object/);
+    expect(() =>
+      assertValidApiContractSnapshot(
+        { schemaVersion: 1, version: '0.0.0', procedures: { p: null } },
+        'bad'
+      )
+    ).toThrow(/must be an object/);
+    expect(() =>
+      assertValidApiContractSnapshot(
+        { schemaVersion: 1, version: '0.0.0', procedures: { p: { type: 'rpc' } } },
+        'bad'
+      )
+    ).toThrow(/invalid type/);
+    expect(() =>
+      assertValidApiContractSnapshot(
+        {
+          schemaVersion: 1,
+          version: '0.0.0',
+          procedures: { p: { type: 'query', inputOptional: 'no' } },
+        },
+        'bad'
+      )
+    ).toThrow(/boolean inputOptional/);
+    expect(() =>
+      assertValidApiContractSnapshot(
+        {
+          schemaVersion: 1,
+          version: '0.0.0',
+          procedures: { p: { type: 'query', inputOptional: true, input: [] } },
+        },
+        'bad'
+      )
+    ).toThrow(/input must be an object or null/);
+    expect(() =>
+      assertValidApiContractSnapshot(
+        {
+          schemaVersion: 1,
+          version: '0.0.0',
+          procedures: { p: { type: 'query', inputOptional: true, input: null, output: 'bad' } },
+        },
+        'bad'
+      )
+    ).toThrow(/output must be an object or null/);
+  });
+
+  it('covers exclusiveMaximum integer equivalence, pattern removal, tuple arity, and output upper bounds', () => {
+    const base = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              intMax: z.number().int().lt(10),
+              pat: z.string().regex(/^[a-z]+$/),
+              tuple: z.tuple([z.string()]),
+            })
+          )
+          .output(
+            z.object({
+              intMax: z.number().int().max(10),
+              strMax: z.string().max(10),
+              arrMax: z.array(z.string()).max(5),
+              tuple: z.tuple([z.string()]),
+            })
+          )
+          .query(() => ({ intMax: 1, strMax: 'a', arrMax: [], tuple: ['x'] })),
+      }),
+    });
+
+    const compat = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              intMax: z.number().int().max(9),
+              pat: z.string(),
+              tuple: z.tuple([z.string()]),
+            })
+          )
+          .output(
+            z.object({
+              intMax: z.number().int().lt(10),
+              strMax: z.string().max(8),
+              arrMax: z.array(z.string()).max(4),
+              tuple: z.tuple([z.string()]),
+            })
+          )
+          .query(() => ({ intMax: 1, strMax: 'a', arrMax: [], tuple: ['x'] })),
+      }),
+    });
+    const compatDiff = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(compat));
+    expect(compatDiff.breaking).toEqual([]);
+    expect(compatDiff.nonBreaking.some((m) => m.includes('pattern removed'))).toBe(true);
+    expect(compatDiff.nonBreaking.some((m) => m.includes('output maximum tightened'))).toBe(true);
+
+    const broken = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              intMax: z.number().int().max(8),
+              pat: z.string().regex(/^[0-9]+$/),
+              tuple: z.tuple([z.string(), z.number()]),
+            })
+          )
+          .output(
+            z.object({
+              intMax: z.number().int().max(20),
+              strMax: z.string().max(20),
+              arrMax: z.array(z.string()),
+              tuple: z.tuple([z.string(), z.number()]),
+            })
+          )
+          .query(() => ({ intMax: 1, strMax: 'a', arrMax: [], tuple: ['x', 1] })),
+      }),
+    });
+    const brokenDiff = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(broken));
+    expect(brokenDiff.breaking.some((b) => b.path === 'input.intMax')).toBe(true);
+    expect(brokenDiff.breaking.some((b) => b.path === 'input.pat')).toBe(true);
+    expect(brokenDiff.breaking.some((b) => b.path === 'input.tuple')).toBe(true);
+    expect(brokenDiff.breaking.some((b) => b.path === 'output.intMax')).toBe(true);
+    expect(brokenDiff.breaking.some((b) => b.path === 'output.strMax')).toBe(true);
+    expect(brokenDiff.breaking.some((b) => b.path === 'output.arrMax')).toBe(true);
+    expect(brokenDiff.breaking.some((b) => b.path === 'output.tuple')).toBe(true);
   });
 });

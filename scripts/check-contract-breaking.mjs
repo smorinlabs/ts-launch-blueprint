@@ -2,7 +2,7 @@
 // Usage: pnpm exec tsx scripts/check-contract-breaking.mjs <base.json> <head.json>
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONTRACT_MODULE_PATH = resolve(REPO_ROOT, 'apps/api/src/contract.ts');
@@ -16,7 +16,11 @@ if (basePath === undefined || headPath === undefined) {
 const base = JSON.parse(readFileSync(basePath, 'utf8'));
 const head = JSON.parse(readFileSync(headPath, 'utf8'));
 
-const { detectBreakingContractChanges } = await import(CONTRACT_MODULE_PATH);
+const { assertValidApiContractSnapshot, detectBreakingContractChanges } = await import(
+  pathToFileURL(CONTRACT_MODULE_PATH).href
+);
+assertValidApiContractSnapshot(base, basePath);
+assertValidApiContractSnapshot(head, headPath);
 const { breaking, nonBreaking } = detectBreakingContractChanges(base, head);
 
 for (const item of nonBreaking) {

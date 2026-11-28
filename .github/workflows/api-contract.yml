@@ -50,7 +50,9 @@ jobs:
             git fetch origin "$BASE_REF" --depth=1
           fi
           snapshot="origin/$BASE_REF:docs/api/contract.snapshot.json"
-          if git show "$snapshot" > "$RUNNER_TEMP/base-contract.snapshot.json" 2>/dev/null; then
+          base_tree="$(git ls-tree --name-only "origin/$BASE_REF" -- docs/api/contract.snapshot.json)"
+          if [ -n "$base_tree" ]; then
+            git show "$snapshot" > "$RUNNER_TEMP/base-contract.snapshot.json"
             echo "base snapshot extracted"
           else
             # First PR to introduce the snapshot: nothing to diff against.

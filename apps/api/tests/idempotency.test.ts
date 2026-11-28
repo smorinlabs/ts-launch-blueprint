@@ -510,4 +510,78 @@ describe('idempotency middleware outer pre-next() header preservation', () => {
     expect(replay.headers.get('X-Mode')).toBe('inner');
     expect(replay.headers.get('X-Tags')).toBe('alpha, beta');
   });
+
+  it('coalesces concurrent overlapping requests sharing an Idempotency-Key and clears on failure', async () => {
+    let execCount = 0;
+    let unblockLeader!: () => void;
+    let signalLeaderStarted!: () => void;
+    const leaderStarted = new Promise<void>((r) => {
+      signalLeaderStarted = r;
+    });
+    const app2 = new Hono();
+    app2.use('*', idempotency());
+    app2.post('/items', async (c) => {
+      execCount += 1;
+      const n = execCount;
+      if (n === 1) {
+        signalLeaderStarted();
+        await new Promise<void>((r) => {
+          unblockLeader = r;
+        });
+        return c.json({ error: 'temporary' }, 500);
+      }
+      return c.json({ n }, 201);
+    });
+
+    const p1 = app2.request('/items', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'race-fail' },
+    });
+    await leaderStarted;
+    const p2 = app2.request('/items', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'race-fail' },
+    });
+    unblockLeader();
+    const [r1, r2] = await Promise.all([p1, p2]);
+    expect(r1.status).toBe(500);
+    expect(r2.status).toBe(201);
+    expect(r2.headers.get('Idempotency-Replayed')).toBeNull();
+    expect(await r2.json()).toEqual({ n: 2 });
+    expect(execCount).toBe(2);
+
+    // Confirm concurrent success case cleanly awaits in-flight result
+    let okCount = 0;
+    let unblockOk!: () => void;
+    let signalOkStarted!: () => void;
+    const okStarted = new Promise<void>((r) => {
+      signalOkStarted = r;
+    });
+    const app3 = new Hono();
+    app3.use('*', idempotency());
+    app3.post('/ok', async (c) => {
+      okCount += 1;
+      const n = okCount;
+      if (n === 1) {
+        signalOkStarted();
+        await new Promise<void>((r) => {
+          unblockOk = r;
+        });
+      }
+      return c.json({ n }, 201);
+    });
+
+    const ok1 = app3.request('/ok', { method: 'POST', headers: { 'Idempotency-Key': 'race-ok' } });
+    await okStarted;
+    const ok2 = app3.request('/ok', { method: 'POST', headers: { 'Idempotency-Key': 'race-ok' } });
+    unblockOk();
+    const [resOk1, resOk2] = await Promise.all([ok1, ok2]);
+    expect(resOk1.status).toBe(201);
+    expect(resOk1.headers.get('Idempotency-Replayed')).toBeNull();
+    expect(await resOk1.json()).toEqual({ n: 1 });
+    expect(resOk2.status).toBe(201);
+    expect(resOk2.headers.get('Idempotency-Replayed')).toBe('true');
+    expect(await resOk2.json()).toEqual({ n: 1 });
+    expect(okCount).toBe(1);
+  });
 });

@@ -47,8 +47,8 @@ function isOptionalZodSchema(schema: z.ZodType): boolean {
   return typeof candidate.isOptional === 'function' ? candidate.isOptional() : false;
 }
 
-function toJsonSchema(schema: z.ZodType): JsonSchemaObject {
-  return z.toJSONSchema(schema, { unrepresentable: 'any' }) as JsonSchemaObject;
+function toJsonSchema(schema: z.ZodType, io: 'input' | 'output'): JsonSchemaObject {
+  return z.toJSONSchema(schema, { io, unrepresentable: 'any' }) as JsonSchemaObject;
 }
 
 /** Build a deterministic contract snapshot from a tRPC router (default: appRouter). */
@@ -61,13 +61,18 @@ export function buildApiContractSnapshot(router: AnyTRPCRouter = appRouter): Api
   for (const name of sortedNames) {
     const def = rawProcedures[name]!._def;
     const inputs = def.inputs ?? [];
-    const inputSchema = inputs.at(-1);
+    if (inputs.length > 1) {
+      throw new Error(
+        `Procedure "${name}" chains ${inputs.length} input validators; contract snapshot v1 supports at most 1 input validator`
+      );
+    }
+    const inputSchema = inputs[0];
     const inputOptional = inputSchema === undefined ? true : isOptionalZodSchema(inputSchema);
     procedures[name] = {
       type: def.type,
       inputOptional,
-      input: inputSchema === undefined ? null : toJsonSchema(inputSchema),
-      output: def.output === undefined ? null : toJsonSchema(def.output),
+      input: inputSchema === undefined ? null : toJsonSchema(inputSchema, 'input'),
+      output: def.output === undefined ? null : toJsonSchema(def.output, 'output'),
     };
   }
 
@@ -188,6 +193,141 @@ function propertiesOf(schema: JsonSchemaObject): Record<string, JsonSchemaObject
   return out;
 }
 
+interface EffectiveBound {
+  value: number;
+  inclusive: boolean;
+}
+
+function lowerNumericBound(
+  schema: JsonSchemaObject,
+  normalizeInt: boolean
+): EffectiveBound | undefined {
+  const min = numberOrUndefined(schema['minimum']);
+  const exMin = numberOrUndefined(schema['exclusiveMinimum']);
+  const candidates: EffectiveBound[] = [];
+  if (min !== undefined) {
+    candidates.push({ value: min, inclusive: true });
+  }
+  if (exMin !== undefined) {
+    if (normalizeInt && Number.isInteger(exMin)) {
+      candidates.push({ value: exMin + 1, inclusive: true });
+    } else {
+      candidates.push({ value: exMin, inclusive: false });
+    }
+  }
+  if (candidates.length === 0) {
+    return undefined;
+  }
+  return candidates.reduce((best, cur) => {
+    if (cur.value > best.value) {
+      return cur;
+    }
+    if (cur.value === best.value && !cur.inclusive) {
+      return cur;
+    }
+    return best;
+  });
+}
+
+function upperNumericBound(
+  schema: JsonSchemaObject,
+  normalizeInt: boolean
+): EffectiveBound | undefined {
+  const max = numberOrUndefined(schema['maximum']);
+  const exMax = numberOrUndefined(schema['exclusiveMaximum']);
+  const candidates: EffectiveBound[] = [];
+  if (max !== undefined) {
+    candidates.push({ value: max, inclusive: true });
+  }
+  if (exMax !== undefined) {
+    if (normalizeInt && Number.isInteger(exMax)) {
+      candidates.push({ value: exMax - 1, inclusive: true });
+    } else {
+      candidates.push({ value: exMax, inclusive: false });
+    }
+  }
+  if (candidates.length === 0) {
+    return undefined;
+  }
+  return candidates.reduce((best, cur) => {
+    if (cur.value < best.value) {
+      return cur;
+    }
+    if (cur.value === best.value && !cur.inclusive) {
+      return cur;
+    }
+    return best;
+  });
+}
+
+function isLowerStricter(
+  head: EffectiveBound | undefined,
+  base: EffectiveBound | undefined
+): boolean {
+  if (head === undefined) {
+    return false;
+  }
+  if (base === undefined) {
+    return true;
+  }
+  return (
+    head.value > base.value || (head.value === base.value && !head.inclusive && base.inclusive)
+  );
+}
+
+function isLowerLooser(
+  head: EffectiveBound | undefined,
+  base: EffectiveBound | undefined
+): boolean {
+  if (base === undefined) {
+    return false;
+  }
+  if (head === undefined) {
+    return true;
+  }
+  return (
+    head.value < base.value || (head.value === base.value && head.inclusive && !base.inclusive)
+  );
+}
+
+function isUpperStricter(
+  head: EffectiveBound | undefined,
+  base: EffectiveBound | undefined
+): boolean {
+  if (head === undefined) {
+    return false;
+  }
+  if (base === undefined) {
+    return true;
+  }
+  return (
+    head.value < base.value || (head.value === base.value && !head.inclusive && base.inclusive)
+  );
+}
+
+function isUpperLooser(
+  head: EffectiveBound | undefined,
+  base: EffectiveBound | undefined
+): boolean {
+  if (base === undefined) {
+    return false;
+  }
+  if (head === undefined) {
+    return true;
+  }
+  return (
+    head.value > base.value || (head.value === base.value && head.inclusive && !base.inclusive)
+  );
+}
+
+function formatBound(bound: EffectiveBound | undefined, kind: 'min' | 'max'): string {
+  if (bound === undefined) {
+    return 'none';
+  }
+  const op = kind === 'min' ? (bound.inclusive ? '>=' : '>') : bound.inclusive ? '<=' : '<';
+  return `${op} ${bound.value}`;
+}
+
 function compareInputSchema(
   procedure: string,
   path: string,
@@ -196,6 +336,20 @@ function compareInputSchema(
   breaking: BreakingChange[],
   nonBreaking: string[]
 ): void {
+  if (baseRaw['type'] === 'null') {
+    if (isNullableSchema(headRaw)) {
+      if (headRaw['type'] !== 'null') {
+        nonBreaking.push(`${procedure} ${path}: input widened from null to nullable`);
+      }
+      return;
+    }
+    breaking.push({
+      procedure,
+      path,
+      reason: `Input type changed from null to ${String(headRaw['type'])}`,
+    });
+    return;
+  }
   if (isNullableSchema(baseRaw) && !isNullableSchema(headRaw)) {
     breaking.push({ procedure, path, reason: 'Input is no longer nullable' });
   }
@@ -239,7 +393,32 @@ function compareInputSchema(
     nonBreaking.push(`${procedure} ${path}: input integer widened to number`);
   }
 
-  for (const bound of ['minimum', 'exclusiveMinimum', 'minLength', 'minItems'] as const) {
+  const normalizeInt = base['type'] === 'integer' && head['type'] === 'integer';
+  const bLower = lowerNumericBound(base, normalizeInt);
+  const hLower = lowerNumericBound(head, normalizeInt);
+  if (isLowerStricter(hLower, bLower)) {
+    breaking.push({
+      procedure,
+      path,
+      reason: `Input minimum narrowed (${formatBound(bLower, 'min')} -> ${formatBound(hLower, 'min')})`,
+    });
+  } else if (isLowerLooser(hLower, bLower)) {
+    nonBreaking.push(`${procedure} ${path}: input minimum loosened`);
+  }
+
+  const bUpper = upperNumericBound(base, normalizeInt);
+  const hUpper = upperNumericBound(head, normalizeInt);
+  if (isUpperStricter(hUpper, bUpper)) {
+    breaking.push({
+      procedure,
+      path,
+      reason: `Input maximum narrowed (${formatBound(bUpper, 'max')} -> ${formatBound(hUpper, 'max')})`,
+    });
+  } else if (isUpperLooser(hUpper, bUpper)) {
+    nonBreaking.push(`${procedure} ${path}: input maximum loosened`);
+  }
+
+  for (const bound of ['minLength', 'minItems'] as const) {
     const bVal = numberOrUndefined(base[bound]);
     const hVal = numberOrUndefined(head[bound]);
     if (hVal !== undefined && (bVal === undefined || hVal > bVal)) {
@@ -253,7 +432,7 @@ function compareInputSchema(
     }
   }
 
-  for (const bound of ['maximum', 'exclusiveMaximum', 'maxLength', 'maxItems'] as const) {
+  for (const bound of ['maxLength', 'maxItems'] as const) {
     const bVal = numberOrUndefined(base[bound]);
     const hVal = numberOrUndefined(head[bound]);
     if (hVal !== undefined && (bVal === undefined || hVal < bVal)) {
@@ -265,6 +444,21 @@ function compareInputSchema(
     } else if (bVal !== undefined && (hVal === undefined || hVal > bVal)) {
       nonBreaking.push(`${procedure} ${path}: input ${bound} loosened`);
     }
+  }
+
+  const basePattern = typeof base['pattern'] === 'string' ? base['pattern'] : undefined;
+  const headPattern = typeof head['pattern'] === 'string' ? head['pattern'] : undefined;
+  if (headPattern !== undefined && headPattern !== basePattern) {
+    breaking.push({
+      procedure,
+      path,
+      reason:
+        basePattern === undefined
+          ? `Input pattern added (${headPattern})`
+          : `Input pattern changed from ${basePattern} to ${headPattern}`,
+    });
+  } else if (basePattern !== undefined && headPattern === undefined) {
+    nonBreaking.push(`${procedure} ${path}: input pattern removed`);
   }
 
   const hasBaseConst = Object.hasOwn(base, 'const');
@@ -314,14 +508,21 @@ function compareInputSchema(
   }
 
   if (base['type'] === 'object' && head['type'] === 'object') {
-    if (base['additionalProperties'] !== false && head['additionalProperties'] === false) {
+    const baseAP = base['additionalProperties'];
+    const headAP = head['additionalProperties'];
+    if (baseAP !== false && headAP === false) {
       breaking.push({
         procedure,
         path,
         reason: 'Input no longer allows additional properties',
       });
-    } else if (base['additionalProperties'] === false && head['additionalProperties'] !== false) {
+    } else if (baseAP === false && headAP !== false) {
       nonBreaking.push(`${procedure} ${path}: input now allows additional properties`);
+    } else if (isRecord(headAP)) {
+      const effectiveBaseAP = isRecord(baseAP) ? baseAP : {};
+      compareInputSchema(procedure, `${path}.*`, effectiveBaseAP, headAP, breaking, nonBreaking);
+    } else if (isRecord(baseAP)) {
+      nonBreaking.push(`${procedure} ${path}: input additionalProperties constraint loosened`);
     }
 
     const baseProps = propertiesOf(base);
@@ -339,7 +540,7 @@ function compareInputSchema(
       }
     }
 
-    const strictUnknown = head['additionalProperties'] === false;
+    const strictUnknown = headAP === false;
     for (const [prop, bProp] of Object.entries(baseProps)) {
       const hProp = headProps[prop];
       if (hProp === undefined) {
@@ -355,20 +556,65 @@ function compareInputSchema(
       }
     }
 
-    for (const prop of Object.keys(headProps)) {
+    const baseAllowsExtraExplicitly = baseAP === true || isRecord(baseAP);
+    for (const [prop, hProp] of Object.entries(headProps)) {
       if (baseProps[prop] === undefined && !headReq.has(prop)) {
+        if (baseAllowsExtraExplicitly) {
+          const baseCatchall = isRecord(baseAP) ? baseAP : {};
+          const probeBreaking: BreakingChange[] = [];
+          compareInputSchema(procedure, `${path}.${prop}`, baseCatchall, hProp, probeBreaking, []);
+          if (probeBreaking.length > 0) {
+            breaking.push({
+              procedure,
+              path: `${path}.${prop}`,
+              reason: `New optional input field "${prop}" narrows accepted extra properties`,
+            });
+            continue;
+          }
+        }
         nonBreaking.push(`${procedure} ${path}.${prop}: optional input field added`);
       }
     }
   }
 
-  if (
-    base['type'] === 'array' &&
-    head['type'] === 'array' &&
-    isRecord(base['items']) &&
-    isRecord(head['items'])
-  ) {
-    compareInputSchema(procedure, `${path}[]`, base['items'], head['items'], breaking, nonBreaking);
+  if (base['type'] === 'array' && head['type'] === 'array') {
+    const basePrefix = Array.isArray(base['prefixItems'])
+      ? base['prefixItems'].filter(isRecord)
+      : null;
+    const headPrefix = Array.isArray(head['prefixItems'])
+      ? head['prefixItems'].filter(isRecord)
+      : null;
+    if (basePrefix !== null || headPrefix !== null) {
+      const bTuple = basePrefix ?? [];
+      const hTuple = headPrefix ?? [];
+      const shared = Math.min(bTuple.length, hTuple.length);
+      for (let i = 0; i < shared; i += 1) {
+        compareInputSchema(
+          procedure,
+          `${path}[${i}]`,
+          bTuple[i]!,
+          hTuple[i]!,
+          breaking,
+          nonBreaking
+        );
+      }
+      if (hTuple.length !== bTuple.length) {
+        breaking.push({
+          procedure,
+          path,
+          reason: `Input tuple arity changed from ${bTuple.length} to ${hTuple.length}`,
+        });
+      }
+    } else if (isRecord(base['items']) && isRecord(head['items'])) {
+      compareInputSchema(
+        procedure,
+        `${path}[]`,
+        base['items'],
+        head['items'],
+        breaking,
+        nonBreaking
+      );
+    }
   }
 }
 
@@ -380,6 +626,16 @@ function compareOutputSchema(
   breaking: BreakingChange[],
   nonBreaking: string[]
 ): void {
+  if (headRaw['type'] === 'null') {
+    if (isNullableSchema(baseRaw)) {
+      if (baseRaw['type'] !== 'null') {
+        nonBreaking.push(`${procedure} ${path}: output narrowed from nullable to null`);
+      }
+      return;
+    }
+    breaking.push({ procedure, path, reason: 'Output became nullable' });
+    return;
+  }
   if (!isNullableSchema(baseRaw) && isNullableSchema(headRaw)) {
     breaking.push({ procedure, path, reason: 'Output became nullable' });
   }
@@ -417,6 +673,59 @@ function compareOutputSchema(
       reason: `Output type changed from ${String(base['type'])} to ${String(head['type'])}`,
     });
     return;
+  }
+
+  const normalizeInt = base['type'] === 'integer' && head['type'] === 'integer';
+  const bLower = lowerNumericBound(base, normalizeInt);
+  const hLower = lowerNumericBound(head, normalizeInt);
+  if (isLowerLooser(hLower, bLower)) {
+    breaking.push({
+      procedure,
+      path,
+      reason: `Output minimum weakened (${formatBound(bLower, 'min')} -> ${formatBound(hLower, 'min')})`,
+    });
+  } else if (isLowerStricter(hLower, bLower)) {
+    nonBreaking.push(`${procedure} ${path}: output minimum tightened`);
+  }
+
+  const bUpper = upperNumericBound(base, normalizeInt);
+  const hUpper = upperNumericBound(head, normalizeInt);
+  if (isUpperLooser(hUpper, bUpper)) {
+    breaking.push({
+      procedure,
+      path,
+      reason: `Output maximum weakened (${formatBound(bUpper, 'max')} -> ${formatBound(hUpper, 'max')})`,
+    });
+  } else if (isUpperStricter(hUpper, bUpper)) {
+    nonBreaking.push(`${procedure} ${path}: output maximum tightened`);
+  }
+
+  for (const bound of ['minLength', 'minItems'] as const) {
+    const bVal = numberOrUndefined(base[bound]);
+    const hVal = numberOrUndefined(head[bound]);
+    if (bVal !== undefined && (hVal === undefined || hVal < bVal)) {
+      breaking.push({
+        procedure,
+        path,
+        reason: `Output ${bound} weakened (${bVal} -> ${String(hVal)})`,
+      });
+    } else if (hVal !== undefined && (bVal === undefined || hVal > bVal)) {
+      nonBreaking.push(`${procedure} ${path}: output ${bound} tightened`);
+    }
+  }
+
+  for (const bound of ['maxLength', 'maxItems'] as const) {
+    const bVal = numberOrUndefined(base[bound]);
+    const hVal = numberOrUndefined(head[bound]);
+    if (bVal !== undefined && (hVal === undefined || hVal > bVal)) {
+      breaking.push({
+        procedure,
+        path,
+        reason: `Output ${bound} weakened (${bVal} -> ${String(hVal)})`,
+      });
+    } else if (hVal !== undefined && (bVal === undefined || hVal < bVal)) {
+      nonBreaking.push(`${procedure} ${path}: output ${bound} tightened`);
+    }
   }
 
   const hasBaseConst = Object.hasOwn(base, 'const');
@@ -503,20 +812,90 @@ function compareOutputSchema(
     }
   }
 
-  if (
-    base['type'] === 'array' &&
-    head['type'] === 'array' &&
-    isRecord(base['items']) &&
-    isRecord(head['items'])
-  ) {
-    compareOutputSchema(
-      procedure,
-      `${path}[]`,
-      base['items'],
-      head['items'],
-      breaking,
-      nonBreaking
+  if (base['type'] === 'array' && head['type'] === 'array') {
+    const basePrefix = Array.isArray(base['prefixItems'])
+      ? base['prefixItems'].filter(isRecord)
+      : null;
+    const headPrefix = Array.isArray(head['prefixItems'])
+      ? head['prefixItems'].filter(isRecord)
+      : null;
+    if (basePrefix !== null || headPrefix !== null) {
+      const bTuple = basePrefix ?? [];
+      const hTuple = headPrefix ?? [];
+      const shared = Math.min(bTuple.length, hTuple.length);
+      for (let i = 0; i < shared; i += 1) {
+        compareOutputSchema(
+          procedure,
+          `${path}[${i}]`,
+          bTuple[i]!,
+          hTuple[i]!,
+          breaking,
+          nonBreaking
+        );
+      }
+      if (hTuple.length !== bTuple.length) {
+        breaking.push({
+          procedure,
+          path,
+          reason: `Output tuple arity changed from ${bTuple.length} to ${hTuple.length}`,
+        });
+      }
+    } else if (isRecord(base['items']) && isRecord(head['items'])) {
+      compareOutputSchema(
+        procedure,
+        `${path}[]`,
+        base['items'],
+        head['items'],
+        breaking,
+        nonBreaking
+      );
+    }
+  }
+}
+
+const VALID_PROCEDURE_TYPES = new Set(['query', 'mutation', 'subscription']);
+
+/** Validate that a parsed JSON value conforms to the contract snapshot v1 schema. */
+export function assertValidApiContractSnapshot(
+  doc: unknown,
+  label = 'snapshot'
+): asserts doc is ApiContractSnapshot {
+  if (!isRecord(doc)) {
+    throw new Error(`Invalid API contract ${label}: expected JSON object`);
+  }
+  if (doc['schemaVersion'] !== CONTRACT_SCHEMA_VERSION) {
+    throw new Error(
+      `Invalid API contract ${label}: unsupported schemaVersion ${String(doc['schemaVersion'])}`
     );
+  }
+  if (typeof doc['version'] !== 'string') {
+    throw new Error(`Invalid API contract ${label}: expected string version`);
+  }
+  if (!isRecord(doc['procedures'])) {
+    throw new Error(`Invalid API contract ${label}: expected procedures object`);
+  }
+  for (const [name, proc] of Object.entries(doc['procedures'])) {
+    if (!isRecord(proc)) {
+      throw new Error(`Invalid API contract ${label}: procedure "${name}" must be an object`);
+    }
+    if (typeof proc['type'] !== 'string' || !VALID_PROCEDURE_TYPES.has(proc['type'])) {
+      throw new Error(`Invalid API contract ${label}: procedure "${name}" has invalid type`);
+    }
+    if (typeof proc['inputOptional'] !== 'boolean') {
+      throw new Error(
+        `Invalid API contract ${label}: procedure "${name}" must have boolean inputOptional`
+      );
+    }
+    if (proc['input'] !== null && !isRecord(proc['input'])) {
+      throw new Error(
+        `Invalid API contract ${label}: procedure "${name}" input must be an object or null`
+      );
+    }
+    if (proc['output'] !== null && !isRecord(proc['output'])) {
+      throw new Error(
+        `Invalid API contract ${label}: procedure "${name}" output must be an object or null`
+      );
+    }
   }
 }
 

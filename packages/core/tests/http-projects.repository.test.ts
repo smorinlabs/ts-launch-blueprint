@@ -251,4 +251,21 @@ describe('HTTP repository: pagination and request params', () => {
     }).listWorkspaces();
     expect(urls[0]!.toString()).toBe('http://127.0.0.1:8080/api//v1/workspaces');
   });
+
+  it('cancels the unread 404 response body before returning null from getProject', async () => {
+    let cancelled = false;
+    const body = new ReadableStream({
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const fetchImpl = (() =>
+      Promise.resolve(new Response(body, { status: 404 }))) as unknown as typeof fetch;
+    const result = await createHttpProjectsRepository({
+      token: 't',
+      fetchImpl,
+    }).getProject('missing');
+    expect(result).toBeNull();
+    expect(cancelled).toBe(true);
+  });
 });

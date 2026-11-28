@@ -27,7 +27,12 @@ export const appRouter = router({
       // would reject it with 400 ("expected object, received undefined").
       .input(ApiListProjectsInputSchema.optional())
       .output(ListProjectsOutputSchema)
-      .query(({ input, ctx }) => ctx.core.projects.listProjects(input)),
+      .query(({ input, ctx }) =>
+        ctx.core.projects.listProjects({
+          ...input,
+          limit: input?.limit ?? MAX_API_LIMIT,
+        })
+      ),
 
     get: publicProcedure
       .input(GetProjectInputSchema)

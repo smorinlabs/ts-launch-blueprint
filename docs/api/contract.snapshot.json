@@ -14,8 +14,7 @@
             "minLength": 1
           }
         },
-        "required": ["id"],
-        "additionalProperties": false
+        "required": ["id"]
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -75,8 +74,7 @@
             "type": "string",
             "minLength": 1
           }
-        },
-        "additionalProperties": false
+        }
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

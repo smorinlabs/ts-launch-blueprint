@@ -203,6 +203,7 @@ export function createHttpProjectsRepository(
     }
     if (!response.ok) {
       if (requestOptions?.allowNotFound === true && response.status === 404) {
+        await response.body?.cancel();
         return undefined;
       }
       const message = await errorMessage(response);

@@ -55,6 +55,24 @@ describe('projects.list (tRPC caller)', () => {
     await expect(caller.projects.list({ limit: 101 })).rejects.toMatchObject({
       code: 'BAD_REQUEST',
     });
+
+    const largeProjects = Array.from({ length: 120 }, (_, i) => ({
+      id: `p-${i + 1}`,
+      name: `Project ${i + 1}`,
+      workspace: { name: 'Engineering' },
+    }));
+    const largeCaller = appRouter.createCaller({
+      core: createCore({
+        source: 'memory',
+        seed: { workspaces: [{ gid: 'ws1', name: 'Engineering' }], projects: largeProjects },
+      }),
+    });
+    const defaultPage = await largeCaller.projects.list();
+    expect(defaultPage.projects).toHaveLength(MAX_API_LIMIT);
+    expect(defaultPage.nextCursor).not.toBeNull();
+    const emptyInputPage = await largeCaller.projects.list({});
+    expect(emptyInputPage.projects).toHaveLength(MAX_API_LIMIT);
+    expect(emptyInputPage.nextCursor).not.toBeNull();
   });
 
   it('rejects limit 0 with BAD_REQUEST (the core contract validates input)', async () => {
