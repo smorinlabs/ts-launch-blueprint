@@ -30,9 +30,9 @@ Add gitleaks, TruffleHog CI, weekly dep-audit, canary, and CodeQL/Dependabot
 
 ### Tests & Tasks
 
-- [ ] [P04-TS01] Add/update `tests/repo-hygiene.test.ts` (and dedicated security/audit-triage tests) verifying SHA-pinned third-party actions and top-level `permissions:` on `secret-scan.yml`, `dep-audit.yml`, `canary.yml`, and `audit-triage.yml`, `.github/codeql/codeql-config.yml`, `.github/dependabot.yml` hardening fields, and `muse_audit_triage.py`/policy gates.
-- [ ] [P04-TS02] Add tests covering `scripts/check-gitleaks.sh` (`--staged`/`--range` handling) and `scripts/install-gitleaks.sh` checksum verification.
-- [ ] [P04-T01] Add `.gitleaks.toml`, `.gitleaksignore`, `scripts/install-gitleaks.sh`, `scripts/check-gitleaks.sh`, `Justfile` `install-gitleaks`/`check-gitleaks` recipes, and `lefthook.yml` `pre-commit`/`pre-push` hooks.
-- [ ] [P04-T02] Add `.github/workflows/secret-scan.yml` (SHA-pinned TruffleHog `--only-verified`), `just audit`, `.github/workflows/dep-audit.yml`, and `.github/workflows/canary.yml`.
-- [ ] [P04-T03] Add `.github/codeql/codeql-config.yml` (wired into `codeql.yml`), harden `.github/dependabot.yml`, and add `.github/workflows/audit-triage.yml`, `.github/scripts/muse_audit_triage.py`, and `.github/muse-audit-triage/`.
-- [ ] [P04-T04] Run `just all`, `just coverage`, `just pack-check`, `just docs-check`, and `project-audit P04`; open PR, run `ci-fix --optimize` closeout on green CI, resolve review threads, mark `P04` `[x]`, and merge via `--merge`.
+- [x] [P04-TS01] Add/update `tests/repo-hygiene.test.ts` (and dedicated security/audit-triage tests) verifying SHA-pinned third-party actions and top-level `permissions:` on `secret-scan.yml`, `dep-audit.yml`, `canary.yml`, and `audit-triage.yml`, `.github/codeql/codeql-config.yml`, `.github/dependabot.yml` hardening fields, and `muse_audit_triage.py`/policy gates.
+- [x] [P04-TS02] Add tests covering `scripts/check-gitleaks.sh` (`--staged`/`--range` handling) and `scripts/install-gitleaks.sh` checksum verification.
+- [x] [P04-T01] Add `.gitleaks.toml`, `.gitleaksignore`, `scripts/install-gitleaks.sh`, `scripts/check-gitleaks.sh`, `Justfile` `install-gitleaks`/`check-gitleaks` recipes, and `lefthook.yml` `pre-commit`/`pre-push` hooks.
+- [x] [P04-T02] Add `.github/workflows/secret-scan.yml` (SHA-pinned TruffleHog `--only-verified`), `just audit`, `.github/workflows/dep-audit.yml`, and `.github/workflows/canary.yml`.
+- [x] [P04-T03] Add `.github/codeql/codeql-config.yml` (wired into `codeql.yml`), harden `.github/dependabot.yml`, and add `.github/workflows/audit-triage.yml`, `.github/scripts/muse_audit_triage.py`, and `.github/muse-audit-triage/`.
+- [x] [P04-T04] Run `just all`, `just coverage`, `just pack-check`, `just docs-check`, and `project-audit P04`; open PR, run `ci-fix --optimize` closeout on green CI, resolve review threads, mark `P04` `[x]`, and merge via `--merge`.

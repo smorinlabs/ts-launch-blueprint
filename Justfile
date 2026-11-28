@@ -445,6 +445,21 @@ install-shell-tools:
     bash scripts/install-shellcheck.sh
     bash scripts/install-actionlint.sh
 
+# Install pinned gitleaks binary into ~/.local/bin with SHA256 verification.
+[group('install')]
+install-gitleaks:
+    bash scripts/install-gitleaks.sh
+
+# Run gitleaks secret scan (--staged | --range | --full).
+[group('dev'), group('pre-commit')]
+check-gitleaks mode="--staged":
+    bash scripts/check-gitleaks.sh {{mode}}
+
+# Audit dependencies against known vulnerabilities (high/critical threshold).
+[group('dev'), group('pre-commit')]
+@audit:
+    pnpm audit --audit-level=high
+
 # Check all tracked shell scripts.
 [group('dev'), group('pre-commit')]
 check-shell:

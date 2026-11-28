@@ -48,7 +48,7 @@ file plus those.
 - [x] **P01** — [Switch press-verify to template-press v5.0.0](projects/P01-switch-press-verify-to-template-press-v5.md) — Replace temporary template-press git SHA pin with PyPI v5.0.0 once released
 - [x] **P02** — [Enforce CI coverage and pack-check smoke](projects/P02-enforce-ci-coverage-and-pack-check-smoke.md) — Run coverage thresholds, Codecov OIDC, and pack-check smoke tests on every PR
 - [ ] **P03** — [Slim PR CI and add cross-OS matrix](projects/P03-slim-pr-ci-and-add-cross-os-matrix.md) — Add merge_group, PR concurrency, change fast paths, ci-ok gate, and 3-OS matrix
-- [ ] **P04** — [Secret scanning and scheduled dependency audits](projects/P04-secret-scanning-and-scheduled-dependency-audits.md) — Add gitleaks, TruffleHog CI, weekly dep-audit, canary, and CodeQL/Dependabot
+- [x] **P04** — [Secret scanning and scheduled dependency audits](projects/P04-secret-scanning-and-scheduled-dependency-audits.md) — Add gitleaks, TruffleHog CI, weekly dep-audit, canary, and CodeQL/Dependabot
 - [ ] **P05** — [Hook and CI quality gate parity](projects/P05-hook-and-ci-quality-gate-parity.md) — Mirror commitlint, large-file, codespell, EditorConfig, and lockfile/TOML gates
 - [?] **P06** — [Turnkey toolchains and unified local setup](projects/P06-turnkey-toolchains-and-unified-local-setup-.md) — Add mise, flox, devcontainer, make bootstrap, just setup, and Justfile DX fixes
 - [?] **P07** — [Template-press fork guard and bootstrap skill](projects/P07-template-press-fork-guard-and-bootstrap-skill-.md) — Add guard.sh, CI bootstrap acceptance, press cleanups, and new-ts-project skill

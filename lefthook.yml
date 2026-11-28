@@ -70,6 +70,15 @@ pre-commit:
     # the whole graph (mirrors the source's repo-wide mypy hook).
     - name: typecheck
       run: sh scripts/typecheck.sh
+    # Secret scan over staged diff (skipped in CI where secret-scan.yml runs
+    # TruffleHog over PR diffs / push history).
+    - name: gitleaks
+      run: |
+        if [ "${CI:-}" = "true" ]; then
+          echo "gitleaks skipped in CI (secret-scan.yml covers CI)"
+        else
+          bash scripts/check-gitleaks.sh --staged
+        fi
 
 commit-msg:
   jobs:
@@ -83,6 +92,8 @@ commit-msg:
 # Opt-in: export TS_PROJECTS_PREPUSH_TESTS=1 to enable locally.
 pre-push:
   jobs:
+    - name: gitleaks-range
+      run: bash scripts/check-gitleaks.sh --range
     - name: test
       run: |
         if [ "${TS_PROJECTS_PREPUSH_TESTS:-0}" = "1" ]; then

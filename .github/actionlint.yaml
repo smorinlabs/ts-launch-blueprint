@@ -8,6 +8,10 @@
 # bypass them), and while stale the "missing app-id" ignore also masks a
 # mint step missing its id input entirely (a `client_id` typo still
 # surfaces).
+config-variables:
+  # Kill-switch for the audit-triage bot (audit-triage.yml); unset = inert.
+  - MUSE_CI_ENABLED
+
 paths:
   .github/workflows/release-please.yml:
     ignore:
