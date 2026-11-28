@@ -3,7 +3,7 @@
 #   docker build -f apps/api/Dockerfile -t ts-launch-blueprint-api .
 
 # Build stage: install the workspace with the pinned pnpm, build the API.
-FROM node:24-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530 AS build
+FROM node:25-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS build
 WORKDIR /repo
 # pnpm pinned to the root packageManager version (D-035); not corepack, which
 # newer Node versions no longer ship.
@@ -23,7 +23,7 @@ RUN pnpm --filter @ts-launch-blueprint/api build
 
 # Runtime stage: only the bundled server (every dependency is in
 # dist/server.js), run as the non-root `node` user.
-FROM node:24-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530
+FROM node:25-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370
 ENV NODE_ENV=production PORT=8080 HOST=0.0.0.0
 WORKDIR /app
 COPY --from=build /repo/apps/api/dist ./dist
