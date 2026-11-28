@@ -1,16 +1,29 @@
-// In-process CLI core tests (D-016(1), D-019(4) tier 1): runCli(argv,
-// deps) with injected writers/env — no subprocess, no process.exit.
-// cspell:ignore verbos projcts envtokenvalue flagtokenvalue filetoken
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+// In-process CLI core tests (P11-TS04): noun-verb CLI tree, bare group
+// help, did-you-mean suggestions, config init/path/get/set, doctor [--bundle],
+// completion {bash,zsh,fish}, single-emission config warnings, logging & color.
+// cspell:ignore verbos projcts envtoken envtokenvalue flagtokenvalue filetoken powershell compgen COMPREPLY CWORD
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { ChoicePrompter, ConfirmPrompter } from '../src/cli/adapters.js';
 import { createColors } from '../src/cli/colors.js';
 import { CONFIG_FILE_NAME, TOKEN_ENV_VAR } from '../src/cli/config.js';
 import type { CliDeps } from '../src/cli/deps.js';
 import { realDeps, runCli } from '../src/cli/router.js';
+import { configDir, configFile, TOOL_DIR_NAME } from '../src/cli/xdg-paths.js';
 import { VERSION } from '../src/version.js';
 
 const tempDirs: string[] = [];
@@ -58,10 +71,10 @@ function makeHarness(overrides: Partial<CliDeps> = {}): Harness {
 }
 
 // eslint-disable-next-line no-control-regex -- ANSI escape detection
-const ANSI_PATTERN = /\[/;
+const ANSI_PATTERN = /\x1b\[/;
 
-describe('version and help (cli-standards R4.1)', () => {
-  it('--version prints ts-projects plus the version, exit 0', async () => {
+describe('version, bare help, and did-you-mean (Q3.A)', () => {
+  it('--version emits exact single-line ts-projects <VERSION>, exit 0', async () => {
     const h = makeHarness();
     const code = await runCli(['--version'], h.deps);
     expect(code).toBe(0);
@@ -72,42 +85,66 @@ describe('version and help (cli-standards R4.1)', () => {
   it('-V is the short version flag', async () => {
     const h = makeHarness();
     expect(await runCli(['-V'], h.deps)).toBe(0);
-    expect(h.stdout()).toContain(`ts-projects ${VERSION}`);
+    expect(h.stdout()).toBe(`ts-projects ${VERSION}\n`);
   });
 
-  it('--help shows usage and the global options, exit 0', async () => {
+  it('--help shows usage, global options, and v4 noun commands', async () => {
     const h = makeHarness();
     const code = await runCli(['--help'], h.deps);
     expect(code).toBe(0);
+    expect(h.stderr()).toBe('');
     const help = h.stdout();
     expect(help).toContain('Usage: ts-projects [options] [command]');
     for (const flag of [
       '-V, --version',
       '-h, --help',
+      '-o, --output <format>',
+      '--json',
+      '--output-file <path>',
+      '--log-level <level>',
+      '--log-file [path]',
       '-v, --verbose',
       '-q, --quiet',
-      '--no-color',
-      '--config <path>',
       '--debug',
+      '--no-color',
+      '--no-input',
+      '--config <path>',
       '--token <token>',
     ]) {
       expect(help).toContain(flag);
     }
-    expect(help).toContain('projects');
-    expect(help).toContain('config');
+    for (const cmd of ['projects', 'config', 'doctor', 'completion']) {
+      expect(help).toContain(cmd);
+    }
   });
 
-  it('no arguments dispatches to the default projects command', async () => {
-    // Source parity: bare `py-projects` ran the command; with no token
-    // anywhere that is the missing-token auth path (exit 4, D-016(2)).
+  it('bare ts-projects prints root help to stdout and exits 0', async () => {
     const h = makeHarness();
-    expect(await runCli([], h.deps)).toBe(4);
-    expect(h.stderr()).toContain('No TS_PROJECTS_TOKEN found');
+    const code = await runCli([], h.deps);
+    expect(code).toBe(0);
+    expect(h.stderr()).toBe('');
+    expect(h.stdout()).toContain('Usage: ts-projects [options] [command]');
+    expect(h.stdout()).toContain('projects');
+    expect(h.stdout()).toContain('config');
   });
-});
 
-describe('usage errors (exit 2, D-016(2,8))', () => {
-  it('unknown flag -> exit 2 with a did-you-mean suggestion', async () => {
+  it('bare projects and bare config print group help to stdout and exit 0', async () => {
+    const proj = makeHarness();
+    expect(await runCli(['projects'], proj.deps)).toBe(0);
+    expect(proj.stderr()).toBe('');
+    expect(proj.stdout()).toContain('list');
+    expect(proj.stdout()).toContain('get');
+
+    const cfg = makeHarness();
+    expect(await runCli(['config'], cfg.deps)).toBe(0);
+    expect(cfg.stderr()).toBe('');
+    expect(cfg.stdout()).toContain('init');
+    expect(cfg.stdout()).toContain('path');
+    expect(cfg.stdout()).toContain('get');
+    expect(cfg.stdout()).toContain('set');
+  });
+
+  it('unknown flag -> exit 2 with did-you-mean suggestion', async () => {
     const h = makeHarness();
     const code = await runCli(['--verbos'], h.deps);
     expect(code).toBe(2);
@@ -116,227 +153,562 @@ describe('usage errors (exit 2, D-016(2,8))', () => {
     expect(h.stdout()).toBe('');
   });
 
-  it('unknown command word -> exit 2 usage error', async () => {
-    // With projects as the DEFAULT command (S3b), a stray word becomes
-    // an unexpected operand of projects — the same usage-error semantics
-    // as bare `py-projects projcts` under click ("unexpected extra
-    // argument", exit 2). Option did-you-mean is unaffected (above).
+  it('unknown root command -> exit 2 with did-you-mean suggestion', async () => {
     const h = makeHarness();
     const code = await runCli(['projcts'], h.deps);
     expect(code).toBe(2);
-    expect(h.stderr()).toContain("too many arguments for 'projects'");
-    expect(h.stderr()).toContain('projcts');
-  });
-});
-
-describe('config --show (token resolution surface)', () => {
-  it('env token -> exit 0, redacted token on stdout only', async () => {
-    const h = makeHarness({ env: { [TOKEN_ENV_VAR]: 'supersecret1234' } });
-    const code = await runCli(['config', '--show'], h.deps);
-    expect(code).toBe(0);
-    expect(h.stdout()).toContain('token = "***1234" (source: env)');
-    expect(h.stdout()).not.toContain('supersecret1234');
-    expect(h.stderr()).not.toContain('supersecret1234');
-  });
-
-  it('flag token beats env token', async () => {
-    const h = makeHarness({ env: { [TOKEN_ENV_VAR]: 'envtokenvalue1' } });
-    const code = await runCli(['--token', 'flagtokenvalue2', 'config', '--show'], h.deps);
-    expect(code).toBe(0);
-    expect(h.stdout()).toContain('token = "***lue2" (source: flag)');
-  });
-
-  it('file token surfaces workspace/limit and the file path', async () => {
-    const home = makeTempDir();
-    const dir = join(home, '.config', 'ts-projects');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(
-      join(dir, CONFIG_FILE_NAME),
-      'token = "filetoken5678"\nworkspace = "Acme"\nlimit = 50\n',
-      { mode: 0o600 }
-    );
-    const h = makeHarness({ homedir: () => home });
-    const code = await runCli(['config', '--show'], h.deps);
-    expect(code).toBe(0);
-    const output = h.stdout();
-    expect(output).toContain('token = "***5678" (source: file)');
-    expect(output).toContain('workspace = "Acme"');
-    expect(output).toContain('limit = 50');
-    expect(output).toContain(join(dir, CONFIG_FILE_NAME));
-  });
-
-  it('missing token everywhere -> exit 4 with the three remedies on stderr', async () => {
-    const h = makeHarness();
-    const code = await runCli(['config', '--show'], h.deps);
-    expect(code).toBe(4);
+    expect(h.stderr()).toContain("unknown command 'projcts'");
+    expect(h.stderr()).toContain('Did you mean projects?');
     expect(h.stdout()).toBe('');
-    const err = h.stderr();
-    expect(err).toContain('No TS_PROJECTS_TOKEN found');
-    expect(err).toContain('three options');
-    expect(err).toContain('--token');
-    expect(err).toContain(`export ${TOKEN_ENV_VAR}=`);
-    expect(err).toContain(CONFIG_FILE_NAME);
   });
 
-  it('nonexistent --config -> exit 2 usage error', async () => {
-    const home = makeTempDir();
-    const h = makeHarness({ homedir: () => home });
-    const code = await runCli(['--config', join(home, 'nope.toml'), 'config', '--show'], h.deps);
-    expect(code).toBe(2);
-    expect(h.stderr()).toContain('Config file does not exist');
-  });
+  it('unknown verb in projects and config groups -> exit 2 with did-you-mean suggestion', async () => {
+    const p = makeHarness();
+    expect(await runCli(['projects', 'lst'], p.deps)).toBe(2);
+    expect(p.stderr()).toContain('Did you mean list?');
 
-  it('malformed TOML -> exit 1 config error', async () => {
-    const home = makeTempDir();
-    const dir = join(home, '.config', 'ts-projects');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, CONFIG_FILE_NAME), 'token = broken\n', { mode: 0o600 });
-    const h = makeHarness({ homedir: () => home });
-    const code = await runCli(['config', '--show'], h.deps);
-    expect(code).toBe(1);
-    expect(h.stderr()).toContain('Invalid TOML');
-  });
-
-  it('config without --show prints the subcommand help', async () => {
-    const h = makeHarness();
-    const code = await runCli(['config'], h.deps);
-    expect(code).toBe(0);
-    expect(h.stdout()).toContain('--show');
+    const c = makeHarness();
+    expect(await runCli(['config', 'st'], c.deps)).toBe(2);
+    expect(c.stderr()).toContain('Did you mean set?');
   });
 });
 
-describe('verbosity ladder (D-018(3), cli-standards R4.4)', () => {
-  const env = { [TOKEN_ENV_VAR]: 'supersecret1234' };
+describe('config path', () => {
+  it('shows resolved path and exists status in text and JSON', async () => {
+    const home = makeTempDir();
+    const expectedPath = configFile({}, () => home);
 
-  it('default level shows info but not debug/trace', async () => {
-    const h = makeHarness({ env });
-    await runCli(['config', '--show'], h.deps);
-    expect(h.stderr()).toContain('resolved configuration');
-    expect(h.stderr()).not.toContain('token source:');
-    expect(h.stderr()).not.toContain('trace:');
+    const hText = makeHarness({ homedir: () => home });
+    expect(await runCli(['config', 'path'], hText.deps)).toBe(0);
+    expect(hText.stdout()).toContain(expectedPath);
+    expect(hText.stdout()).toContain('no');
+
+    const hJson = makeHarness({ homedir: () => home });
+    expect(await runCli(['config', 'path', '--json'], hJson.deps)).toBe(0);
+    expect(JSON.parse(hJson.stdout())).toEqual({ path: expectedPath, exists: false });
   });
 
-  it('-v adds debug output', async () => {
-    const h = makeHarness({ env });
-    await runCli(['-v', 'config', '--show'], h.deps);
-    expect(h.stderr()).toContain('token source: env');
-    expect(h.stderr()).not.toContain('trace:');
+  it('wraps absolute path in OSC-8 file:// link in TTY text mode, plain for relative path', async () => {
+    const home = makeTempDir();
+    const hTty = makeHarness({ homedir: () => home, stdoutIsTTY: true });
+    expect(await runCli(['config', 'path'], hTty.deps)).toBe(0);
+    expect(hTty.stdout()).toContain('\x1b]8;;file://');
+
+    const hRel = makeHarness({ homedir: () => home, stdoutIsTTY: true });
+    expect(await runCli(['config', 'path', '--config', 'rel.toml'], hRel.deps)).toBe(0);
+    expect(hRel.stdout()).toContain('rel.toml');
+    expect(hRel.stdout()).not.toContain('\x1b]8;;file://');
+  });
+});
+
+describe('config get', () => {
+  it('returns setting value with source "config" vs "default"', async () => {
+    const home = makeTempDir();
+    const cfg = join(home, 'custom.toml');
+    writeFileSync(cfg, '[output]\ncolor = "always"\n', 'utf8');
+
+    const hCfg = makeHarness({ homedir: () => home });
+    expect(
+      await runCli(['config', 'get', 'output.color', '--config', cfg, '--json'], hCfg.deps)
+    ).toBe(0);
+    expect(JSON.parse(hCfg.stdout())).toEqual({
+      key: 'output.color',
+      value: 'always',
+      source: 'config',
+    });
+
+    const hDef = makeHarness({ homedir: () => home });
+    expect(
+      await runCli(['config', 'get', 'logging.level', '--config', cfg, '--json'], hDef.deps)
+    ).toBe(0);
+    expect(JSON.parse(hDef.stdout())).toEqual({
+      key: 'logging.level',
+      value: 'warning',
+      source: 'default',
+    });
   });
 
-  it('-vv adds trace output', async () => {
-    const h = makeHarness({ env });
-    await runCli(['-v', '-v', 'config', '--show'], h.deps);
-    expect(h.stderr()).toContain('token source: env');
-    expect(h.stderr()).toContain('configuration resolution complete');
+  it('masks token (flag/env/absent) and never exposes raw secret', async () => {
+    const hEnv = makeHarness({ env: { [TOKEN_ENV_VAR]: 'supersecret1234' } });
+    expect(await runCli(['config', 'get', 'token', '--json'], hEnv.deps)).toBe(0);
+    expect(JSON.parse(hEnv.stdout())).toEqual({
+      key: 'token',
+      value: '****1234',
+      source: 'env',
+    });
+    expect(hEnv.stdout()).not.toContain('supersecret1234');
+    expect(hEnv.stderr()).not.toContain('supersecret1234');
+
+    const hFlag = makeHarness({ env: { [TOKEN_ENV_VAR]: 'envtokenvalue1' } });
+    expect(await runCli(['config', 'get', 'token', '--token', 'abcd', '--json'], hFlag.deps)).toBe(
+      0
+    );
+    expect(JSON.parse(hFlag.stdout())).toEqual({
+      key: 'token',
+      value: '****',
+      source: 'flag',
+    });
+
+    const hNone = makeHarness();
+    expect(await runCli(['config', 'get', 'token', '--json'], hNone.deps)).toBe(0);
+    expect(JSON.parse(hNone.stdout())).toEqual({
+      key: 'token',
+      value: null,
+      source: null,
+    });
   });
 
-  it('-q suppresses info', async () => {
-    const h = makeHarness({ env });
-    await runCli(['-q', 'config', '--show'], h.deps);
-    expect(h.stderr()).not.toContain('resolved configuration');
+  it('unknown key -> exit 2 usage error', async () => {
+    const h = makeHarness();
+    expect(await runCli(['config', 'get', 'unknown.key'], h.deps)).toBe(2);
+  });
+});
+
+describe('config init', () => {
+  it('--yes writes [output] and [logging] defaults atomically (0600 on POSIX)', async () => {
+    const dir = makeTempDir();
+    const target = join(dir, 'cfg.toml');
+    const h = makeHarness({ homedir: () => dir });
+    const code = await runCli(['config', 'init', '--yes', '--config', target], h.deps);
+    expect(code).toBe(0);
+    const body = readFileSync(target, 'utf8');
+    expect(body).toContain('format = "text"');
+    expect(body).toContain('color = "auto"');
+    expect(body).toContain('level = "warning"');
+    expect(h.stderr()).toContain(`Wrote ${target}`);
+    const mode = process.platform === 'win32' ? 0o600 : statSync(target).mode & 0o777;
+    expect(mode).toBe(0o600);
   });
 
-  it('quiet beats verbose when both are given', async () => {
-    const h = makeHarness({ env });
-    await runCli(['-q', '-v', 'config', '--show'], h.deps);
-    expect(h.stderr()).not.toContain('resolved configuration');
-    expect(h.stderr()).not.toContain('token source:');
+  it('--dry-run emits preview lines and writes nothing', async () => {
+    const dir = makeTempDir();
+    const target = join(dir, 'dry.toml');
+    const h = makeHarness({ homedir: () => dir });
+    const code = await runCli(['config', 'init', '--yes', '--dry-run', '--config', target], h.deps);
+    expect(code).toBe(0);
+    expect(h.stderr()).toContain('[dry-run] would set output.format = text');
+    expect(h.stderr()).toContain('[dry-run] would set output.color = auto');
+    expect(h.stderr()).toContain('[dry-run] would set logging.level = warning');
+    expect(existsSync(target)).toBe(false);
   });
 
-  it('--debug overrides --quiet', async () => {
-    const h = makeHarness({ env });
-    await runCli(['--debug', '-q', 'config', '--show'], h.deps);
-    expect(h.stderr()).toContain('token source: env');
+  it('--no-input without --yes refuses with ConfigError (exit 1) and --yes hint', async () => {
+    const dir = makeTempDir();
+    const target = join(dir, 'nope.toml');
+    const h = makeHarness({ homedir: () => dir });
+    const code = await runCli(['config', 'init', '--no-input', '--config', target], h.deps);
+    expect(code).toBe(1);
+    expect(h.stderr()).toContain('--yes');
+    expect(existsSync(target)).toBe(false);
   });
 
-  it.skipIf(process.platform === 'win32')(
-    '-q still shows warnings (loose permissions)',
-    async () => {
-      const home = makeTempDir();
-      const dir = join(home, '.config', 'ts-projects');
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, CONFIG_FILE_NAME), 'token = "filetoken5678"\n', {
-        mode: 0o644,
-      });
-      const h = makeHarness({ homedir: () => home });
-      const code = await runCli(['-q', 'config', '--show'], h.deps);
+  it('interactive prompts via promptChoice write chosen values', async () => {
+    const dir = makeTempDir();
+    const target = join(dir, 'interactive.toml');
+    const promptChoice = vi.fn<ChoicePrompter>(async (key: string) => {
+      if (key === 'output.format') return 'json';
+      if (key === 'output.color') return 'always';
+      return 'info';
+    });
+    const h = makeHarness({ homedir: () => dir, promptChoice });
+    const code = await runCli(['config', 'init', '--config', target], h.deps);
+    expect(code).toBe(0);
+    expect(promptChoice).toHaveBeenCalledTimes(3);
+    const body = readFileSync(target, 'utf8');
+    expect(body).toContain('format = "json"');
+    expect(body).toContain('color = "always"');
+    expect(body).toContain('level = "info"');
+  });
+
+  it('refuses to overwrite corrupt target file', async () => {
+    const dir = makeTempDir();
+    const target = join(dir, 'corrupt.toml');
+    writeFileSync(target, '[output\nbroken\n', 'utf8');
+    // Note: explicit --config already fails at resolveConfig with ConfigError (exit 1);
+    // also verify user-config target refusal without --config.
+    const userDir = configDir({}, () => dir);
+    mkdirSync(userDir, { recursive: true });
+    const userTarget = join(userDir, CONFIG_FILE_NAME);
+    writeFileSync(userTarget, '[output\nbroken\n', 'utf8');
+    chmodSync(userTarget, 0o600);
+    const h = makeHarness({ homedir: () => dir });
+    const code = await runCli(['config', 'init', '--yes'], h.deps);
+    expect(code).toBe(1);
+    expect(readFileSync(userTarget, 'utf8')).toBe('[output\nbroken\n');
+  });
+});
+
+describe('config set', () => {
+  it('writes nested TOML key atomically on new file even with --no-input', async () => {
+    const dir = makeTempDir();
+    const target = join(dir, 'cfg.toml');
+    const h = makeHarness({ homedir: () => dir });
+    const code = await runCli(
+      ['config', 'set', 'logging.level', 'info', '--config', target, '--no-input'],
+      h.deps
+    );
+    expect(code).toBe(0);
+    const body = readFileSync(target, 'utf8');
+    expect(body).toContain('[logging]');
+    expect(body).toContain('level = "info"');
+  });
+
+  it('rejects token and invalid enum values with exit 1', async () => {
+    const dir = makeTempDir();
+    const target = join(dir, 'cfg.toml');
+    const hTok = makeHarness({ homedir: () => dir });
+    expect(await runCli(['config', 'set', 'token', 'secret', '--config', target], hTok.deps)).toBe(
+      1
+    );
+    expect(hTok.stderr()).toContain('TS001');
+
+    const hBad = makeHarness({ homedir: () => dir });
+    expect(
+      await runCli(['config', 'set', 'output.color', 'rainbow', '--config', target], hBad.deps)
+    ).toBe(1);
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it('--dry-run returns source "dry-run" and writes nothing', async () => {
+    const dir = makeTempDir();
+    const target = join(dir, 'dry.toml');
+    const h = makeHarness({ homedir: () => dir });
+    const code = await runCli(
+      ['config', 'set', 'output.color', 'never', '--config', target, '--dry-run', '--json'],
+      h.deps
+    );
+    expect(code).toBe(0);
+    expect(JSON.parse(h.stdout())).toEqual({
+      key: 'output.color',
+      value: 'never',
+      source: 'dry-run',
+    });
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it('overwrite confirmation: same value skips prompt, changed value prompts, decline exits 130', async () => {
+    const dir = makeTempDir();
+    const target = join(dir, 'cfg.toml');
+    writeFileSync(target, '[logging]\nlevel = "warning"\n', 'utf8');
+
+    // Same value -> no prompt even with --no-input
+    const promptConfirmSame = vi.fn<ConfirmPrompter>(async () => false);
+    const hSame = makeHarness({ homedir: () => dir, promptConfirm: promptConfirmSame });
+    expect(
+      await runCli(
+        ['config', 'set', 'logging.level', 'warning', '--config', target, '--no-input'],
+        hSame.deps
+      )
+    ).toBe(0);
+    expect(promptConfirmSame).not.toHaveBeenCalled();
+
+    // Changed value + --no-input without --yes -> ConfigError exit 1
+    const hNoInput = makeHarness({ homedir: () => dir });
+    expect(
+      await runCli(
+        ['config', 'set', 'logging.level', 'info', '--config', target, '--no-input'],
+        hNoInput.deps
+      )
+    ).toBe(1);
+    expect(hNoInput.stderr()).toContain('--yes');
+    expect(readFileSync(target, 'utf8')).toContain('level = "warning"');
+
+    // Changed value + interactive decline -> Aborted. + exit 130
+    const promptDecline = vi.fn<ConfirmPrompter>(async () => false);
+    const hDecline = makeHarness({ homedir: () => dir, promptConfirm: promptDecline });
+    expect(
+      await runCli(['config', 'set', 'logging.level', 'info', '--config', target], hDecline.deps)
+    ).toBe(130);
+    expect(promptDecline).toHaveBeenCalledTimes(1);
+    expect(hDecline.stderr()).toContain('Aborted.');
+    expect(readFileSync(target, 'utf8')).toContain('level = "warning"');
+
+    // Changed value + --yes -> overwrites cleanly
+    const hYes = makeHarness({ homedir: () => dir });
+    expect(
+      await runCli(
+        ['config', 'set', 'logging.level', 'info', '--config', target, '--yes'],
+        hYes.deps
+      )
+    ).toBe(0);
+    expect(readFileSync(target, 'utf8')).toContain('level = "info"');
+  });
+
+  it('refuses corrupt target file on config set', async () => {
+    const dir = makeTempDir();
+    const userDir = configDir({}, () => dir);
+    mkdirSync(userDir, { recursive: true });
+    const userTarget = join(userDir, CONFIG_FILE_NAME);
+    writeFileSync(userTarget, '[logging\nbroken\n', 'utf8');
+    const h = makeHarness({ homedir: () => dir });
+    expect(await runCli(['config', 'set', 'logging.level', 'info', '--yes'], h.deps)).toBe(1);
+    expect(readFileSync(userTarget, 'utf8')).toBe('[logging\nbroken\n');
+  });
+});
+
+describe('doctor and doctor --bundle', () => {
+  it('runs checks and exits 0 when only warnings are present', async () => {
+    const home = makeTempDir();
+    const h = makeHarness({ homedir: () => home });
+    const code = await runCli(['doctor', '--json'], h.deps);
+    expect(code).toBe(0);
+    const payload = JSON.parse(h.stdout()) as {
+      checks: Array<{ name: string; status: string; detail: string }>;
+    };
+    const names = payload.checks.map((c) => c.name);
+    expect(names).toEqual(['node', 'platform', 'config-file', 'token']);
+    expect(payload.checks.find((c) => c.name === 'token')?.status).toBe('warn');
+  });
+
+  it('exits 1 when node check fails (< 24)', async () => {
+    const h = makeHarness({ nodeVersion: '22.11.0' });
+    const code = await runCli(['doctor', '--json'], h.deps);
+    expect(code).toBe(1);
+    const payload = JSON.parse(h.stdout()) as {
+      checks: Array<{ name: string; status: string; detail: string }>;
+    };
+    expect(payload.checks.find((c) => c.name === 'node')?.status).toBe('error');
+  });
+
+  it('doctor --bundle redacts sensitive TS_PROJECTS_* env vars and excludes log contents', async () => {
+    const home = makeTempDir();
+    const logPath = join(home, 'secret.log');
+    writeFileSync(logPath, 'DO_NOT_LEAK_THIS_LOG_CONTENT\n', 'utf8');
+    const h = makeHarness({
+      homedir: () => home,
+      env: {
+        TS_PROJECTS_TOKEN: 'secret-tok',
+        TS_PROJECTS_API_KEY: 'secret-key',
+        TS_PROJECTS_SECRET: 'secret-val',
+        TS_PROJECTS_PASSWORD: 'secret-pw',
+        TS_PROJECTS_CRED: 'secret-cred',
+        TS_PROJECTS_PRIVATE: 'secret-priv',
+        TS_PROJECTS_SOURCE: 'memory',
+        TS_PROJECTS_OUTPUT: 'json',
+        TS_PROJECTS_LOG_FILE: logPath,
+      },
+    });
+    const code = await runCli(['doctor', '--bundle', '--json'], h.deps);
+    expect(code).toBe(0);
+    const raw = h.stdout();
+    for (const secret of [
+      'secret-tok',
+      'secret-key',
+      'secret-val',
+      'secret-pw',
+      'secret-cred',
+      'secret-priv',
+      'DO_NOT_LEAK_THIS_LOG_CONTENT',
+    ]) {
+      expect(raw).not.toContain(secret);
+    }
+    const bundle = JSON.parse(raw) as {
+      version: string;
+      token_present: boolean;
+      token_source: string | null;
+      env: Record<string, string>;
+      log_file: string;
+    };
+    expect(bundle.version).toBe(VERSION);
+    expect(bundle.token_present).toBe(true);
+    expect(bundle.token_source).toBe('env');
+    expect(bundle.env['TS_PROJECTS_TOKEN']).toBe('<redacted>');
+    expect(bundle.env['TS_PROJECTS_API_KEY']).toBe('<redacted>');
+    expect(bundle.env['TS_PROJECTS_SECRET']).toBe('<redacted>');
+    expect(bundle.env['TS_PROJECTS_PASSWORD']).toBe('<redacted>');
+    expect(bundle.env['TS_PROJECTS_CRED']).toBe('<redacted>');
+    expect(bundle.env['TS_PROJECTS_PRIVATE']).toBe('<redacted>');
+    expect(bundle.env['TS_PROJECTS_SOURCE']).toBe('memory');
+    expect(typeof bundle.log_file).toBe('string');
+  });
+
+  it('doctor --bundle redacts URL userinfo and sensitive query params in TS_PROJECTS_API_URL while preserving clean URLs', async () => {
+    const hDirty = makeHarness({
+      env: {
+        TS_PROJECTS_API_URL:
+          'https://alice:s3cr3t@api.example.test/api/1.0?access_token=tok999&auth=bearer&region=us',
+      },
+    });
+    expect(await runCli(['doctor', '--bundle', '--json'], hDirty.deps)).toBe(0);
+    const dirtyOut = hDirty.stdout();
+    expect(dirtyOut).not.toContain('alice');
+    expect(dirtyOut).not.toContain('s3cr3t');
+    expect(dirtyOut).not.toContain('tok999');
+    expect(dirtyOut).not.toContain('bearer');
+    const dirtyBundle = JSON.parse(dirtyOut) as { env: Record<string, string> };
+    const sanitized = dirtyBundle.env['TS_PROJECTS_API_URL'] ?? '';
+    expect(sanitized).toContain('REDACTED');
+    expect(sanitized).toContain('region=us');
+    expect(sanitized).toContain('api.example.test/api/1.0');
+
+    const hClean = makeHarness({
+      env: {
+        TS_PROJECTS_API_URL: 'https://app.ts.com/api/1.0',
+      },
+    });
+    expect(await runCli(['doctor', '--bundle', '--json'], hClean.deps)).toBe(0);
+    const cleanBundle = JSON.parse(hClean.stdout()) as { env: Record<string, string> };
+    expect(cleanBundle.env['TS_PROJECTS_API_URL']).toBe('https://app.ts.com/api/1.0');
+  });
+});
+
+describe('completion {bash,zsh,fish}', () => {
+  const hasBash =
+    process.platform !== 'win32' &&
+    spawnSync('bash', ['-c', 'command -v compgen >/dev/null'], { encoding: 'utf8' }).status === 0;
+  const hasZsh =
+    process.platform !== 'win32' &&
+    spawnSync('zsh', ['-c', 'true'], { encoding: 'utf8' }).status === 0;
+
+  it.each(['bash', 'zsh', 'fish'] as const)(
+    'emits %s completion script to stdout',
+    async (shell) => {
+      const h = makeHarness();
+      const code = await runCli(['completion', shell], h.deps);
       expect(code).toBe(0);
-      expect(h.stderr()).toContain('chmod 600');
+      expect(h.stderr()).toBe('');
+      expect(h.stdout()).toContain(TOOL_DIR_NAME);
+      expect(h.stdout()).toContain(`_${TOOL_DIR_NAME.replaceAll('-', '_')}_completion`);
     }
   );
+
+  it('bash completion handles leading global options before noun/verb', async () => {
+    const h = makeHarness();
+    expect(await runCli(['completion', 'bash'], h.deps)).toBe(0);
+    const script = h.stdout();
+    expect(script).not.toContain('case "${COMP_WORDS[1]}"');
+    expect(script).toContain('pos=()');
+  });
+
+  it.runIf(hasBash)(
+    'bash completion passes bash -n and completes with leading global flags',
+    async () => {
+      const h = makeHarness();
+      expect(await runCli(['completion', 'bash'], h.deps)).toBe(0);
+      const script = h.stdout();
+      const fnName = `_${TOOL_DIR_NAME.replaceAll('-', '_')}_completion`;
+      const syntax = spawnSync('bash', ['-n'], { input: script, encoding: 'utf8' });
+      expect(syntax.status).toBe(0);
+
+      const probe = [
+        script,
+        'COMP_WORDS=(ts-projects --json projects "")',
+        'COMP_CWORD=3',
+        fnName,
+        'printf "1:%s\\n" "${COMPREPLY[*]}"',
+        'COMP_WORDS=(ts-projects -o json config "")',
+        'COMP_CWORD=4',
+        fnName,
+        'printf "2:%s\\n" "${COMPREPLY[*]}"',
+        'COMP_WORDS=(ts-projects --json config get "")',
+        'COMP_CWORD=4',
+        fnName,
+        'printf "3:%s\\n" "${COMPREPLY[*]}"',
+      ].join('\n');
+      const run = spawnSync('bash', ['-c', probe], { encoding: 'utf8' });
+      expect(run.status).toBe(0);
+      expect(run.stdout).toContain('1:');
+      expect(run.stdout).toMatch(/1:.*\blist\b.*\bget\b/);
+      expect(run.stdout).toMatch(/2:.*\binit\b.*\bpath\b.*\bget\b.*\bset\b/);
+      expect(run.stdout).toMatch(/3:.*\boutput\.format\b.*\btoken\b/);
+    }
+  );
+
+  it('zsh completion includes args) state handler for projects, config, doctor, and completion', async () => {
+    const h = makeHarness();
+    expect(await runCli(['completion', 'zsh'], h.deps)).toBe(0);
+    const script = h.stdout();
+    expect(script).toContain('args)');
+    expect(script).toContain('$line[1]');
+    expect(script).toContain('projects)');
+    expect(script).toContain('config)');
+    expect(script).toContain('doctor)');
+    expect(script).toContain('completion)');
+    expect(script).toContain('bash zsh fish');
+  });
+
+  it.runIf(hasZsh)('zsh completion passes zsh -n syntax check', async () => {
+    const h = makeHarness();
+    expect(await runCli(['completion', 'zsh'], h.deps)).toBe(0);
+    const syntax = spawnSync('zsh', ['-n'], { input: h.stdout(), encoding: 'utf8' });
+    expect(syntax.status).toBe(0);
+  });
+
+  it('fish completion tracks positional depth and dispatches subcommand flags and keys', async () => {
+    const h = makeHarness();
+    expect(await runCli(['completion', 'fish'], h.deps)).toBe(0);
+    const script = h.stdout();
+    expect(script).toContain('count $pos');
+    expect(script).toContain('--workspace');
+    expect(script).toContain('output.format');
+    expect(script).toContain('--dry-run');
+    expect(script).toContain('--bundle');
+    expect(script).toContain('bash zsh fish');
+  });
+
+  it('rejects unsupported shell with exit 2', async () => {
+    const h = makeHarness();
+    const code = await runCli(['completion', 'powershell'], h.deps);
+    expect(code).toBe(2);
+    expect(h.stdout()).toBe('');
+  });
 });
 
-describe('stack traces (source --verbose traceback intent)', () => {
-  it('hides the stack by default', async () => {
-    const h = makeHarness();
-    await runCli(['config', '--show'], h.deps);
-    expect(h.stderr()).not.toContain('at ');
+describe('single-emission config warnings & suppression in json mode', () => {
+  it('emits discovered-config degradation warning ONCE on stderr even with -q, suppressed in json mode', async () => {
+    const home = makeTempDir();
+    const dir = configDir({}, () => home);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, CONFIG_FILE_NAME), '[output]\ncolor = "yes"\n', { mode: 0o600 });
+
+    const hText = makeHarness({ homedir: () => home });
+    expect(await runCli(['-q', 'config', 'path'], hText.deps)).toBe(0);
+    const matches = hText.stderr().match(/ignoring invalid config value output\.color/g) ?? [];
+    expect(matches).toHaveLength(1);
+
+    const hJson = makeHarness({ homedir: () => home });
+    expect(await runCli(['config', 'path', '--json'], hJson.deps)).toBe(0);
+    expect(hJson.stderr()).not.toContain('ignoring invalid config value');
   });
 
-  it('shows the stack under --debug', async () => {
-    const h = makeHarness();
-    await runCli(['--debug', 'config', '--show'], h.deps);
-    expect(h.stderr()).toContain('AuthError');
-    expect(h.stderr()).toMatch(/\n\s+at /);
-  });
+  it('corrupt explicit --config -> exit 1 ConfigError; missing explicit --config -> tolerated', async () => {
+    const home = makeTempDir();
+    const missing = join(home, 'nope.toml');
+    const hMissing = makeHarness({ homedir: () => home });
+    expect(await runCli(['config', 'path', '--config', missing, '--json'], hMissing.deps)).toBe(0);
+    expect(JSON.parse(hMissing.stdout())).toEqual({ path: missing, exists: false });
 
-  it('shows the stack under -v', async () => {
-    const h = makeHarness();
-    await runCli(['-v', 'config', '--show'], h.deps);
-    expect(h.stderr()).toMatch(/\n\s+at /);
+    const corrupt = join(home, 'bad.toml');
+    writeFileSync(corrupt, '[output\nbroken\n', 'utf8');
+    const hCorrupt = makeHarness({ homedir: () => home });
+    expect(await runCli(['config', 'path', '--config', corrupt], hCorrupt.deps)).toBe(1);
+    expect(hCorrupt.stderr()).toContain('invalid TOML in config file');
   });
 });
 
 describe('color gating (D-018(2), D-038)', () => {
-  it('FORCE_COLOR yields ANSI on error output', async () => {
-    const h = makeHarness({ env: { FORCE_COLOR: '1' } });
-    await runCli(['config', '--show'], h.deps);
-    expect(h.stderr()).toMatch(ANSI_PATTERN);
+  it('FORCE_COLOR yields ANSI on error output, --no-color and NO_COLOR strip it', async () => {
+    const hForce = makeHarness({ env: { FORCE_COLOR: '1' } });
+    await runCli(['projects', 'list', '--no-input'], hForce.deps);
+    expect(hForce.stderr()).toMatch(ANSI_PATTERN);
+
+    const hNoFlag = makeHarness({ env: { FORCE_COLOR: '1' } });
+    await runCli(['--no-color', 'projects', 'list', '--no-input'], hNoFlag.deps);
+    expect(hNoFlag.stderr()).not.toMatch(ANSI_PATTERN);
+
+    const hNoEnv = makeHarness({ env: { NO_COLOR: '1', FORCE_COLOR: '1' } });
+    await runCli(['projects', 'list', '--no-input'], hNoEnv.deps);
+    expect(hNoEnv.stderr()).not.toMatch(ANSI_PATTERN);
   });
 
-  it('--no-color strips ANSI even under FORCE_COLOR', async () => {
-    const h = makeHarness({ env: { FORCE_COLOR: '1' } });
-    await runCli(['--no-color', 'config', '--show'], h.deps);
-    expect(h.stderr()).not.toMatch(ANSI_PATTERN);
-  });
-
-  it('NO_COLOR strips ANSI', async () => {
-    const h = makeHarness({ env: { NO_COLOR: '1', FORCE_COLOR: '' } });
-    await runCli(['config', '--show'], h.deps);
-    expect(h.stderr()).not.toMatch(ANSI_PATTERN);
-  });
-
-  it('non-TTY stderr without FORCE_COLOR has no ANSI', async () => {
-    const h = makeHarness();
-    await runCli(['config', '--show'], h.deps);
-    expect(h.stderr()).not.toMatch(ANSI_PATTERN);
-  });
-
-  it('TTY stderr enables ANSI', async () => {
-    const h = makeHarness({ stderrIsTTY: true });
-    await runCli(['config', '--show'], h.deps);
-    expect(h.stderr()).toMatch(ANSI_PATTERN);
-  });
-
-  // D-038: createColors(enabled) must be fully determined by the passed
-  // boolean, never by picocolors' own module-load env/argv/TTY detection
-  // (pc.isColorSupported, derived from the real process this test runs
-  // in). Assert both directions unconditionally: whatever the ambient
-  // real environment's auto-detected verdict happens to be here, at
-  // least one of these two assertions would fail if colors.ts fell back
-  // to picocolors' default-detected formatters (e.g. `pc.red`) instead
-  // of the enabled-gated instance from `pc.createColors(enabled)`.
-  it('enabled=true yields ANSI regardless of the ambient real environment', () => {
+  it('enabled=true/false determines picocolors output independently', () => {
     expect(createColors(true).error('x')).toMatch(ANSI_PATTERN);
-  });
-
-  it('enabled=false yields no ANSI regardless of the ambient real environment', () => {
     expect(createColors(false).error('x')).toBe('x');
   });
 });
 
 describe('realDeps (process-backed wiring)', () => {
-  it('exposes writers, env, homedir, and TTY flags', () => {
+  it('exposes writers, env, homedir, TTY flags, and adapters', () => {
     const deps = realDeps();
     expect(deps.env).toBe(process.env);
     expect(typeof deps.homedir()).toBe('string');
@@ -347,7 +719,6 @@ describe('realDeps (process-backed wiring)', () => {
     expect(typeof deps.prompter).toBe('function');
     expect(typeof deps.clipboard).toBe('function');
     expect(typeof deps.spinner).toBe('function');
-    // Writers target the real streams; exercise them with empty writes.
     deps.stdout('');
     deps.stderr('');
   });

@@ -1,8 +1,9 @@
 // resolveApiConfig: the API's defaults (127.0.0.1:8080, in-memory data) and
 // the startup errors for bad values.
+import { ConfigError, DomainError, ERROR_CODES } from '@ts-launch-blueprint/core';
 import { describe, expect, it } from 'vitest';
 
-import { ConfigError, parseRateLimit, resolveApiConfig } from '../src/config.js';
+import { parseRateLimit, resolveApiConfig } from '../src/config.js';
 
 describe('resolveApiConfig', () => {
   it('defaults to 127.0.0.1:8080, in-memory source, no CORS/rate-limit, and 10s shutdown', () => {
@@ -36,9 +37,18 @@ describe('resolveApiConfig', () => {
     expect(resolveApiConfig({ HOST: '' }).host).toBe('127.0.0.1');
   });
 
-  it('rejects a whitespace-only HOST', () => {
+  it('rejects a whitespace-only HOST with core ConfigError (TS001)', () => {
     expect(() => resolveApiConfig({ HOST: '   ' })).toThrow(ConfigError);
     expect(() => resolveApiConfig({ HOST: '   ' })).toThrow('Invalid HOST "   "');
+    let caught: unknown;
+    try {
+      resolveApiConfig({ HOST: '   ' });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ConfigError);
+    expect(caught).toBeInstanceOf(DomainError);
+    expect((caught as ConfigError).code).toBe(ERROR_CODES.config);
   });
 
   it.each(['abc', '0', '65536', '80.5', '-1'])('rejects PORT=%s', (value) => {

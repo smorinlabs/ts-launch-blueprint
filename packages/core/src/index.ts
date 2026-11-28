@@ -18,9 +18,16 @@ export type { ListProjectsQuery, ProjectsRepository } from './repositories/proje
 export {
   ApiError,
   AuthError,
+  ConfigError,
   ConflictError,
   DomainError,
+  type DomainErrorOptions,
+  ERROR_CODES,
+  type ErrorCode,
+  InterruptError,
   NotFoundError,
+  ProjectNotFoundError,
+  WorkspaceNotFoundError,
 } from './schemas/errors.js';
 export type { Project, Workspace } from './schemas/project.schema.js';
 export {

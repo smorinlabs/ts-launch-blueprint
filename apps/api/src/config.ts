@@ -2,6 +2,7 @@
 // server.ts turns a ConfigError into a non-zero exit at startup. The source
 // parser duplicates the CLI's on purpose: one app never imports another
 // ([app-no-cross-app-import]); if both copies grow, move it into the core.
+import { ConfigError } from '@ts-launch-blueprint/core';
 import { z } from 'zod';
 
 /** Env var selecting the data source; the API defaults to `memory`. */
@@ -54,14 +55,6 @@ export interface RateLimitConfig {
   limit: number;
   windowMs: number;
   unit: 'second' | 'minute' | 'hour' | 'day';
-}
-
-/** A configuration problem, reported at startup. */
-export class ConfigError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ConfigError';
-  }
 }
 
 /** Tracing settings; `tracesUrl` undefined means tracing is off. */

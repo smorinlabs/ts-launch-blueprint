@@ -1,4 +1,4 @@
-// Golden snapshots of every command's --help output at a deterministic 80 columns (P08-TS04, Q3.A).
+// Golden snapshots of every command's --help output at a deterministic 80 columns (P08-TS04, Q3.A, P11-TS06).
 import { describe, expect, it } from 'vitest';
 
 import { realClipboard, realPrompter, realSpinner } from '../src/cli/adapters.js';
@@ -44,7 +44,15 @@ function makeHelpHarness(
 const HELP_COMMANDS: ReadonlyArray<{ label: string; argv: string[] }> = [
   { label: 'root', argv: [] },
   { label: 'projects', argv: ['projects'] },
+  { label: 'projects list', argv: ['projects', 'list'] },
+  { label: 'projects get', argv: ['projects', 'get'] },
   { label: 'config', argv: ['config'] },
+  { label: 'config init', argv: ['config', 'init'] },
+  { label: 'config path', argv: ['config', 'path'] },
+  { label: 'config get', argv: ['config', 'get'] },
+  { label: 'config set', argv: ['config', 'set'] },
+  { label: 'doctor', argv: ['doctor'] },
+  { label: 'completion', argv: ['completion'] },
 ];
 
 describe('CLI --help golden snapshots', () => {
@@ -68,7 +76,7 @@ describe('CLI --help golden snapshots', () => {
       const { deps, stdout } = makeHelpHarness();
       const code = await runCli(['--help'], deps);
       expect(code).toBe(0);
-      expect(stdout()).toContain('(default:\n                      false)');
+      expect(stdout()).toContain('"csv",\n                         "markdown")');
     } finally {
       if (isTtyDesc === undefined) {
         Reflect.deleteProperty(process.stdout, 'isTTY');
@@ -89,12 +97,12 @@ describe('CLI --help golden snapshots', () => {
       Object.defineProperty(process.stdout, 'columns', { value: 200, configurable: true });
       const wide = makeHelpHarness({}, true);
       expect(await runCli(['--help'], wide.deps)).toBe(0);
-      expect(wide.stdout()).toContain('(default: false)');
+      expect(wide.stdout()).toContain('"csv", "markdown")');
 
       Object.defineProperty(process.stdout, 'columns', { value: undefined, configurable: true });
       const fallback = makeHelpHarness({}, true);
       expect(await runCli(['--help'], fallback.deps)).toBe(0);
-      expect(fallback.stdout()).toContain('(default:\n                      false)');
+      expect(fallback.stdout()).toContain('"csv",\n                         "markdown")');
     } finally {
       if (colsDesc === undefined) {
         Reflect.deleteProperty(process.stdout, 'columns');

@@ -8,8 +8,11 @@ import * as lib from '../src/lib.js';
 import type {
   ApiClient,
   ApiClientOptions,
+  CliErrorOptions,
   ConfigFileValues,
   ConfigFs,
+  DomainErrorOptions,
+  ErrorCode,
   ExitCode,
   OutputFormat,
   Project,
@@ -21,8 +24,6 @@ import type {
 
 describe('public API surface (D-012(3))', () => {
   it('src/lib.ts exports exactly the expected runtime names', () => {
-    // Sorted in place: tsconfig's ES2022 lib has no toSorted(), and
-    // unicorn(no-array-sort) only allows sort() as its own statement.
     const names = Object.keys(lib);
     names.sort();
     expect(names).toEqual([
@@ -35,12 +36,16 @@ describe('public API surface (D-012(3))', () => {
       'ConflictError',
       'DEFAULT_LIMIT',
       'DEFAULT_TIMEOUT_MS',
+      'ERROR_CODES',
       'EXIT_CODES',
+      'InterruptError',
       'NotFoundError',
       'OUTPUT_FORMATS',
+      'ProjectNotFoundError',
       'TOKEN_ENV_VAR',
       'UsageError',
       'VERSION',
+      'WorkspaceNotFoundError',
       'configFileSchema',
       'createApiClient',
       'defaultConfigPath',
@@ -48,20 +53,27 @@ describe('public API surface (D-012(3))', () => {
       'formatOutput',
       'missingTokenMessage',
       'redactToken',
+      'relativeTime',
       'requireToken',
       'resolveConfig',
+      'richLink',
       'writeUserConfig',
     ]);
   });
 
-  it('src/lib.ts exports the expected types', () => {
-    // Compile-time guard: this file fails `tsc --noEmit` if any type above is
-    // removed or renamed. The tuple below just marks the imports as used.
+  it('src/lib.ts exports the expected types and excludes file from TokenSource', () => {
+    type _AssertTokenSource =
+      Exclude<TokenSource, 'flag' | 'env' | 'none'> extends never ? true : never;
+    const _tokenSourceExact: _AssertTokenSource = true;
+
     type _Surface = [
       ApiClient,
       ApiClientOptions,
+      CliErrorOptions,
       ConfigFileValues,
       ConfigFs,
+      DomainErrorOptions,
+      ErrorCode,
       ExitCode,
       OutputFormat,
       Project,
@@ -70,6 +82,7 @@ describe('public API surface (D-012(3))', () => {
       TokenSource,
       Workspace,
     ];
-    expect(true).toBe(true);
+    expect(_tokenSourceExact).toBe(true);
+    expect(lib.OUTPUT_FORMATS).toEqual(['text', 'json', 'csv', 'markdown']);
   });
 });

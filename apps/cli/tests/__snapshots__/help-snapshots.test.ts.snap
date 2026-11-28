@@ -1,33 +1,144 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'config' 1`] = `
-"Usage: ts-projects config [options]
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'completion' 1`] = `
+"Usage: ts-projects completion [options] <shell>
 
-inspect the resolved configuration
+generate shell completion script (bash, zsh, fish)
+
+Arguments:
+  shell       target shell (choices: "bash", "zsh", "fish")
 
 Options:
-  --show      print effective configuration values (secrets redacted) (default:
+  -h, --help  display help for command
+"
+`;
+
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'config get' 1`] = `
+"Usage: ts-projects config get [options] <key>
+
+show a resolved config value and its source
+
+Arguments:
+  key         dotted config key (choices: "logging.file", "logging.file_level",
+              "logging.format", "logging.level", "output.color",
+              "output.format", "token")
+
+Options:
+  -h, --help  display help for command
+"
+`;
+
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'config init' 1`] = `
+"Usage: ts-projects config init [options]
+
+create or update the config file with guided prompts
+
+Options:
+  --dry-run   show what would change; write nothing (default: false)
+  -y, --yes   accept current defaults without prompting (default: false)
+  -h, --help  display help for command
+"
+`;
+
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'config path' 1`] = `
+"Usage: ts-projects config path [options]
+
+show the resolved config file path and whether it exists
+
+Options:
+  -h, --help  display help for command
+"
+`;
+
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'config set' 1`] = `
+"Usage: ts-projects config set [options] <key> <value>
+
+write a non-secret config value atomically
+
+Arguments:
+  key         dotted config key (e.g. output.color, logging.level)
+  value       value to write
+
+Options:
+  --dry-run   show what would change; write nothing (default: false)
+  -y, --yes   skip overwrite confirmation prompt (default: false)
+  -h, --help  display help for command
+"
+`;
+
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'config' 1`] = `
+"Usage: ts-projects config [options] [command]
+
+inspect and edit CLI configuration
+
+Options:
+  -h, --help                   display help for command
+
+Commands:
+  init [options]               create or update the config file with guided
+                               prompts
+  path                         show the resolved config file path and whether it
+                               exists
+  get <key>                    show a resolved config value and its source
+  set [options] <key> <value>  write a non-secret config value atomically
+  help [command]               display help for command
+"
+`;
+
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'doctor' 1`] = `
+"Usage: ts-projects doctor [options]
+
+check environment and configuration health
+
+Options:
+  --bundle    collect a redacted diagnostics bundle for bug reports (default:
               false)
   -h, --help  display help for command
 "
 `;
 
-exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'projects' 1`] = `
-"Usage: ts-projects projects [options]
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'projects get' 1`] = `
+"Usage: ts-projects projects get [options] <id>
+
+fetch a single project by ID
+
+Arguments:
+  id               project ID
+
+Options:
+  --copy           copy results to clipboard (default: false)
+  --source <name>  data source: http (default) or memory (demo data, no token)
+  -h, --help       display help for command
+"
+`;
+
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'projects list' 1`] = `
+"Usage: ts-projects projects list [options]
 
 search and select projects
 
 Options:
   --workspace <name>  filter projects by workspace name
   --limit <n>         maximum number of projects to retrieve (default: 200)
-  --format <format>   output format (choices: "text", "json", "csv", default:
-                      "text")
-  --json              output json (alias for --format json)
-  --output <file>     write results to file
   --copy              copy results to clipboard (default: false)
   --source <name>     data source: http (default) or memory (demo data, no
                       token)
   -h, --help          display help for command
+"
+`;
+
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'projects' 1`] = `
+"Usage: ts-projects projects [options] [command]
+
+list and inspect projects
+
+Options:
+  -h, --help          display help for command
+
+Commands:
+  list [options]      search and select projects
+  get [options] <id>  fetch a single project by ID
+  help [command]      display help for command
 "
 `;
 
@@ -37,20 +148,29 @@ exports[`CLI --help golden snapshots > matches committed 80-column --help snapsh
 Search and select projects.
 
 Options:
-  -V, --version       output the version number
-  -v, --verbose       increase verbosity (repeatable: -v debug, -vv trace)
-  -q, --quiet         only show warnings and errors (default: false)
-  --debug             maximum diagnostics; implies -v and overrides -q (default:
-                      false)
-  --no-color          disable colored output
-  --no-input          never prompt; select all fetched projects
-  --config <path>     path to config file (replaces discovery)
-  --token <token>     personal access token
-  -h, --help          display help for command
+  -V, --version          output the version number
+  -o, --output <format>  output format (choices: "text", "json", "csv",
+                         "markdown")
+  --json                 shorthand for --output json
+  --output-file <path>   write results to a file instead of stdout
+  --log-level <level>    explicit console log level (choices: "debug", "info",
+                         "warning", "error", "critical")
+  --log-file [path]      enable rotating file logging (default: XDG state)
+  -v, --verbose          increase verbosity (repeatable: -v info, -vv debug)
+  -q, --quiet            suppress non-essential stderr output (default: false)
+  --debug                maximum diagnostics; enables debug logs and stack
+                         traces (default: false)
+  --no-color             disable colored output
+  --no-input             never prompt; disable interactive pager
+  --config <path>        path to config file (replaces discovery)
+  --token <token>        personal access token
+  -h, --help             display help for command
 
 Commands:
-  projects [options]  search and select projects
-  config [options]    inspect the resolved configuration
-  help [command]      display help for command
+  projects               list and inspect projects
+  config                 inspect and edit CLI configuration
+  doctor [options]       check environment and configuration health
+  completion <shell>     generate shell completion script (bash, zsh, fish)
+  help [command]         display help for command
 "
 `;

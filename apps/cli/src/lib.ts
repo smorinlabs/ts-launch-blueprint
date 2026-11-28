@@ -28,13 +28,31 @@ export {
 } from './cli/config.js';
 export {
   CliError,
-  ConfigError,
+  type CliErrorOptions,
   EXIT_CODES,
   type ExitCode,
   exitCodeFor,
   UsageError,
 } from './cli/exit-codes.js';
-export { ApiError, AuthError, ConflictError, NotFoundError } from '@ts-launch-blueprint/core';
+export {
+  ApiError,
+  AuthError,
+  ConfigError,
+  ConflictError,
+  type DomainErrorOptions,
+  ERROR_CODES,
+  type ErrorCode,
+  InterruptError,
+  NotFoundError,
+  ProjectNotFoundError,
+  WorkspaceNotFoundError,
+} from '@ts-launch-blueprint/core';
 export type { Project, Workspace } from '@ts-launch-blueprint/core';
-export { formatOutput, type OutputFormat, OUTPUT_FORMATS } from './cli/format.js';
+export {
+  formatOutput,
+  type OutputFormat,
+  OUTPUT_FORMATS,
+  relativeTime,
+  richLink,
+} from './cli/format.js';
 export { VERSION } from './version.js';

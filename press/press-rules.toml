@@ -41,6 +41,43 @@ pattern = "{cli_name}_config.toml"
 reason = "CLI config filename joins cli_name with _config.toml"
 
 [[replace]]
+pattern = "{cli_name}.log"
+reason = "CLI log filename joins cli_name with .log"
+
+[[replace]]
+pattern = "{cli_name}_crash.log"
+reason = "CLI crash log filename joins cli_name with _crash.log"
+
+[[replace]]
+pattern = "{cli_name}_first_run.marker"
+reason = "CLI first-run onboarding marker filename joins cli_name with _first_run.marker"
+
+[[replace]]
+pattern = "{cli_name}-xdg-"
+files = ["apps/cli/tests/**"]
+reason = "temporary directory prefix in xdg-paths tests"
+
+[[replace]]
+pattern = "{cli_name}_db"
+files = ["apps/cli/tests/**"]
+reason = "sample database filename in xdg-paths tests"
+
+[[replace]]
+pattern = "{cli_name}_cache"
+files = ["apps/cli/tests/**"]
+reason = "sample cache filename in xdg-paths tests"
+
+[[replace]]
+pattern = "{cli_name}_history"
+files = ["apps/cli/tests/**"]
+reason = "sample history filename in xdg-paths tests"
+
+[[replace]]
+pattern = "{cli_name}_first_run"
+files = ["apps/cli/tests/**"]
+reason = "sample state filename in xdg-paths tests"
+
+[[replace]]
 pattern = "{cli_name}-cli-"
 files = ["apps/cli/tests/**"]
 reason = "temporary directory prefix in CLI tests"

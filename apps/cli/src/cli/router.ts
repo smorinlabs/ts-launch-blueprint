@@ -1,26 +1,61 @@
-// Commander v15 program factory wrapped in DI (D-016(1)): thin entry
-// (src/cli.ts) calls runCli(argv, deps) -> exit code; tests call it
-// in-process with injected writers/env (claim-npm CliDeps pattern).
-//
-// Port of the source CLI surface (py_launch_blueprint/projects.py
-// docstring + option surface, lines 24-63/320-353) with the D-031 fix:
-// the source's "fuzzy matching" docstring claim was false advertising
-// and is not carried. Usage errors map to exit 2 via exitOverride
-// (Commander defaults to 1; D-016(2)); did-you-mean suggestions come
-// from Commander's built-in showSuggestionAfterError (D-016(8)).
+// Commander v15 noun-verb program factory wrapped in DI (`runCli(argv, deps)`).
+// Uses HelpGroupCommand so bare root / noun groups emit help to stdout and exit 0
+// while preserving showSuggestionAfterError(true) on typos.
 import { homedir as osHomedir } from 'node:os';
 
-import { Command, CommanderError } from 'commander';
+import { DomainError, ERROR_CODES } from '@ts-launch-blueprint/core';
+import { Command, CommanderError, type HelpContext, Option } from 'commander';
 
 import { VERSION } from '../version.js';
-import { realClipboard, realPrompter, realSpinner } from './adapters.js';
-import { colorEnabled, createColors } from './colors.js';
+import {
+  realChoicePrompter,
+  realClipboard,
+  realConfirmPrompter,
+  realPager,
+  realPrompter,
+  realSpinner,
+} from './adapters.js';
+import { colorEnabled, type Colors, createColors } from './colors.js';
+import { registerCompletionCommand } from './commands/completion.js';
+import { registerConfigCommand, SilentExitError } from './commands/config.js';
+import { registerDoctorCommand } from './commands/doctor.js';
 import { registerProjectsCommand } from './commands/projects.js';
-import { redactToken, requireToken, resolveConfig } from './config.js';
+import { type ConfigColorMode, resolveConfig } from './config.js';
+import { writeCrashLog } from './crash-log.js';
 import type { CliContext, CliDeps, GlobalOpts } from './deps.js';
-import { EXIT_CODES, exitCodeFor } from './exit-codes.js';
-import { createLogger, resolveLevel } from './logger.js';
-import { resolveSource } from './source.js';
+import { CliError, EXIT_CODES, exitCodeFor, UsageError } from './exit-codes.js';
+import { formatHumanError, formatJsonError, OUTPUT_FORMATS, type OutputFormat } from './format.js';
+import {
+  createLogger,
+  LOG_LEVELS,
+  resolveConsoleLevel,
+  resolveLogFilePath,
+  resolveLogFormat,
+} from './logger.js';
+import { maybeShowFirstRunHint } from './onboarding.js';
+import { TOOL_DIR_NAME } from './xdg-paths.js';
+
+const ENV_PREFIX = TOOL_DIR_NAME.toUpperCase().replaceAll('-', '_');
+const OUTPUT_ENV_VAR = `${ENV_PREFIX}_OUTPUT`;
+
+/** Command subclass converting bare-group `error: true` help calls to exit 0 on stdout. */
+class HelpGroupCommand extends Command {
+  override createCommand(name?: string): Command {
+    return new HelpGroupCommand(name);
+  }
+
+  override help(context?: HelpContext): never;
+  override help(cb: (str: string) => string): never;
+  override help(contextOrCb?: HelpContext | ((str: string) => string)): never {
+    if (typeof contextOrCb === 'function') {
+      return super.help(contextOrCb);
+    }
+    if (contextOrCb?.error === true) {
+      return super.help({ ...contextOrCb, error: false });
+    }
+    return super.help(contextOrCb);
+  }
+}
 
 /** Real process-backed deps for the production entry point. */
 export function realDeps(): CliDeps {
@@ -33,167 +68,292 @@ export function realDeps(): CliDeps {
     },
     env: process.env,
     homedir: osHomedir,
+    cwd: () => process.cwd(),
+    platform: process.platform,
     stdoutIsTTY: process.stdout.isTTY ?? false,
     stderrIsTTY: process.stderr.isTTY ?? false,
     stdinIsTTY: process.stdin.isTTY ?? false,
     fetchImpl: globalThis.fetch,
     prompter: realPrompter,
+    promptChoice: realChoicePrompter,
+    promptConfirm: realConfirmPrompter,
+    pager: realPager,
     clipboard: realClipboard,
     spinner: realSpinner,
   };
 }
 
-function buildContext(program: Command, deps: CliDeps): CliContext {
+function resolveOutputMode(
+  opts: GlobalOpts,
+  env: Record<string, string | undefined>,
+  configFormat: OutputFormat
+): OutputFormat {
+  if (opts.json === true) {
+    return 'json';
+  }
+  if (opts.output !== undefined) {
+    return opts.output;
+  }
+  const rawEnv = env[OUTPUT_ENV_VAR];
+  if (rawEnv !== undefined && rawEnv !== '') {
+    if (!(OUTPUT_FORMATS as readonly string[]).includes(rawEnv)) {
+      throw new UsageError(
+        `Invalid ${OUTPUT_ENV_VAR} "${rawEnv}": expected one of ${OUTPUT_FORMATS.join(', ')}`
+      );
+    }
+    return rawEnv as OutputFormat;
+  }
+  return configFormat;
+}
+
+function resolveColorMode(
+  opts: GlobalOpts,
+  env: Record<string, string | undefined>,
+  configColor: ConfigColorMode
+): ConfigColorMode {
+  if (opts.color === false) {
+    return 'never';
+  }
+  const noColor = env['NO_COLOR'];
+  if (noColor !== undefined && noColor !== '') {
+    return 'never';
+  }
+  const forceColor = env['FORCE_COLOR'];
+  if (forceColor !== undefined && forceColor !== '' && forceColor !== '0') {
+    return 'always';
+  }
+  return configColor;
+}
+
+function fallbackIsJson(program: Command, deps: CliDeps): boolean {
   const opts = program.opts<GlobalOpts>();
-  const colors = createColors(
+  if (opts.json === true || opts.output === 'json') {
+    return true;
+  }
+  return opts.output === undefined && deps.env[OUTPUT_ENV_VAR] === 'json';
+}
+
+function fallbackColors(program: Command, deps: CliDeps): Colors {
+  const opts = program.opts<GlobalOpts>();
+  return createColors(
     colorEnabled({
       noColorFlag: opts.color === false,
       env: deps.env,
       isTTY: deps.stderrIsTTY,
     })
   );
-  const logger = createLogger(
-    deps.stderr,
-    resolveLevel({ verbose: opts.verbose, quiet: opts.quiet, debug: opts.debug }),
-    colors
-  );
-  return { opts, colors, logger };
 }
 
-function buildProgram(deps: CliDeps): Command {
-  const program = new Command();
+interface ContextRef {
+  current: CliContext | undefined;
+  outputMode: OutputFormat | undefined;
+  colors: Colors | undefined;
+}
+
+function buildContext(
+  program: Command,
+  deps: CliDeps,
+  commandPath: string,
+  ctxRef: ContextRef
+): CliContext {
+  const opts = program.opts<GlobalOpts>();
+
+  // Validate TS_PROJECTS_OUTPUT / --output early so invalid values throw UsageError (2).
+  const initialMode = resolveOutputMode(opts, deps.env, 'text');
+  ctxRef.outputMode = initialMode;
+
+  const resolvedConfig = resolveConfig({
+    flagToken: opts.token,
+    configPathFlag: opts.config,
+    env: deps.env,
+    homedir: deps.homedir,
+    cwd: deps.cwd,
+    fs: deps.fs,
+    platform: deps.platform,
+  });
+
+  const outputMode = resolveOutputMode(opts, deps.env, resolvedConfig.settings.output.format);
+  ctxRef.outputMode = outputMode;
+
+  const colorMode = resolveColorMode(opts, deps.env, resolvedConfig.settings.output.color);
+  const stderrColored =
+    colorMode === 'always' ? true : colorMode === 'never' ? false : deps.stderrIsTTY;
+  const colors = createColors(stderrColored);
+  ctxRef.colors = colors;
+
+  const message = (text: string): void => {
+    if (outputMode === 'json') {
+      return;
+    }
+    deps.stderr(`${text}\n`);
+  };
+
+  // Emit discovered-config degradation warnings ONCE on stderr (suppressed in json mode).
+  for (const warning of resolvedConfig.warnings) {
+    message(`${colors.warn('warning:')} ${warning}`);
+  }
+
+  const level = resolveConsoleLevel({
+    logLevelFlag: opts.logLevel,
+    env: deps.env,
+    verbose: opts.verbose,
+    quiet: opts.quiet,
+    debug: opts.debug,
+    configLevel: resolvedConfig.settings.logging.level,
+  });
+  const filePath = resolveLogFilePath({
+    logFileFlag: opts.logFile,
+    env: deps.env,
+    homedir: deps.homedir,
+    platform: deps.platform,
+    configFile: resolvedConfig.settings.logging.file,
+  });
+  const fileFormat = resolveLogFormat(deps.env, resolvedConfig.settings.logging.format);
+
+  const logger = createLogger({
+    stderr: deps.stderr,
+    level,
+    colors,
+    stderrIsTTY: deps.stderrIsTTY,
+    filePath,
+    fileLevel: resolvedConfig.settings.logging.file_level,
+    fileFormat,
+    platform: deps.platform,
+  });
+
+  logger.debug('invocation context ready', {
+    output_mode: outputMode,
+    color: colorMode,
+    log_file: filePath ?? null,
+  });
+
+  const ctx: CliContext = {
+    opts,
+    colors,
+    logger,
+    outputMode,
+    colorMode,
+    outputFile: opts.outputFile,
+    resolvedConfig,
+    message,
+  };
+  ctxRef.current = ctx;
+
+  maybeShowFirstRunHint(ctx, deps, commandPath);
+  return ctx;
+}
+
+function buildProgram(deps: CliDeps, ctxRef: ContextRef, errChunks: string[]): Command {
+  const program = new HelpGroupCommand();
   program
-    .name('ts-projects')
+    .name(TOOL_DIR_NAME)
     .description('Search and select projects.')
-    .version(`ts-projects ${VERSION}`, '-V, --version', 'output the version number')
-    // Usage errors must exit 2 (cli-standards R6.1); Commander defaults
-    // to 1, so exitOverride routes everything through runCli's mapping.
+    .version(`${TOOL_DIR_NAME} ${VERSION}`, '-V, --version', 'output the version number')
     .exitOverride()
     .showSuggestionAfterError(true)
     .configureOutput({
       writeOut: (text) => deps.stdout(text),
-      writeErr: (text) => deps.stderr(text),
+      writeErr: (text) => {
+        errChunks.push(text);
+      },
       getOutHelpWidth: () => (deps.stdoutIsTTY ? (process.stdout.columns ?? 80) : 80),
     })
+    .addOption(new Option('-o, --output <format>', 'output format').choices(OUTPUT_FORMATS))
+    .option('--json', 'shorthand for --output json')
+    .option('--output-file <path>', 'write results to a file instead of stdout')
+    .addOption(new Option('--log-level <level>', 'explicit console log level').choices(LOG_LEVELS))
+    .option('--log-file [path]', 'enable rotating file logging (default: XDG state)')
     .option(
       '-v, --verbose',
-      'increase verbosity (repeatable: -v debug, -vv trace)',
+      'increase verbosity (repeatable: -v info, -vv debug)',
       (_value: string | undefined, previous: number) => previous + 1,
       0
     )
-    .option('-q, --quiet', 'only show warnings and errors', false)
-    .option('--debug', 'maximum diagnostics; implies -v and overrides -q', false)
+    .option('-q, --quiet', 'suppress non-essential stderr output', false)
+    .option('--debug', 'maximum diagnostics; enables debug logs and stack traces', false)
     .option('--no-color', 'disable colored output')
-    .option('--no-input', 'never prompt; select all fetched projects')
+    .option('--no-input', 'never prompt; disable interactive pager')
     .option('--config <path>', 'path to config file (replaces discovery)')
     .option('--token <token>', 'personal access token');
 
-  registerProjectsCommand(program, deps, () => buildContext(program, deps));
+  const initContext = (commandPath: string): CliContext =>
+    buildContext(program, deps, commandPath, ctxRef);
 
-  const configCommand = program
-    .command('config')
-    .description('inspect the resolved configuration')
-    .option('--show', 'print effective configuration values (secrets redacted)', false);
-  configCommand.action((cmdOpts: { show: boolean }) => {
-    const { logger } = buildContext(program, deps);
-    if (!cmdOpts.show) {
-      deps.stdout(configCommand.helpInformation());
-      return;
-    }
-    const globals = program.opts<GlobalOpts>();
-    // --source belongs to the projects command, so only the env var applies
-    // here; memory mode needs no token, so requireToken is skipped.
-    const { source, origin } = resolveSource({ env: deps.env });
-    const resolved = resolveConfig({
-      flagToken: globals.token,
-      configPathFlag: globals.config,
-      env: deps.env,
-      homedir: deps.homedir,
-      fs: deps.fs,
-      warn: (message) => logger.warn(message),
-    });
-    const token = source === 'memory' ? undefined : requireToken(resolved, deps.env, deps.homedir);
-    // Leveled diagnostics (D-018(3)): info by default, debug at -v,
-    // trace at -vv; -q drops info. All on stderr, never stdout.
-    logger.info(`resolved configuration (config file: ${resolved.configPath ?? 'none'})`);
-    logger.debug(`token source: ${resolved.tokenSource}`);
-    logger.trace('configuration resolution complete');
-    const lines = [
-      `source = ${source} (source: ${origin})`,
-      token === undefined
-        ? 'token = (not needed: memory source)'
-        : `token = "${redactToken(token)}" (source: ${resolved.tokenSource})`,
-      `workspace = ${resolved.workspace === undefined ? '(unset)' : `"${resolved.workspace}"`}`,
-      `limit = ${resolved.limit === undefined ? '(unset)' : String(resolved.limit)}`,
-      `config_file = ${resolved.configPath ?? '(none)'}`,
-    ];
-    deps.stdout(`${lines.join('\n')}\n`);
-  });
+  registerProjectsCommand(program, deps, initContext);
+  registerConfigCommand(program, deps, initContext);
+  registerDoctorCommand(program, deps, initContext);
+  registerCompletionCommand(program, deps, initContext);
 
   return program;
 }
 
 /**
- * Run the CLI in-process. Returns the exit code (never throws, never
- * calls process.exit) so the entry can set process.exitCode and tests
- * can assert codes directly (D-016(1,2)).
+ * Run the CLI in-process. Returns the exit code (never throws, never calls
+ * `process.exit`).
  */
 export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
-  const program = buildProgram(deps);
+  const ctxRef: ContextRef = { current: undefined, outputMode: undefined, colors: undefined };
+  const errChunks: string[] = [];
+  const program = buildProgram(deps, ctxRef, errChunks);
   try {
     await program.parseAsync(argv, { from: 'user' });
     return EXIT_CODES.success;
   } catch (err) {
     if (err instanceof CommanderError) {
-      // --help / -V land here with exitCode 0; Commander already wrote
-      // the message via configureOutput. Everything else is usage -> 2.
-      return err.exitCode === 0 ? EXIT_CODES.success : EXIT_CODES.usage;
+      if (err.exitCode === 0) {
+        return EXIT_CODES.success;
+      }
+      const rawErrText = errChunks.join('');
+      if (fallbackIsJson(program, deps)) {
+        const firstLine = (rawErrText.split('\n', 1)[0] ?? err.message).trim();
+        const normalized = firstLine.startsWith('error: ')
+          ? firstLine.slice('error: '.length)
+          : firstLine;
+        const message = normalized !== '' ? normalized : err.message;
+        deps.stderr(`${formatJsonError({ exitCode: EXIT_CODES.usage, message })}\n`);
+      } else if (rawErrText !== '') {
+        deps.stderr(rawErrText);
+      }
+      return EXIT_CODES.usage;
     }
-    // Prompt interrupt (D-033): @inquirer rejects with ExitPromptError on
-    // both ^C and stdin-close mid-prompt. Detected by name so the prompt
-    // stack stays a dynamic import (@inquirer/core is not a direct dep).
-    // A clean "Cancelled." replaces the library internals ("User force
-    // closed the prompt with SIGINT" / "... with 13 null"); exit 130 per
-    // the R6.1 interrupt contract — a documented deviation from the
-    // source, whose questionary swallowed ^C into exit 0.
+    if (err instanceof SilentExitError) {
+      return err.exitCode;
+    }
     if (err instanceof Error && err.name === 'ExitPromptError') {
       deps.stderr('Cancelled.\n');
       return EXIT_CODES.sigint;
     }
-    const message = err instanceof Error ? err.message : String(err);
-    // Machine-mode error envelope (D-018(4)/D-033, cli-standards R7.8):
-    // when the requested format is json, stderr carries a single
-    // {"error":{"code","message"}} JSON object instead of the human
-    // text (and never a stack trace). Usage errors above are exempt —
-    // "after arg parsing" is the contract boundary.
-    if (machineMode(program)) {
-      const code = err instanceof Error ? err.name : 'Error';
-      // Concise, single-line message: multi-line remediation prose (the
-      // missing-token tutorial) is human-mode content; machines get the
-      // headline only.
-      const concise = message.split('\n', 1)[0] ?? message;
-      deps.stderr(`${JSON.stringify({ error: { code, message: concise } })}\n`);
-      return exitCodeFor(err);
+
+    const isDomainOrCli = err instanceof DomainError || err instanceof CliError;
+    const exitCode = exitCodeFor(err);
+    const rawMessage = err instanceof Error ? err.message : String(err);
+    const isJson =
+      ctxRef.outputMode !== undefined
+        ? ctxRef.outputMode === 'json'
+        : fallbackIsJson(program, deps);
+    const colors = ctxRef.colors ?? fallbackColors(program, deps);
+    const errorCode =
+      err instanceof DomainError
+        ? err.code
+        : err instanceof CliError
+          ? err.code
+          : ERROR_CODES.unexpected;
+    const hint = err instanceof DomainError || err instanceof CliError ? err.hint : undefined;
+    const tracebackPath = isDomainOrCli ? undefined : writeCrashLog(err, deps);
+
+    if (isJson) {
+      const concise = rawMessage.split('\n', 1)[0] ?? rawMessage;
+      deps.stderr(
+        `${formatJsonError({ exitCode, message: concise, errorCode, hint, tracebackPath })}\n`
+      );
+      return exitCode;
     }
-    const { opts, logger } = buildContext(program, deps);
-    logger.error(message);
-    // Source --verbose traceback intent: stack traces only under
-    // --debug or -v and up (D-018(3)).
+
+    deps.stderr(formatHumanError({ message: rawMessage, colors, errorCode, hint, tracebackPath }));
+    const opts = program.opts<GlobalOpts>();
     if ((opts.debug || opts.verbose >= 1) && err instanceof Error && err.stack !== undefined) {
       deps.stderr(`${err.stack}\n`);
     }
-    return exitCodeFor(err);
+    return exitCode;
   }
-}
-
-/** True when the failed invocation asked for JSON output (--format json
- * or its --json alias on the projects command). Unparsed commands report
- * their defaults (text), so non-projects invocations stay human-mode. */
-function machineMode(program: Command): boolean {
-  const projects = program.commands.find((command) => command.name() === 'projects');
-  if (projects === undefined) {
-    return false;
-  }
-  const opts = projects.opts<{ format?: string; json?: boolean }>();
-  return opts.json === true || opts.format === 'json';
 }

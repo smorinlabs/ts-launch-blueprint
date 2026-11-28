@@ -1,30 +1,29 @@
 # ts-projects Example CLI
 
-`ts-projects` is the template's example CLI — a TypeScript port of the
-source repo's `py-projects` tool (D-024(11)). This document is its UX
-spec.
+`ts-projects` is the template's example CLI — a TypeScript port of
+`py-launch-blueprint`'s `plbp` v4 CLI (`Q3.A`, `Q4.A`). This document is
+its UX spec.
 
 ## Features
 
-- 🏢 Filter by workspace
-- 📋 Multiple output formats (text, JSON, CSV)
-- ✅ Interactive multi-select of the fetched projects
-- 📎 Clipboard integration
-- 🎨 Terminal UI with color support (`--no-color`/`NO_COLOR` honored)
-- 🔐 Secure token handling
-- 🤖 Pipe-safe: results on stdout only, diagnostics on stderr
-
-> The source advertised "fuzzy search for project names" but never
-> implemented it; the claim (and its dead dependencies) are dropped per
-> D-031. The checkbox prompt's built-in list navigation is the
-> selection aid.
+- 🧭 Clean noun-verb command tree (`projects`, `config`, `doctor`, `completion`)
+- 🏢 Filter projects by workspace or fetch a single project by ID
+- 📋 Global output formats (`text`, `json`, `csv`, `markdown`) and `--output-file`
+- ✅ Interactive multi-select on `projects list` in TTY mode
+- 📎 Clipboard integration (`--copy`)
+- 🎨 Terminal UI with color support (`--no-color`/`NO_COLOR`/`[output].color`)
+- 🔐 Env/flag-only token handling (tokens are never stored in TOML config files)
+- 📁 3-layer TOML config discovery (`system` → `user` → `project`) with warning degradation
+- 📖 Interactive pager (`TS_PROJECTS_PAGER` > `PAGER` > `less -FRX`) for tall text output
+- 🩺 Diagnostics (`doctor [--bundle]`) and shell completion (`completion {bash,zsh,fish}`)
+- 🪵 Dual-sink logging (`--log-level`, `--log-file`) and `TS000` crash log
+- 🤖 Pipe-safe: results on stdout only, diagnostics/warnings/errors on stderr
 
 ## Installation
 
 ### From npm
 
 ```bash
-# Placeholder — not yet published to npm (publishing lands in S5).
 npm install -g ts-launch-blueprint
 ```
 
@@ -47,264 +46,182 @@ node apps/cli/dist/cli.js --help
 
 ## Configuration
 
-The tool supports multiple ways to provide your ts-projects Personal
-Access Token (PAT), in order of precedence:
+### Token Precedence (No Tokens in Config Files)
 
-1. Command-line argument: `--token`
+Per ADR 0002, `ts-projects` never reads or writes `token` in TOML config
+files. Tokens resolve strictly from:
+
+1. Command-line flag: `--token <token>`
 2. Environment variable: `TS_PROJECTS_TOKEN`
-3. Configuration file: `~/.config/ts-projects/ts-projects_config.toml`
 
-The configuration file is TOML (cli-standards R5.2; D-017(1)). If
-`XDG_CONFIG_HOME` is set, the file lives at
-`$XDG_CONFIG_HOME/ts-projects/ts-projects_config.toml`; the
-`~/.config` fallback applies on ALL platforms, including Windows
-(`%USERPROFILE%\.config\ts-projects\`), matching the source's
-cross-platform `~/.config` behavior.
+Empty strings are treated as unset. Running `ts-projects config set token ...`
+is rejected with `ConfigError` (`TS001`).
 
-> **Migration note (Python source)**: the source stored the token in a
-> dotenv file (`~/.config/py-cli/.env` with `PY_TOKEN=...`). The port
-> replaces that tier with the TOML file above — move your token to
-> `token = "..."` in `ts-projects_config.toml`. There is no `.env`
-> config tier and no dotenv dependency (D-017(5)).
+### 3-Layer Config Discovery & Platform Paths (ADR 0004, ADR 0011)
 
-### Setting Up the Configuration File
+Without `--config` or `TS_PROJECTS_CONFIG`, `ts-projects` merges three
+TOML layers from lowest to highest precedence:
 
-1. Create the config directory:
+1. **System**: `$XDG_CONFIG_DIRS` (colon-separated on POSIX, semicolon-separated
+   on Windows; defaults to `/etc/xdg/ts-projects/ts-projects_config.toml`
+   on POSIX and `%PROGRAMDATA%\ts-projects\ts-projects_config.toml` on Windows)
+2. **User**: `$XDG_CONFIG_HOME/ts-projects/ts-projects_config.toml`
+   (defaults to `~/.config/ts-projects/ts-projects_config.toml` on POSIX
+   and `%APPDATA%\ts-projects\ts-projects_config.toml` on Windows)
+3. **Project**: `./.ts-projects_config.toml` in the current working directory if
+   present, otherwise `./ts-projects_config.toml`
 
-```bash
-mkdir -p ~/.config/ts-projects
-```
+`XDG_CONFIG_HOME`, `XDG_CONFIG_DIRS`, `XDG_DATA_HOME`, `XDG_STATE_HOME`,
+and `XDG_CACHE_HOME` win on **all** platforms when set, non-empty, and
+absolute. On Windows, unset XDG variables default to `%APPDATA%`
+(config), `%LOCALAPPDATA%` (data/state), and `%LOCALAPPDATA%\ts-projects\Cache`
+(cache).
 
-2. Create `ts-projects_config.toml`:
+If a discovered config file or setting value is invalid, `ts-projects`
+emits a `warning:` on stderr once (suppressed in JSON mode) and degrades
+gracefully to valid defaults. Explicit `--config <path>` (or
+`TS_PROJECTS_CONFIG`) replaces discovery: a missing file is tolerated,
+while unreadable or malformed TOML raises `ConfigError` (`TS001`, exit `1`).
 
-```bash
-cat > ~/.config/ts-projects/ts-projects_config.toml <<'EOF'
-token = "your_token_here"
-EOF
-```
-
-3. Set proper permissions (POSIX):
-
-```bash
-chmod 600 ~/.config/ts-projects/ts-projects_config.toml
-```
-
-The CLI warns (non-fatally) when a token-bearing config file is
-readable by group/others, and its own config writes use mode `0600`.
-
-> **Windows note (D-017(6))**: file modes cannot express user/group/
-> other on Windows, so the `chmod 600` step does not apply. Files under
-> `%USERPROFILE%` are already scoped to your account by the profile
-> directory's default ACLs. To harden explicitly:
->
-> ```
-> icacls "%USERPROFILE%\.config\ts-projects\ts-projects_config.toml" /inheritance:r /grant:r "%USERNAME%:F"
-> ```
-
-### Optional Config Keys
+### Config Schema & Interactive Management
 
 ```toml
-token = "your_token_here"   # personal access token
-workspace = "My Workspace"  # default workspace filter
-limit = 200                 # default maximum number of projects
+workspace = "My Workspace"  # optional default workspace filter for projects list
+limit = 200                 # optional default limit for projects list
+
+[output]
+format = "text"   # text | json | csv | markdown
+color = "auto"    # auto | always | never
+
+[logging]
+level = "warning"     # debug | info | warning | error | critical
+file = ""             # optional log file path
+file_level = "debug"  # debug | info | warning | error | critical
+format = "text"       # text | json
 ```
 
-`workspace` and `limit` act as defaults for the matching flags; an
-explicit `--workspace`/`--limit` flag always wins (cli-standards R5.1).
-
-### `--config <path>`
-
-`--config` points the CLI at an explicit config file. The path must
-exist (a missing path is a usage error, exit 2) and it REPLACES
-discovery — the default user config is not merged in (cli-standards
-R5.4).
-
-### Inspecting the Effective Configuration
+Manage config safely (atomic `temp + fsync + rename`, `0o600` on POSIX,
+corrupt-target write refusal):
 
 ```bash
-# Print effective values (token redacted) and their source
-ts-projects config --show
+ts-projects config init              # guided prompts on stderr (--yes, --dry-run)
+ts-projects config path              # print resolved target path and existence
+ts-projects config get output.color  # show value and source (config | default)
+ts-projects config get token         # masked ****XXXX and source (flag | env | -)
+ts-projects config set logging.level info --yes
 ```
 
 ## Usage
 
-`projects` is the default command: bare `ts-projects` runs it, exactly
-like bare `py-projects` did in the source.
+Bare `ts-projects` (and bare `ts-projects projects` / `ts-projects config`)
+prints help to stdout and exits `0`. Misspelled commands and flags suggest
+near matches (`Did you mean ...?`) and exit `2`.
 
-### Basic Usage
-
-```bash
-# Search for projects (fetch, preview, interactive multi-select)
-ts-projects
-
-# Filter by workspace (case-insensitive name match)
-ts-projects --workspace "My Workspace"
-
-# Limit results (default: 200)
-ts-projects --limit 50
-```
-
-After the fetch, an interactive checkbox prompt (rendered on stderr)
-lets you select the subset of projects to output. Only the selected
-projects flow into the output formats and sinks. Selecting nothing is a
-graceful no-op: `No projects selected` on stderr, exit 0.
-
-Interrupting the prompt (`Ctrl-C`, or stdin closing mid-prompt) prints
-`Cancelled.` on stderr and exits **130** (D-033). This deliberately
-diverges from the Python source, whose questionary prompt swallowed
-`Ctrl-C` into an empty selection and exited 0 — hiding the cancellation
-from scripts.
-
-### Demo Mode (No Token, No Server)
-
-`--source memory` (or `TS_PROJECTS_SOURCE=memory`) runs the CLI on the
-core's built-in in-memory demo data: two workspaces (Engineering,
-Marketing) and four projects. No token is looked up (one given anyway is
-ignored), `TS_PROJECTS_API_URL` is ignored, and no network call is made.
-Every other option works the same:
+### `projects list` and `projects get <id>`
 
 ```bash
-# Try the CLI without a token or a server
-ts-projects --source memory
-TS_PROJECTS_SOURCE=memory ts-projects --workspace engineering --no-input --format json
+# List projects (interactive multi-select in TTY mode)
+ts-projects projects list
+
+# Filter by workspace and limit
+ts-projects projects list --workspace "My Workspace" --limit 50
+
+# Fetch a single project by ID
+ts-projects projects get 12345 --json
+
+# Demo mode without token or network
+ts-projects projects list --source memory --no-input --json
+TS_PROJECTS_SOURCE=memory ts-projects projects get p-1 --json
 ```
 
-The default source is `http`; `--source` beats `TS_PROJECTS_SOURCE`, and
-any other value is a usage error (exit 2):
-`Invalid source "foo": expected "http" or "memory"`. In memory mode one
-notice line goes to stderr (`Using in-memory demo data (...)`), hidden by
-`-q`, so stdout stays pipe-safe. `config --show` prints the effective
-source as its first line.
+Selecting nothing in interactive mode prints `No projects selected` on stderr
+and exits `0`. Interrupting a prompt (`Ctrl-C`) prints `Cancelled.` on stderr
+and exits `130`.
 
-### Non-Interactive Use
+### Global Output Formats (`-o/--output`, `--json`, `--output-file`)
 
-The prompt requires a TTY. With `--no-input`, or whenever stdin/stderr
-is not a TTY (pipes, CI, cron), the prompt is skipped and ALL fetched
-projects are selected:
+Every subcommand honors global output flags before or after the verb:
 
 ```bash
-# Pipe-safe: stdout carries exactly one JSON document, nothing else
-ts-projects --no-input --format json | jq '.projects[].name'
+ts-projects projects list -o text       # terminal table (paged if tall)
+ts-projects projects list -o json       # 2-space JSON
+ts-projects projects list --json        # overrides -o / env / config -> json
+ts-projects projects list -o csv        # RFC 4180 CSV
+ts-projects projects list -o markdown   # GFM table with ## heading and \| escaping
+ts-projects doctor --bundle --output-file report.json --json
 ```
 
-The fetch spinner renders on stderr only, and only when stderr is a
-TTY outside CI — piped output never needs stripping.
+Precedence: `--json` > `-o/--output` > `TS_PROJECTS_OUTPUT` > `[output].format` > `text`.
 
-### Output Formats
+### Interactive Pager (ADR 0008)
+
+In `text` mode on an interactive stdout TTY without `--output-file` or
+`--no-input`, output with line count `>=` terminal rows pipes through
+`TS_PROJECTS_PAGER` > `PAGER` > `less -FRX`. Set-but-empty `TS_PROJECTS_PAGER=""`
+or `PAGER=""` disables paging. Spawn failures fall back cleanly to stdout.
+
+### First-Run Onboarding & Crash Log
+
+- **First-run hint**: On an interactive TTY stderr run when no config file
+  exists (`--no-input`, `-q`, `--json`, and `config init` excluded), a
+  one-time hint is shown and recorded at
+  `<state>/ts-projects/ts-projects_first_run.marker`.
+- **Crash log (`TS000`)**: Unexpected non-domain errors append a UTC
+  timestamp and stack trace to `<state>/ts-projects/ts-projects_crash.log`
+  and print `full traceback: <path>` (or `traceback_path` in JSON errors).
+
+### `doctor [--bundle]` and `completion`
 
 ```bash
-# JSON output: {"projects": [...]} with 2-space indent
-ts-projects --format json
-
-# CSV output: id,name header, one row per selected project
-ts-projects --format csv
-
-# Text output (default): one project ID per line (xargs-friendly)
-ts-projects --format text
-
-# --json is an alias for --format json (cli-standards R4.2)
-ts-projects --json
+ts-projects doctor            # checks node (>=24), platform, config-file, token
+ts-projects doctor --bundle   # redacted snapshot for bug reports
+ts-projects completion bash   # also zsh, fish
 ```
 
-`--json` and an explicit `--format` together are a usage error
-(exit 2).
+### Structured JSON Errors (ADR 0006)
 
-> **cli-standards divergence (D-033)**: the standard's
-> `-o/--output <table|json|...>` format enum is deliberately NOT
-> adopted — `--output` remains the **file sink** for parity with the
-> Python source, and the format lives on `--format`/`--json`.
-
-**Machine-mode errors**: when json output is requested (`--format
-json` or `--json`), any error after argument parsing is emitted on
-stderr as a single JSON object per cli-standards R7.8 instead of the
-human text:
+When JSON output is active, errors on stderr emit a single JSON line:
 
 ```json
 {
   "error": {
-    "code": "AuthError",
-    "message": "No TS_PROJECTS_TOKEN found in environment or config file."
+    "code": 4,
+    "name": "AUTH",
+    "message": "No TS_PROJECTS_TOKEN found (never stored in the config file).",
+    "error_code": "TS002",
+    "hint": "supply it via --token or $TS_PROJECTS_TOKEN; `ts-projects doctor` checks setup"
   }
 }
 ```
 
-`code` is the error class (`AuthError`, `ApiError`, `NotFoundError`,
-`ConfigError`, ...) whose exit-code mapping is the table below. Prompt
-cancellation is not an error: it prints `Cancelled.` and exits 130 in
-every mode.
-
-### Result Sinks
-
-```bash
-# Write to a file instead of stdout (confirmation goes to stderr)
-ts-projects --output projects.txt
-
-# Additionally copy the exact result string to the clipboard
-ts-projects --copy
-```
-
-`--copy` needs a display server. In headless environments (CI,
-containers, bare Linux servers without `xsel`/`wl-clipboard`) it fails
-with a clear error on stderr and exit 1 — never a crash — after the
-result has already been written to stdout or the `--output` file.
-
-### Additional Options
-
-```bash
-# Verbose diagnostics (repeatable; adds the ID column to the preview)
-ts-projects --verbose
-
-# Disable colors
-ts-projects --no-color
-
-# Show help
-ts-projects --help
-
-# Show version
-ts-projects --version
-```
-
 ## Environment Variables
 
-| Variable              | Effect                                                                               |
-| --------------------- | ------------------------------------------------------------------------------------ |
-| `TS_PROJECTS_TOKEN`   | Personal access token (beats the config file)                                        |
-| `TS_PROJECTS_API_URL` | Overrides the API root (testing/self-hosted; default `https://app.ts.com/api/1.0`)   |
-| `TS_PROJECTS_SOURCE`  | Data source: `http` (default) or `memory` (demo data, no token); `--source` beats it |
-| `XDG_CONFIG_HOME`     | Overrides the config base directory                                                  |
-| `NO_COLOR`            | Disables colored output (any non-empty value)                                        |
-| `FORCE_COLOR`         | Forces colored output even when not a TTY (`0` disables)                             |
-| `CI`                  | Any non-empty value suppresses the fetch spinner                                     |
-
-An empty `TS_PROJECTS_TOKEN` is treated as unset. `--no-color` beats
-`NO_COLOR`, which beats `FORCE_COLOR`, which beats TTY detection
-(D-026/D-018(2)).
-
-`TS_PROJECTS_API_URL` exists so the e2e test tier (and anyone pointing
-the CLI at a compatible self-hosted API) can override the placeholder
-API root without code changes.
+| Variable                   | Effect                                                                           |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| `TS_PROJECTS_TOKEN`        | Personal access token (only env/flag token source; empty treated as unset)       |
+| `TS_PROJECTS_CONFIG`       | Explicit config file path (replaces 3-layer discovery)                           |
+| `TS_PROJECTS_OUTPUT`       | Default output format (`text`, `json`, `csv`, `markdown`)                        |
+| `TS_PROJECTS_PAGER`        | Pager command (`""` disables paging)                                             |
+| `TS_PROJECTS_LOG_LEVEL`    | Explicit console log level (`debug`, `info`, `warning`, `error`, `critical`)     |
+| `TS_PROJECTS_LOG_FILE`     | File sink path (`""` enables default `<state>/ts-projects/ts-projects.log`)      |
+| `TS_PROJECTS_LOG_FORMAT`   | File sink format (`text` or `json` JSONL)                                        |
+| `TS_PROJECTS_API_URL`      | Overrides the API root (default `https://app.ts.com/api/1.0`)                    |
+| `TS_PROJECTS_SOURCE`       | Data source: `http` (default) or `memory`                                        |
+| `XDG_CONFIG_HOME` / `...`  | XDG base-directory overrides (`CONFIG`, `CONFIG_DIRS`, `DATA`, `STATE`, `CACHE`) |
+| `NO_COLOR` / `FORCE_COLOR` | Color overrides (`--no-color` > `NO_COLOR` > `FORCE_COLOR` > `[output].color`)   |
+| `CI`                       | Any non-empty value suppresses the fetch spinner                                 |
 
 ## Exit Codes
 
-Per cli-standards R6.1 (D-016(2)):
+Per cli-standards R6.1:
 
-| Code | Meaning                                                |
-| ---- | ------------------------------------------------------ |
-| 0    | Success (including benign empty results)               |
-| 1    | Generic/config/API error, unexpected exception         |
-| 2    | Usage error (bad flag/command, nonexistent `--config`) |
-| 3    | Not found (e.g. workspace not found)                   |
-| 4    | Authentication error (missing/invalid token)           |
-| 5    | Conflict                                               |
-| 130  | Interrupted (SIGINT, incl. `Ctrl-C` at the prompt)     |
-| 143  | Terminated (SIGTERM)                                   |
-
-> **Mapping vs the Python source (D-024(11))**: the source _documented_
-> 0 success / 1 configuration / 2 authentication / 3 API / 4 I/O /
-> 5 interrupt, and _implemented_ 1 for config-and-missing-token, 3 for
-> API errors, and 4 for unexpected exceptions. The port adopts the
-> normative cli-standards ladder instead: missing/invalid token moves
-> 1 → 4 (auth), API/network failures move 3 → 1, unexpected exceptions
-> move 4 → 1, workspace-not-found stays 3, usage errors are 2, and the
-> doc-only "5 = user interrupt" is replaced by the standard 130/143
-> signal codes.
+| Code  | Name        | Meaning                                                |
+| ----- | ----------- | ------------------------------------------------------ |
+| `0`   | `SUCCESS`   | Success (including bare help and benign empty results) |
+| `1`   | `ERROR`     | Config (`TS001`), API (`TS003`), clipboard, or `TS000` |
+| `2`   | `USAGE`     | Invalid flag, argument, command, or env choice         |
+| `3`   | `NOT_FOUND` | Project (`TS005`) or workspace (`TS006`) not found     |
+| `4`   | `AUTH`      | Missing or rejected token (`TS002`)                    |
+| `5`   | `CONFLICT`  | Conflict                                               |
+| `130` | `SIGINT`    | Interrupted / cancelled / prompt declined (`TS004`)    |
+| `143` | `SIGTERM`   | Terminated                                             |

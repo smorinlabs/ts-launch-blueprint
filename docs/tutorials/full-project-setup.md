@@ -100,8 +100,7 @@ just version           # node apps/cli/dist/cli.js --version
 the real command:
 
 ```bash
-export TS_PROJECTS_TOKEN=your_token_here
-just run --format json
+just run projects list --source memory --no-input --json
 ```
 
 See [EXAMPLECLI.md](../../EXAMPLECLI.md) for the full UX spec —
