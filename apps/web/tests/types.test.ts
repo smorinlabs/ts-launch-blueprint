@@ -3,7 +3,7 @@
 // the API router, the procedure or the shared contract drift apart.
 import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '@ts-launch-blueprint/api/router';
-import type { ListProjectsOutput } from '@ts-launch-blueprint/core';
+import type { ListProjectsOutput } from 'ts-launch-blueprint-core';
 import { describe, expectTypeOf, it } from 'vitest';
 
 describe('end-to-end types', () => {

@@ -1,11 +1,16 @@
 # SPDX-License-Identifier: MIT
 
-# Publish (D-021(5), D-012(5), Q2.A resolving D-045): a `v*` tag (pushed when a
-# release-please Release PR is merged) triggers a cheap `verify` gate that must
-# pass before the environment-gated `publish` job runs. `apps/cli`
-# (`ts-launch-blueprint`) is the sole published package (`Q2.A`);
-# `packages/core` remains private and bundled. Uses npm Trusted Publishing
-# (OIDC only; no long-lived publish secret anywhere).
+# Publish (D-021(5), D-012(5), ADR 0017 / Q13.A / Q14.A): a `v*` tag (pushed
+# when a release-please Release PR is merged) triggers a cheap `verify` gate
+# that must pass before the environment-gated publish jobs run.
+#
+# - `publish` publishes `apps/cli` (`ts-launch-blueprint`) via OIDC Trusted
+#   Publishing (no long-lived publish secret anywhere).
+# - `publish-core` runs in parallel when `vars.PUBLISH_CORE == 'true'` (Q14.A),
+#   packing `packages/core` (`ts-launch-blueprint-core`) with `pnpm pack` (so
+#   `publishConfig.exports` rewrites exports to `./dist/*`) and publishing that
+#   tarball with `npm publish <tarball> --access public` via OIDC Trusted
+#   Publishing. `verify` always runs `just pack-check` on BOTH packages.
 
 name: Publish
 
@@ -16,7 +21,7 @@ on:
   # Manual dispatch fallback (must target a v* tag, never a branch).
   workflow_dispatch:
 
-# Deny-all baseline (D-022(10)); each job re-grants only what it needs.
+# Deny-all baseline (D-022(10)); each job below re-grants only what it needs.
 permissions: {}
 
 concurrency:
@@ -77,17 +82,20 @@ jobs:
           fi
           echo "Tag ${GITHUB_REF_NAME} is an ancestor of main."
 
-      - name: Assert tag == package.json == manifest version (D-021(5)/D-022(13))
+      - name: Assert tag == root/core/cli package.json == manifest version (D-021(5)/D-022(13)/ADR 0017)
         run: |-
           set -euo pipefail
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          # The published package is apps/cli (D-040); a repo-hygiene test
-          # keeps the root package.json version equal to it.
-          PKG_VERSION="$(node -p "require('./apps/cli/package.json').version")"
+          ROOT_VERSION="$(node -p "require('./package.json').version")"
+          CORE_VERSION="$(node -p "require('./packages/core/package.json').version")"
+          CLI_VERSION="$(node -p "require('./apps/cli/package.json').version")"
           MANIFEST_VERSION="$(node -p "require('./.release-please-manifest.json')['.']")"
-          echo "tag=${TAG_VERSION} package.json=${PKG_VERSION} manifest=${MANIFEST_VERSION}"
-          if [ "${TAG_VERSION}" != "${PKG_VERSION}" ] || [ "${TAG_VERSION}" != "${MANIFEST_VERSION}" ]; then
-            echo "::error::Version mismatch between tag, package.json, and manifest."
+          echo "tag=${TAG_VERSION} root=${ROOT_VERSION} core=${CORE_VERSION} cli=${CLI_VERSION} manifest=${MANIFEST_VERSION}"
+          if [ "${TAG_VERSION}" != "${ROOT_VERSION}" ] \
+              || [ "${TAG_VERSION}" != "${CORE_VERSION}" ] \
+              || [ "${TAG_VERSION}" != "${CLI_VERSION}" ] \
+              || [ "${TAG_VERSION}" != "${MANIFEST_VERSION}" ]; then
+            echo "::error::Version mismatch between tag, root/core/cli package.json, and manifest."
             exit 1
           fi
 
@@ -103,10 +111,10 @@ jobs:
       - name: Quality gates (just all)
         run: just all
 
-      - name: Packaging validation and smoke test (just pack-check)
+      - name: Packaging validation and smoke tests (just pack-check)
         run: just pack-check
 
-  # --- Registry publish: runs ONLY inside the protected `npm` environment,
+  # --- CLI registry publish: runs ONLY inside the protected `npm` environment,
   #     after human approval, on GitHub-hosted runners. Never runs locally. ---
   publish:
     name: publish-npm
@@ -147,8 +155,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm run build
+      - name: Build CLI package
+        run: pnpm --filter ts-launch-blueprint build
 
       # Install/build run under pnpm, but the publish itself uses the npm CLI
       # (D-035): pnpm 10's `pnpm publish` OIDC delegation has an unresolved
@@ -156,8 +164,7 @@ jobs:
       # `npm publish` — Node 24's bundled npm >= 11.5.1 meets the floor — is the
       # reliable OIDC path. No publish secret: authenticated by the id-token
       # OIDC exchange above. Provenance attestations are generated automatically
-      # for public repos under Trusted Publishing. This step is inert until a
-      # trusted publisher for this package is configured on npmjs.com.
+      # for public repos under Trusted Publishing.
       # Strip-guard (canonical form, repo-please-setup 0.7.0): npm publish
       # auto-corrects bin entries warning-only, and its delete paths
       # (`removed invalid "bin[..]"`, `empty "bin" was removed`) ship the
@@ -174,6 +181,58 @@ jobs:
             exit 1
           fi
 
-      - name: Publish to npm (Trusted Publishing / OIDC)
+      - name: Publish CLI to npm (Trusted Publishing / OIDC)
         working-directory: apps/cli
         run: npm publish
+
+  # --- Core library registry publish (opt-in via vars.PUBLISH_CORE == 'true',
+  #     Q14.A / ADR 0017): runs in parallel with `publish` so core setup never
+  #     blocks CLI releases. Packs via `pnpm pack` (rewriting
+  #     publishConfig.exports -> ./dist/*) and publishes that tarball with
+  #     `npm publish <tarball> --access public` over OIDC Trusted Publishing. ---
+  publish-core:
+    name: publish-core-npm
+    needs: verify
+    if: vars.PUBLISH_CORE == 'true'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.3
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build core library
+        run: pnpm --filter ts-launch-blueprint-core build
+
+      - name: Pack and publish core library to npm (Trusted Publishing / OIDC)
+        working-directory: packages/core
+        run: |
+          set -euo pipefail
+          SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/publish-core.XXXXXX")"
+          trap 'rm -rf "$SCRATCH"' EXIT
+          pnpm pack --pack-destination "$SCRATCH"
+          TARBALL="$(find "$SCRATCH" -maxdepth 1 -type f -name '*.tgz' | head -n 1)"
+          if [ -z "$TARBALL" ] || [ ! -f "$TARBALL" ]; then
+            echo "::error::pnpm pack did not produce a tarball for packages/core."
+            exit 1
+          fi
+          npm publish "$TARBALL" --access public

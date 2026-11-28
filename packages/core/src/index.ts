@@ -1,4 +1,4 @@
-// Public entry of the shared core library (@ts-launch-blueprint/core). Apps
+// Public entry of the shared core library (ts-launch-blueprint-core). Apps
 // import the core only through this file, never through ./src/... paths.
 // Converters and raw-API schemas stay internal; only the public contract
 // schemas are exported (D-047). Locked by tests/public-api.test.ts.
@@ -45,3 +45,4 @@ export {
   type ListProjectsInput,
   type ProjectsService,
 } from './services/projects.service.js';
+export { VERSION } from './version.js';

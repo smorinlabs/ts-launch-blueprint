@@ -25,9 +25,9 @@
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@prometheus-io/client": "^0.16.1",
     "@trpc/server": "^11.19.0",
-    "@ts-launch-blueprint/core": "workspace:*",
     "hono": "^4.13.23",
     "pino": "^10.4.0",
+    "ts-launch-blueprint-core": "workspace:*",
     "zod": "^4.6.6"
   },
   "engines": {

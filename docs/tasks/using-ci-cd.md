@@ -60,11 +60,11 @@ A manually-triggered (`workflow_dispatch`), environment-gated deep scan, taking 
 
 ### Release Please (`release-please.yml`)
 
-Runs on every push to `main` (plus manual re-trigger). Watches Conventional Commits and maintains a "Release PR" that bumps `package.json`, `apps/cli/package.json`, and `.release-please-manifest.json` and regenerates `CHANGELOG.md`. Merging that PR tags `vX.Y.Z`, which triggers `publish.yml`. See [the release runbook](../RELEASE.md) for the one-time environment setup and the routine release flow.
+Runs on every push to `main` (plus manual re-trigger). Watches Conventional Commits and maintains a "Release PR" that bumps `package.json`, `packages/core/package.json`, `apps/cli/package.json`, and `.release-please-manifest.json` and regenerates `CHANGELOG.md`. Merging that PR tags `vX.Y.Z`, which triggers `publish.yml`. See [the release runbook](../RELEASE.md) for the one-time environment setup and the routine release flow.
 
 ### Publish (`publish.yml`) & Container Publish (`publish-container.yml`)
 
-- `publish.yml` is triggered by a `v*` tag push (or manual `workflow_dispatch` from a `v*` tag; `Q2.A` resolving `D-045`) for `apps/cli` only: `verify` asserts tag ancestry on `main`, version parity, `just all`, and `just pack-check`; `publish` runs inside the protected `npm` environment using npm Trusted Publishing (OIDC).
+- `publish.yml` is triggered by a `v*` tag push (or manual `workflow_dispatch` from a `v*` tag; ADR 0017): `verify` asserts tag ancestry on `main`, root/core/CLI/manifest version parity, `just all`, and `just pack-check` (`pack-check-core` + `pack-check-cli`); `publish` runs inside the protected `npm` environment for `apps/cli` using npm Trusted Publishing (OIDC), and `publish-core` runs in parallel for `packages/core` when `vars.PUBLISH_CORE == 'true'`.
 - `publish-container.yml` checks building/smoking `apps/api/Dockerfile` on PRs/`merge_group` and publishes versioned GHCR images on `release: [published]`.
 
 ### Difftree PR Comment (`difftree-pr-comment.yml`)
@@ -84,8 +84,8 @@ just setup             # tools + pnpm install + lefthook hooks
 just all               # format-check, lint, check-boundaries, check-shell, check-workflows, check-editorconfig, check-spelling, typecheck, test
 just coverage          # vitest run --coverage (95/95/90/95 thresholds)
 just docs-check        # node scripts/check-links.mjs README.md docs
-just build             # tsdown build
-just pack-check        # apps/cli publint, attw, tarball install + smoke test
+just build             # tsdown/Vite build (packages/core + apps/*)
+just pack-check        # packages/core + apps/cli publint, attw, tarball install + smoke tests
 just audit             # pnpm audit --audit-level=high
 just press-verify      # template-press verification
 pnpm exec lefthook run pre-commit --all-files

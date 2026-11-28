@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { Project } from '@ts-launch-blueprint/core';
 import * as fc from 'fast-check';
+import type { Project } from 'ts-launch-blueprint-core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {

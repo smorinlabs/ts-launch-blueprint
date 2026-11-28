@@ -27,6 +27,8 @@ self-hosted-runner:
 config-variables:
   # Kill-switch for the audit-triage bot (audit-triage.yml); unset = inert.
   - MUSE_CI_ENABLED
+  # Opt-in toggle for publishing packages/core in publish.yml (Q14.A / ADR 0017).
+  - PUBLISH_CORE
   - RUNNER_UBUNTU
   - RUNNER_MACOS
   - RUNNER_WINDOWS

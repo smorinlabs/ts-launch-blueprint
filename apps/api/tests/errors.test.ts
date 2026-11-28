@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 // toTRPCError: the API's domain-error mapping table (D-049). 4xx keep the
 // domain's message; 5xx get a generic one; `cause` is always the original.
-import { ApiError, AuthError, ConflictError, NotFoundError } from '@ts-launch-blueprint/core';
+import { ApiError, AuthError, ConflictError, NotFoundError } from 'ts-launch-blueprint-core';
 import { describe, expect, it } from 'vitest';
 
 import {

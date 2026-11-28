@@ -10,7 +10,7 @@ import {
   ERROR_CODES,
   InterruptError,
   NotFoundError,
-} from '@ts-launch-blueprint/core';
+} from 'ts-launch-blueprint-core';
 import { describe, expect, it } from 'vitest';
 
 import { CliError, EXIT_CODES, exitCodeFor, UsageError } from '../src/cli/exit-codes.js';

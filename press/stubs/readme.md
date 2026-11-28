@@ -12,7 +12,7 @@ Start with [Full Project Setup](./docs/tutorials/full-project-setup.md) and
 make bootstrap      # Level 1: ensure node >=24, pnpm 10, and just are installed
 just setup          # Level 2: install pinned analyzers, pnpm install, git hooks, check-deps
 just all            # format-check, lint, boundaries, shell/workflow, editorconfig, cspell, typecheck, test
-just build          # build apps/*/dist/ with tsdown
+just build          # build packages/*/dist/ and apps/*/dist/ with tsdown/Vite
 ```
 
 Optional turnkey environments are also included: `mise install` (`mise.toml`),

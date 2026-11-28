@@ -1,7 +1,7 @@
 // The request middleware (D-051) through createApp: one JSON line per
 // request, request IDs in and out, trace fields, probe levels, and nothing
 // sensitive (query strings, inputs) in any line.
-import { ApiError, type Core, createCore } from '@ts-launch-blueprint/core';
+import { ApiError, type Core, createCore } from 'ts-launch-blueprint-core';
 import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';

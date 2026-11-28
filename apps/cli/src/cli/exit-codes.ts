@@ -3,7 +3,7 @@
 // auth (missing/invalid token) -> 4, conflict -> 5. SIGINT -> 130 and
 // SIGTERM -> 143 are handled in the process entry (src/cli.ts).
 //
-// Domain errors (from @ts-launch-blueprint/core) carry no exit code; this
+// Domain errors (from ts-launch-blueprint-core) carry no exit code; this
 // module is the CLI controller's mapping from them to R6.1 codes.
 //
 // Source mapping (py_launch_blueprint/projects.py + EXAMPLECLI.md, per
@@ -18,7 +18,7 @@ import {
   type ErrorCode,
   InterruptError,
   NotFoundError,
-} from '@ts-launch-blueprint/core';
+} from 'ts-launch-blueprint-core';
 
 /** Exit codes per cli-standards R6.1 (D-016(2)). */
 export const EXIT_CODES = {

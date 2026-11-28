@@ -26,19 +26,22 @@ retired per Q10.A / Py ADR 0014). For human-contributor flow see
 ## Project Overview
 
 `ts-launch-blueprint` is a production-ready TypeScript workspace shipping a
-shared core (`@ts-launch-blueprint/core`), an example CLI (`ts-projects`), an
+standalone core library (`ts-launch-blueprint-core`), an example CLI (`ts-projects`), an
 HTTP API (`@ts-launch-blueprint/api`), a React/Vite web app
 (`@ts-launch-blueprint/web`), and full quality-gate, packaging, and
 repo-hygiene scaffolding.
 
-- Package name: `ts-launch-blueprint`
+- Package name: `ts-launch-blueprint` (CLI) / `ts-launch-blueprint-core` (standalone core library)
 - Command name: `ts-projects`
 - Env-var prefix: `TS_PROJECTS_*`
 
 ## Project Structure
 
-- `packages/core`: `@ts-launch-blueprint/core` — shared schemas, repositories,
-  and services; private, imported only via its package entry (`src/index.ts`).
+- `packages/core`: publishable standalone core library `ts-launch-blueprint-core`
+  (shared schemas, repositories, services, and `VERSION`); imported by apps only
+  via its package entry (`src/index.ts` in workspace dev, `dist/index.js` +
+  `dist/index.d.ts` via `publishConfig.exports` when packed); build output in
+  `packages/core/dist` (gitignored, `zod` externalized, `sideEffects: false`).
 - `apps/cli`: published npm package `ts-launch-blueprint` (`ts-projects` bin
   entry in `src/cli.ts`, public API in `src/lib.ts`, `src/version.ts`); build
   output in `apps/cli/dist` (gitignored; bundles core).
@@ -89,16 +92,16 @@ setup-hooks`), restores `projects/.gitkeep`, and runs `just check-deps`.
 | Format / check format     | `just format` / `just format-check` (`oxfmt`)                                                                                     |
 | Lint / autofix            | `just lint` / `just lint-fix` (`oxlint`)                                                                                          |
 | Architecture boundaries   | `just check-boundaries` (`depcruise`)                                                                                             |
-| Removable-app proof       | `just check-removable cli` or `just check-removable api web`                                                                      |
+| Removable-app proof       | `just check-removable cli`, `api web`, `web`, or `cli api web` (core-only standalone library)                                     |
 | Type check                | `just typecheck` (`pnpm run typecheck`)                                                                                           |
 | Run tests                 | `just test` (Vitest) or `pnpm exec vitest run <file> -t '<name>'`                                                                 |
 | Advisory Bun tests        | `just test-bun` (Vitest under Bun, excludes `e2e.test.ts`; never `bun install` or bare `bun test`)                                |
 | Coverage (95/95/90/95)    | `just coverage` (`just open-coverage-report` opens HTML)                                                                          |
-| Build all apps            | `just build` (`apps/*/dist`)                                                                                                      |
+| Build packages + apps     | `just build` (`packages/*/dist`, `apps/*/dist`)                                                                                   |
 | Run API / Web dev         | `just api` (port 8080) / `just api-dev` (`tsx watch`) / `just web` (Vite proxies `/trpc` to `:8080`)                              |
 | Docker API + smoke        | `just docker-build`, `just docker-run`, `just smoke`                                                                              |
 | Run built CLI             | `just run <args>` / `just version`                                                                                                |
-| Packaging verification    | `just pack-check` (build, publint, attw, tarball dry-run, scratch install)                                                        |
+| Packaging verification    | `just pack-check` (`pack-check-core` + `pack-check-cli`: build, publint, attw, tarball + consumer smoke)                          |
 | Docs link check / TypeDoc | `just docs-check` / `just docs-api` (optional)                                                                                    |
 | Hook suite & commits      | `just hooks-run` (`just pre-commit-run`), `just verify-commits`, `just ci`                                                        |
 | Security & hygiene checks | `just check-gitleaks`, `just audit`, `just check-shell`, `just check-workflows`, `just check-editorconfig`, `just check-spelling` |
@@ -170,15 +173,15 @@ For **every** review comment (human or bot), complete all three steps:
 
 - `packages/core`: `zod`
 - `apps/cli`: `@inquirer/prompts`, `cli-table3`, `clipboardy`, `commander`,
-  `picocolors`, `smol-toml`, `yocto-spinner`, `zod` (plus `@ts-launch-blueprint/core`)
+  `picocolors`, `smol-toml`, `yocto-spinner`, `zod` (plus `ts-launch-blueprint-core`)
 - `apps/api`: `@hono/node-server`, `@hono/trpc-server`, `@opentelemetry/api`,
   `@opentelemetry/context-async-hooks`, `@opentelemetry/core`,
   `@opentelemetry/exporter-trace-otlp-http`, `@opentelemetry/resources`,
   `@opentelemetry/sdk-trace`, `@opentelemetry/semantic-conventions`,
-  `@trpc/server`, `@prometheus-io/client`, `hono`, `pino`, `zod` (plus `@ts-launch-blueprint/core`)
+  `@trpc/server`, `@prometheus-io/client`, `hono`, `pino`, `zod` (plus `ts-launch-blueprint-core`)
 - `apps/web`: `@tanstack/react-query`, `@trpc/client`, `@trpc/server`,
   `@trpc/tanstack-react-query`, `react`, `react-dom` (with
-  `@ts-launch-blueprint/api` and `@ts-launch-blueprint/core` in devDependencies)
+  `@ts-launch-blueprint/api` and `ts-launch-blueprint-core` in devDependencies)
 
 ### Development Dependencies
 
@@ -192,17 +195,19 @@ For **every** review comment (human or bot), complete all three steps:
 ## Releases
 
 - `release-please` (`release-please-config.json`, `.github/workflows/release-please.yml`)
-  bumps `package.json`, `apps/cli/package.json` (`extra-files`),
-  `.release-please-manifest.json`, and `CHANGELOG.md` atomically (`pnpm-lock.yaml`
-  carries no root version).
+  bumps `package.json`, `packages/core/package.json`, `apps/cli/package.json`
+  (`extra-files`), `.release-please-manifest.json`, and `CHANGELOG.md` atomically
+  (`pnpm-lock.yaml` carries no root version).
 - **Merge strategy**: use `--merge` (repository ruleset disallows squash merges).
   Because individual branch commits land on `main` and feed `release-please`,
   every commit must follow Conventional Commits.
-- **Publishing (`publish.yml`)**: `verify` runs `just pack-check`, then
-  `publish` runs `npm publish` via OIDC Trusted Publishing (`id-token: write` in
-  protected `npm` environment — never `NPM_TOKEN` and never `pnpm publish`).
-  Triggered on `v*` tag pushes (plus `workflow_dispatch` on a `v*` tag) for
-  `apps/cli` (`Q2.A`, resolving `D-045`; see `docs/RELEASE.md`).
+- **Publishing (`publish.yml`)**: `verify` runs `just pack-check` (both core and
+  CLI), then `publish` runs `npm publish` for `apps/cli` via OIDC
+  Trusted Publishing (`id-token: write` in protected `npm` environment — never
+  `NPM_TOKEN` and never `pnpm publish`), and `publish-core` publishes
+  `packages/core` (`ts-launch-blueprint-core`, packed with `pnpm pack` ->
+  `npm publish <tarball> --access public`) in parallel when repository variable
+  `PUBLISH_CORE == 'true'` (ADR 0017; see `docs/RELEASE.md`).
 
 ## Documentation & Link Policy
 

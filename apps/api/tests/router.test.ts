@@ -6,7 +6,7 @@ import {
   DEFAULT_IN_MEMORY_SEED,
   GetProjectOutputSchema,
   ListProjectsOutputSchema,
-} from '@ts-launch-blueprint/core';
+} from 'ts-launch-blueprint-core';
 import { describe, expect, it } from 'vitest';
 
 import { appRouter, MAX_API_LIMIT } from '../src/router.js';

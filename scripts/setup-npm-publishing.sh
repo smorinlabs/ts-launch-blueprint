@@ -2,8 +2,10 @@
 set -euo pipefail
 
 # Print the exact values needed to configure npmjs.com Trusted Publishing (OIDC)
-# for the published CLI package (apps/cli/package.json) and validate that
-# .github/workflows/publish.yml has the required OIDC / environment settings.
+# for the published CLI package (apps/cli/package.json) and standalone core
+# library (packages/core/package.json, when present and enabled via
+# PUBLISH_CORE=true), and validate that .github/workflows/publish.yml has the
+# required OIDC / environment settings.
 #
 # Trusted Publishing requires no NPM_TOKEN secret — GitHub Actions exchanges a
 # short-lived OIDC token (`id-token: write`) directly with npmjs.com.
@@ -16,6 +18,7 @@ set -euo pipefail
 
 WORKFLOW_FILE=".github/workflows/publish.yml"
 CLI_MANIFEST="apps/cli/package.json"
+CORE_MANIFEST="packages/core/package.json"
 ENVIRONMENT="npm"
 
 usage() {
@@ -23,7 +26,8 @@ usage() {
 Usage: scripts/setup-npm-publishing.sh [--help|-h] [owner/repo]
 
 Print the npmjs.com Trusted Publisher (OIDC) configuration fields for the
-published CLI package (`apps/cli/package.json`) and validate
+published CLI package (`apps/cli/package.json`) and standalone core library
+(`packages/core/package.json`, opt-in via `PUBLISH_CORE=true`), and validate
 `.github/workflows/publish.yml`.
 
 If owner/repo is omitted, the repository is detected via `gh repo view` or
@@ -35,6 +39,38 @@ bold() { printf '\x1b[1m%s\x1b[0m' "$*"; }
 cyan() { printf '\x1b[36m%s\x1b[0m' "$*"; }
 warn() { printf '\x1b[33mwarning:\x1b[0m %s\n' "$*" >&2; }
 die()  { printf '\x1b[31merror:\x1b[0m %s\n' "$*" >&2; exit 1; }
+
+read_package_name() {
+    node -e '
+const fs = require("node:fs");
+const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+if (typeof pkg.name !== "string" || pkg.name.trim() === "") process.exit(1);
+process.stdout.write(pkg.name.trim());
+' "$1" 2>/dev/null
+}
+
+print_publisher_block() {
+    local label="$1"
+    local manifest="$2"
+    local pkg_name="$3"
+    echo
+    bold "── npmjs.com Trusted Publisher: ${label} (${manifest}) ──"; echo
+    echo
+    echo "  1. Open: $(cyan "https://www.npmjs.com/package/${pkg_name}/access")"
+    echo "     (If the package has not been published to npm yet, publish an initial"
+    echo "     0.x placeholder manually or claim the name first, then open Settings ->"
+    echo "     Trusted Publisher on npmjs.com.)"
+    echo
+    echo "  2. Under 'Trusted Publisher', select $(bold "GitHub Actions")."
+    echo
+    echo "  3. Fill in these EXACT values:"
+    printf "       %-24s %s\n" "Package Name:"       "$(bold "$pkg_name")"
+    printf "       %-24s %s\n" "Organization / Owner:" "$(bold "$owner")"
+    printf "       %-24s %s\n" "Repository name:"    "$(bold "$repo_name")"
+    printf "       %-24s %s\n" "Workflow filename:"  "$(bold "$workflow_filename")"
+    printf "       %-24s %s\n" "Environment name:"   "$(bold "$ENVIRONMENT")"
+    echo
+}
 
 if [[ $# -ge 1 ]]; then
     case "$1" in
@@ -86,13 +122,14 @@ repo_name="${repo##*/}"
 [[ -f "$CLI_MANIFEST" ]] || die "$CLI_MANIFEST not found at $repo_root"
 command -v node >/dev/null 2>&1 || die "node is required to parse $CLI_MANIFEST"
 
-package_name="$(node -e '
-const fs = require("node:fs");
-const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-if (typeof pkg.name !== "string" || pkg.name.trim() === "") process.exit(1);
-process.stdout.write(pkg.name.trim());
-' "$CLI_MANIFEST" 2>/dev/null)" \
+package_name="$(read_package_name "$CLI_MANIFEST")" \
     || die "could not read package name from $CLI_MANIFEST"
+
+core_package_name=""
+if [[ -f "$CORE_MANIFEST" ]]; then
+    core_package_name="$(read_package_name "$CORE_MANIFEST")" \
+        || die "could not read package name from $CORE_MANIFEST"
+fi
 
 workflow_filename="$(basename "$WORKFLOW_FILE")"
 
@@ -116,34 +153,31 @@ fi
 # --- output --------------------------------------------------------------------
 echo
 bold "npm Trusted Publisher setup for $repo"; echo
-echo "Package (from $CLI_MANIFEST): $package_name"
+echo "CLI package (from $CLI_MANIFEST): $package_name"
+if [[ -n "$core_package_name" ]]; then
+    echo "Core library (from $CORE_MANIFEST): $core_package_name (opt-in: vars.PUBLISH_CORE=true)"
+fi
 echo "Workflow: $WORKFLOW_FILE"
 echo "Environment: $ENVIRONMENT"
-echo
-bold "── npmjs.com Trusted Publisher (GitHub Actions) ─────────────────"; echo
-echo
-echo "  1. Open: $(cyan "https://www.npmjs.com/package/${package_name}/access")"
-echo "     (If the package has not been published to npm yet, publish an initial"
-echo "     0.x placeholder manually or claim the name first, then open Settings ->"
-echo "     Trusted Publisher on npmjs.com.)"
-echo
-echo "  2. Under 'Trusted Publisher', select $(bold "GitHub Actions")."
-echo
-echo "  3. Fill in these EXACT values:"
-printf "       %-24s %s\n" "Package Name:"       "$(bold "$package_name")"
-printf "       %-24s %s\n" "Organization / Owner:" "$(bold "$owner")"
-printf "       %-24s %s\n" "Repository name:"    "$(bold "$repo_name")"
-printf "       %-24s %s\n" "Workflow filename:"  "$(bold "$workflow_filename")"
-printf "       %-24s %s\n" "Environment name:"   "$(bold "$ENVIRONMENT")"
-echo
-echo "  4. Save the publisher, and ensure the '$ENVIRONMENT' GitHub environment"
-echo "     exists (run scripts/setup-github-environments.sh $repo) with"
-echo "     required reviewers configured."
+
+print_publisher_block "CLI package" "$CLI_MANIFEST" "$package_name"
+
+if [[ -n "$core_package_name" ]]; then
+    print_publisher_block "Core library (optional)" "$CORE_MANIFEST" "$core_package_name"
+    echo "  4. Enable core library publishing in GitHub repository variables:"
+    echo "       gh variable set PUBLISH_CORE --body true --repo $repo"
+    echo
+fi
+
+echo "  Save each publisher, and ensure the '$ENVIRONMENT' GitHub environment"
+echo "  exists (run scripts/setup-github-environments.sh $repo) with"
+echo "  required reviewers configured."
 echo
 echo "── After configuration ──────────────────────────────────────────"
 echo
 echo "  • No NPM_TOKEN secret is needed — publish.yml uses OIDC (id-token: write)."
 echo "  • Merging a release-please PR pushes a v* tag and triggers publish.yml."
-echo "  • If you rename the workflow, repo, package, or environment, update the"
+echo "  • Core library publishing stays skipped until PUBLISH_CORE=true is set."
+echo "  • If you rename the workflow, repo, package, or environment, update each"
 echo "    npmjs.com Trusted Publisher entry to match."
 echo

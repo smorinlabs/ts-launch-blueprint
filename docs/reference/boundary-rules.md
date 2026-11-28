@@ -12,7 +12,7 @@ Two tools share the work:
 - **dependency-cruiser** (`.dependency-cruiser.cjs`, run by
   `just check-boundaries`): rules over the whole resolved import graph, which
   a per-file linter can't see: cycles across files, where an import really
-  resolves (including `@ts-launch-blueprint/core`), and type-only edges.
+  resolves (including `ts-launch-blueprint-core`), and type-only edges.
 
 dependency-cruiser runs with the **swc** parser (`@swc/core`). TypeScript 7
 ships no JavaScript compiler API, and dependency-cruiser's default TypeScript
@@ -34,7 +34,7 @@ Every rule's message starts with a tag. Search for the tag on this page.
 | `[service-no-concrete-repository]`          | `services/**` doesn't import `http-*.repository.ts`, `in-memory-*.repository.ts` or `composition.ts`.                                                                                                                                                                                                                                   | oxlint + dependency-cruiser |
 | `[service-type-only-repository]`            | `services/**` → `repositories/**` imports are `import type` only; the repository is injected.                                                                                                                                                                                                                                           | dependency-cruiser          |
 | `[concrete-repository-in-composition-only]` | Inside `packages/core/src`, only `composition.ts` and the `index.ts` entry import a concrete repository.                                                                                                                                                                                                                                | dependency-cruiser          |
-| `[app-core-entry-only]`                     | `apps/**` imports the core only as `@ts-launch-blueprint/core`: no relative path into `packages/`, no `@ts-launch-blueprint/core/<subpath>`.                                                                                                                                                                                            | oxlint + dependency-cruiser |
+| `[app-core-entry-only]`                     | `apps/**` imports the core only as `ts-launch-blueprint-core`: no relative path into `packages/`, no `ts-launch-blueprint-core/<subpath>`.                                                                                                                                                                                              | oxlint + dependency-cruiser |
 | `[app-no-cross-app-import]`                 | One app never imports another app, except the web app's one type-only edge below.                                                                                                                                                                                                                                                       | dependency-cruiser          |
 | `[web-types-only-from-api]`                 | `apps/web/**` imports nothing from another app but `import type { AppRouter } from '@ts-launch-blueprint/api/router'`: no value import of it, no other API file, no other app.                                                                                                                                                          | dependency-cruiser          |
 | `[api-core-via-create-core]`                | `apps/api/src/**` doesn't import `createHttpProjectsRepository`, `createInMemoryProjectsRepository` or `createProjectsService`; the API builds its core with `createCore` (in `server.ts`). The CLI is deliberately not covered: its public `createApiClient` wrapper (`apps/cli/src/api.ts`) builds a repository and service directly. | oxlint                      |
@@ -74,7 +74,7 @@ boundary rule; fix the import.**
   the concrete repository in `packages/core/src/composition.ts`.
 - **`[core-no-framework-import]`**: the code belongs in an app. Move it to
   `apps/<app>/src/`, or pass the value into the core as a plain argument.
-- **`[app-core-entry-only]`**: import from `@ts-launch-blueprint/core`. If the
+- **`[app-core-entry-only]`**: import from `ts-launch-blueprint-core`. If the
   thing you need isn't exported, add it to `packages/core/src/index.ts` and to
   `packages/core/tests/public-api.test.ts`.
 - **`[schema-is-leaf]` / `[repository-no-service]`**: the dependency points
@@ -85,13 +85,13 @@ boundary rule; fix the import.**
 
 ## Where Each Check Runs
 
-| Check                                                          | Local                               | Git hook                              | CI                                              |
-| -------------------------------------------------------------- | ----------------------------------- | ------------------------------------- | ----------------------------------------------- |
-| oxlint rules                                                   | `just lint`, `just all`             | pre-commit `lint` (staged files)      | `Lint` step, hook-suite step                    |
-| dependency-cruiser rules                                       | `just check-boundaries`, `just all` | pre-commit `boundaries` (whole graph) | `Architecture boundaries` step, hook-suite step |
-| Proof tests (`tests/boundaries.test.ts`)                       | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
-| `[no-path-alias]`                                              | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
-| Removable app (`just check-removable cli` / `api web` / `web`) | on demand                           | —                                     | `Removable app check` step                      |
+| Check                                                                          | Local                               | Git hook                              | CI                                              |
+| ------------------------------------------------------------------------------ | ----------------------------------- | ------------------------------------- | ----------------------------------------------- |
+| oxlint rules                                                                   | `just lint`, `just all`             | pre-commit `lint` (staged files)      | `Lint` step, hook-suite step                    |
+| dependency-cruiser rules                                                       | `just check-boundaries`, `just all` | pre-commit `boundaries` (whole graph) | `Architecture boundaries` step, hook-suite step |
+| Proof tests (`tests/boundaries.test.ts`)                                       | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
+| `[no-path-alias]`                                                              | `just test`, `just all`             | pre-push (opt-in)                     | `Test` step                                     |
+| Removable app (`just check-removable cli` / `api web` / `web` / `cli api web`) | on demand                           | —                                     | `Removable app check` step                      |
 
 `just check-removable` is not part of `just all`: it reinstalls dependencies
 in a temp copy, so it needs the network and takes a while.
@@ -105,8 +105,11 @@ removes them together. `apps/web` uses the API's router type, so:
   `just check-removable cli`, `just check-removable web`.
 - **The API** goes together with the web app (`just check-removable api
 web`), or you replace the web app's client first.
+- **All apps together** (`just check-removable cli api web`) prove
+  `packages/core` builds, tests, typechecks, and passes `just pack-check-core`
+  as a pure standalone library repository.
 
-CI runs all three.
+CI runs all four.
 
 ## Removing the CLI
 

@@ -1,13 +1,57 @@
 {
-  "name": "@ts-launch-blueprint/core",
-  "private": true,
-  "description": "Shared core library (schemas, repositories, services) for ts-launch-blueprint",
+  "name": "ts-launch-blueprint-core",
+  "version": "0.2.1",
+  "description": "Standalone domain core library (schemas, repositories, services) for ts-launch-blueprint",
+  "keywords": [
+    "blueprint",
+    "core",
+    "library",
+    "schemas",
+    "template",
+    "typescript",
+    "zod"
+  ],
+  "homepage": "https://github.com/smorinlabs/ts-launch-blueprint/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/smorinlabs/ts-launch-blueprint/issues"
+  },
   "license": "MIT",
+  "author": "Steve Morin <steve.morin@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smorinlabs/ts-launch-blueprint.git",
+    "directory": "packages/core"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown && node scripts/copy-package-files.mjs",
+    "prepublishOnly": "node scripts/guard-publish.mjs"
   },
   "dependencies": {
     "zod": "^4.6.6"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

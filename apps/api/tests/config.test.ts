@@ -1,6 +1,6 @@
 // resolveApiConfig: the API's defaults (127.0.0.1:8080, in-memory data) and
 // the startup errors for bad values.
-import { ConfigError, DomainError, ERROR_CODES } from '@ts-launch-blueprint/core';
+import { ConfigError, DomainError, ERROR_CODES } from 'ts-launch-blueprint-core';
 import { describe, expect, it } from 'vitest';
 
 import { parseRateLimit, resolveApiConfig } from '../src/config.js';

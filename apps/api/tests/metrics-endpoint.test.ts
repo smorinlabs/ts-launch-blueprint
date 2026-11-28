@@ -1,6 +1,6 @@
 // GET /metrics and what requests add to it, through createApp with a test
 // metrics instance (no default Node metrics, so values are exact).
-import { ApiError, type Core, createCore } from '@ts-launch-blueprint/core';
+import { ApiError, type Core, createCore } from 'ts-launch-blueprint-core';
 import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';

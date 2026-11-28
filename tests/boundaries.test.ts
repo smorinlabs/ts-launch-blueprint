@@ -339,7 +339,7 @@ const FORBIDDEN: [string, ForbiddenCase][] = [
       files: () => [
         probe(
           `${CLI}/__boundary-probe-subpath.ts`,
-          "import { createCore } from '@ts-launch-blueprint/core/src/composition.js';\nexport const probe: unknown = createCore;\n"
+          "import { createCore } from 'ts-launch-blueprint-core/src/composition.js';\nexport const probe: unknown = createCore;\n"
         ),
       ],
     },
@@ -353,7 +353,7 @@ const FORBIDDEN: [string, ForbiddenCase][] = [
         // cspell:ignore createservice
         probe(
           `${API}/__boundary-probe-createservice.ts`,
-          "import { createProjectsService } from '@ts-launch-blueprint/core';\nexport const probe: unknown = createProjectsService;\n"
+          "import { createProjectsService } from 'ts-launch-blueprint-core';\nexport const probe: unknown = createProjectsService;\n"
         ),
       ],
     },
@@ -569,12 +569,12 @@ describe.sequential('architecture boundaries (D-042)', () => {
     );
 
     it(
-      'apps/cli importing @ts-launch-blueprint/core',
+      'apps/cli importing ts-launch-blueprint-core',
       () => {
         try {
           const path = probe(
             `${CLI}/__boundary-probe-allowed.ts`,
-            "import { createCore } from '@ts-launch-blueprint/core';\nexport const probe: unknown = createCore;\n"
+            "import { createCore } from 'ts-launch-blueprint-core';\nexport const probe: unknown = createCore;\n"
           );
           expect(outcome(oxlint([path]))).toEqual(PASSED);
           expect(outcome(depcruise())).toEqual(PASSED);
@@ -586,12 +586,12 @@ describe.sequential('architecture boundaries (D-042)', () => {
     );
 
     it(
-      'apps/api importing createCore from @ts-launch-blueprint/core',
+      'apps/api importing createCore from ts-launch-blueprint-core',
       () => {
         try {
           const path = probe(
             `${API}/__boundary-probe-allowed.ts`,
-            "import { createCore, NotFoundError } from '@ts-launch-blueprint/core';\nexport const probe: unknown = [createCore, NotFoundError];\n"
+            "import { createCore, NotFoundError } from 'ts-launch-blueprint-core';\nexport const probe: unknown = [createCore, NotFoundError];\n"
           );
           expect(outcome(oxlint([path]))).toEqual(PASSED);
           expect(outcome(depcruise())).toEqual(PASSED);

@@ -29,7 +29,7 @@ reviews:
         exactOptionalPropertyTypes, isolatedDeclarations at root except
         apps/api and apps/web), oxlint + oxfmt (printWidth 100, single quotes,
         sortImports), architecture boundaries (packages/core imported only via
-        @ts-launch-blueprint/core entry; apps/web imports only the AppRouter
+        ts-launch-blueprint-core entry; apps/web imports only the AppRouter
         type from @ts-launch-blueprint/api/router; no cross-app runtime
         imports), explicit error classes over assertions, and no hardcoded
         credentials. Focus on production changes; ignore test-only scaffolding

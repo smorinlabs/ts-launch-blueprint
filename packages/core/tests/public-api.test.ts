@@ -1,4 +1,4 @@
-// Locks the public surface of @ts-launch-blueprint/core (src/index.ts), the
+// Locks the public surface of ts-launch-blueprint-core (src/index.ts), the
 // only entry apps may import. Changing either list below is a deliberate
 // change to the core's public API.
 import { describe, expect, it } from 'vitest';
@@ -46,6 +46,7 @@ describe('core public API surface', () => {
       'ListProjectsOutputSchema',
       'NotFoundError',
       'ProjectNotFoundError',
+      'VERSION',
       'WorkspaceNotFoundError',
       'createCore',
       'createHttpProjectsRepository',

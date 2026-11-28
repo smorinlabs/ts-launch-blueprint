@@ -3,7 +3,7 @@
 // correlation, and nothing sensitive (query, input, 5xx message) on a span.
 import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
 import type { ReadableSpan } from '@opentelemetry/sdk-trace';
-import { ApiError, type Core, createCore } from '@ts-launch-blueprint/core';
+import { ApiError, type Core, createCore } from 'ts-launch-blueprint-core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';

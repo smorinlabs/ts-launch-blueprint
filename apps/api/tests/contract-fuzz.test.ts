@@ -1,6 +1,6 @@
-// Property-based HTTP/tRPC contract fuzzing over /trpc/projects.list (P08-TS03).
-import { createCore, ListProjectsOutputSchema } from '@ts-launch-blueprint/core';
 import * as fc from 'fast-check';
+// Property-based HTTP/tRPC contract fuzzing over /trpc/projects.list (P08-TS03).
+import { createCore, ListProjectsOutputSchema } from 'ts-launch-blueprint-core';
 import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';

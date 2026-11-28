@@ -15,7 +15,7 @@ Review production TypeScript and project changes for:
   single quotes, semicolons, `sortImports`). Flag style or lint violations.
 - **Imports & architecture boundaries** — follow `.oxlintrc.json` and
   `.dependency-cruiser.cjs`: apps import core only via
-  `@ts-launch-blueprint/core` entry; `apps/web` imports only
+  `ts-launch-blueprint-core` entry; `apps/web` imports only
   `import type { AppRouter } from '@ts-launch-blueprint/api/router'`; no
   cross-app runtime imports or path aliases.
 - **Error handling** — prefer explicit typed error classes (`AppError`

@@ -23,6 +23,16 @@ const BASE_ROOT_PKG = JSON.stringify(
   2
 );
 
+const BASE_CORE_PKG = JSON.stringify(
+  {
+    name: 'pkg-core',
+    version: '1.0.0',
+    dependencies: { zod: '^4.0.0' },
+  },
+  null,
+  2
+);
+
 const BASE_CLI_PKG = JSON.stringify(
   {
     name: 'pkg',
@@ -37,6 +47,8 @@ const BASE_FILES: Record<string, string> = {
   '.release-please-manifest.json': '{\n  ".": "1.0.0"\n}\n',
   'CHANGELOG.md': '# Changelog\n',
   'package.json': `${BASE_ROOT_PKG}\n`,
+  'packages/core/package.json': `${BASE_CORE_PKG}\n`,
+  'packages/core/README.md': '# Core\n',
   'apps/cli/package.json': `${BASE_CLI_PKG}\n`,
   'pnpm-lock.yaml': "lockfileVersion: '9.0'\n",
   'packages/core/src/index.ts': 'export const version = 1;\n',
@@ -49,6 +61,7 @@ const RELEASE_BUMP: Record<string, string> = {
   '.release-please-manifest.json': '{\n  ".": "1.1.0"\n}\n',
   'CHANGELOG.md': '# Changelog\n\n## 1.1.0\n\n- feat: thing\n',
   'package.json': `${BASE_ROOT_PKG.replace('"1.0.0"', '"1.1.0"')}\n`,
+  'packages/core/package.json': `${BASE_CORE_PKG.replace('"1.0.0"', '"1.1.0"')}\n`,
   'apps/cli/package.json': `${BASE_CLI_PKG.replace('"1.0.0"', '"1.1.0"')}\n`,
 };
 
@@ -193,6 +206,14 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     });
   });
 
+  it('packages/core/README.md-only pull request is treated as code (core packaging input)', () => {
+    expect(runDetect({ 'packages/core/README.md': '# Updated Core README\n' })).toEqual({
+      code: 'true',
+      release: 'false',
+      web: 'true',
+    });
+  });
+
   it('code pull request touching packages/core runs code and web E2E jobs', () => {
     expect(runDetect({ 'packages/core/src/index.ts': 'export const version = 2;\n' })).toEqual({
       code: 'true',
@@ -286,6 +307,25 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
         {
           ...RELEASE_BUMP,
           'package.json': RELEASE_BUMP['package.json']!.replace('^4.0.0', '^4.1.0'),
+        },
+        { headRef: RELEASE_BRANCH }
+      )
+    ).toEqual({
+      code: 'true',
+      release: 'false',
+      web: 'true',
+    });
+  });
+
+  it('release-named branch with dependency change in packages/core/package.json runs everything', () => {
+    expect(
+      runDetect(
+        {
+          ...RELEASE_BUMP,
+          'packages/core/package.json': RELEASE_BUMP['packages/core/package.json']!.replace(
+            '^4.0.0',
+            '^4.1.0'
+          ),
         },
         { headRef: RELEASE_BRANCH }
       )

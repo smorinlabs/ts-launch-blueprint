@@ -11,10 +11,10 @@
 import { trpcServer } from '@hono/trpc-server';
 import type { AnyTRPCRouter } from '@trpc/server';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
-import type { Core } from '@ts-launch-blueprint/core';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
+import type { Core } from 'ts-launch-blueprint-core';
 
 import type { RateLimitConfig, TrustProxyConfig } from './config.js';
 import { INTERNAL_ERROR_MESSAGE } from './errors.js';

@@ -1,6 +1,6 @@
 # 0001. pnpm workspace monorepo and CLI-only npm publishing
 
-- **Status:** Accepted
+- **Status:** Accepted (CLI-only publishing superseded by [0017](0017-standalone-core-library-packaging.md))
 - **Date:** 2026-11-28
 - **Deciders:** Maintainers (`D-035`, `D-040`, `D-041`, `D-045`, `Q2.A`)
 - **Related:** `pnpm-workspace.yaml`, `.github/workflows/publish.yml`, `release-please-config.json`

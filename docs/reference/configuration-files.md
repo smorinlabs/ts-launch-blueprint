@@ -109,15 +109,19 @@ and [pnpm](../tools/pnpm.md).
 
 ### `apps/cli/package.json` and `packages/core/package.json`
 
-`apps/cli/package.json` is the published package (`ts-launch-blueprint`):
+`apps/cli/package.json` is the published CLI package (`ts-launch-blueprint`):
 the `ts-projects` bin entry, the ESM `exports` map, the `build` script,
 and the runtime dependencies. It depends on the core through
-`"@ts-launch-blueprint/core": "workspace:*"` as a devDependency, because
-the core is bundled into `dist/` and is never installed from npm.
-`packages/core/package.json` is the private core library
-(`@ts-launch-blueprint/core`), whose only entry is `src/index.ts` (no
-build step). See
-[apps/cli/package.json](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/apps/cli/package.json).
+`"ts-launch-blueprint-core": "workspace:*"` as a devDependency, because
+the core is bundled into `apps/cli/dist/` so the CLI stays self-contained.
+`packages/core/package.json` is the standalone, publishable core library
+(`ts-launch-blueprint-core`), with `"sideEffects": false`, `zod` as its only
+runtime dependency, live TypeScript `exports` for workspace development, and
+`publishConfig.exports` pointing at `./dist/index.js` + `./dist/index.d.ts`
+(built by `packages/core/tsdown.config.ts`). See
+[apps/cli/package.json](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/apps/cli/package.json)
+and
+[packages/core/package.json](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/packages/core/package.json).
 
 ### `.npmrc`
 

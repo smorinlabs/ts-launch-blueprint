@@ -17,24 +17,25 @@ Start from [`template.md`](template.md).
 
 ## Index
 
-| ADR                                                            | Title                                                                    | Status   |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------ | -------- |
-| [0001](0001-pnpm-monorepo-and-cli-only-publishing.md)          | pnpm workspace monorepo and CLI-only npm publishing                      | Accepted |
-| [0002](0002-no-secrets-in-config-file.md)                      | Secrets are never stored in the config file                              | Accepted |
-| [0003](0003-noun-verb-cli-and-global-output-formats.md)        | Noun-verb CLI surface and global output formats                          | Accepted |
-| [0004](0004-config-errors-degrade-to-warnings.md)              | Discovered config errors degrade to warnings                             | Accepted |
-| [0005](0005-turnkey-toolchains-mise-flox-devcontainer.md)      | Turnkey toolchains (mise, flox, DevContainer) with Makefile + Justfile   | Accepted |
-| [0006](0006-stable-error-codes-hints-crash-log.md)             | Unified ConfigError, stable error codes, hints, and crash log            | Accepted |
-| [0007](0007-cli-ergonomics-pager-onboarding-doctor.md)         | CLI ergonomics: pager, guided init, onboarding marker, and doctor bundle | Accepted |
-| [0008](0008-windows-native-paths-xdg-overrides.md)             | Windows-native default directories with XDG overrides everywhere         | Accepted |
-| [0009](0009-layered-core-and-boundary-enforcement.md)          | Layered core architecture with mechanical boundary enforcement           | Accepted |
-| [0010](0010-typescript-7-oxc-and-single-typecheck.md)          | TypeScript 7, Oxlint/Oxfmt, and single-engine typecheck                  | Accepted |
-| [0011](0011-hono-trpc-api-hardening-and-contract-snapshots.md) | Hardened Hono + tRPC API and serialized contract snapshots               | Accepted |
-| [0012](0012-react-vite-web-types-only-router.md)               | React + Vite web app over a types-only AppRouter import                  | Accepted |
-| [0013](0013-testing-resilience-cross-os-ci-and-playwright.md)  | Testing resilience, 4-cell cross-OS CI matrix, and Playwright E2E        | Accepted |
-| [0014](0014-hook-ci-parity-cspell-and-commitlint.md)           | Hook-CI parity, Node-native cspell, and commitlint conventions           | Accepted |
-| [0015](0015-security-scanning-and-optional-org-automation.md)  | Two-layer secret scanning, CodeQL, OSV-Scanner, and optional org triage  | Accepted |
-| [0016](0016-canonical-agents-md-and-plain-markdown-docs.md)    | Canonical AGENTS.md, plain CommonMark docs, and template-press lifecycle | Accepted |
+| ADR                                                            | Title                                                                    | Status                                                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| [0001](0001-pnpm-monorepo-and-cli-only-publishing.md)          | pnpm workspace monorepo and CLI-only npm publishing                      | Superseded in part by [0017](0017-standalone-core-library-packaging.md) |
+| [0002](0002-no-secrets-in-config-file.md)                      | Secrets are never stored in the config file                              | Accepted                                                                |
+| [0003](0003-noun-verb-cli-and-global-output-formats.md)        | Noun-verb CLI surface and global output formats                          | Accepted                                                                |
+| [0004](0004-config-errors-degrade-to-warnings.md)              | Discovered config errors degrade to warnings                             | Accepted                                                                |
+| [0005](0005-turnkey-toolchains-mise-flox-devcontainer.md)      | Turnkey toolchains (mise, flox, DevContainer) with Makefile + Justfile   | Accepted                                                                |
+| [0006](0006-stable-error-codes-hints-crash-log.md)             | Unified ConfigError, stable error codes, hints, and crash log            | Accepted                                                                |
+| [0007](0007-cli-ergonomics-pager-onboarding-doctor.md)         | CLI ergonomics: pager, guided init, onboarding marker, and doctor bundle | Accepted                                                                |
+| [0008](0008-windows-native-paths-xdg-overrides.md)             | Windows-native default directories with XDG overrides everywhere         | Accepted                                                                |
+| [0009](0009-layered-core-and-boundary-enforcement.md)          | Layered core architecture with mechanical boundary enforcement           | Accepted                                                                |
+| [0010](0010-typescript-7-oxc-and-single-typecheck.md)          | TypeScript 7, Oxlint/Oxfmt, and single-engine typecheck                  | Accepted                                                                |
+| [0011](0011-hono-trpc-api-hardening-and-contract-snapshots.md) | Hardened Hono + tRPC API and serialized contract snapshots               | Accepted                                                                |
+| [0012](0012-react-vite-web-types-only-router.md)               | React + Vite web app over a types-only AppRouter import                  | Accepted                                                                |
+| [0013](0013-testing-resilience-cross-os-ci-and-playwright.md)  | Testing resilience, 4-cell cross-OS CI matrix, and Playwright E2E        | Accepted                                                                |
+| [0014](0014-hook-ci-parity-cspell-and-commitlint.md)           | Hook-CI parity, Node-native cspell, and commitlint conventions           | Accepted                                                                |
+| [0015](0015-security-scanning-and-optional-org-automation.md)  | Two-layer secret scanning, CodeQL, OSV-Scanner, and optional org triage  | Accepted                                                                |
+| [0016](0016-canonical-agents-md-and-plain-markdown-docs.md)    | Canonical AGENTS.md, plain CommonMark docs, and template-press lifecycle | Accepted                                                                |
+| [0017](0017-standalone-core-library-packaging.md)              | Standalone core library packaging and opt-in npm publishing              | Accepted                                                                |
 
 ## Note on historical decisions
 

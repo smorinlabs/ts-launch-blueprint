@@ -46,8 +46,8 @@ export {
   NotFoundError,
   ProjectNotFoundError,
   WorkspaceNotFoundError,
-} from '@ts-launch-blueprint/core';
-export type { Project, Workspace } from '@ts-launch-blueprint/core';
+} from 'ts-launch-blueprint-core';
+export type { Project, Workspace } from 'ts-launch-blueprint-core';
 export {
   formatOutput,
   type OutputFormat,

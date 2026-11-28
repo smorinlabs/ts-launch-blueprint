@@ -1,7 +1,15 @@
 // Behavioral guards for release replay, publication identity, and promotion
 // (ported from py-launch-blueprint tests/meta/test_publish_container.py).
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -744,8 +752,24 @@ describe('publish-container behavioral guards', () => {
     }
   });
 
-  it('sourceVersion reads repo version and verifies manifest parity', () => {
+  it('sourceVersion reads repo version and verifies root, core, CLI, and manifest parity', () => {
     expect(sourceVersion()).toMatch(/^\d+\.\d+\.\d+$/);
+
+    const dir = mkdtempSync(join(tmpdir(), 'ghcr-version-'));
+    try {
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ version: '1.2.3' }), 'utf8');
+      writeFileSync(
+        join(dir, '.release-please-manifest.json'),
+        JSON.stringify({ '.': '1.2.3' }),
+        'utf8'
+      );
+      const coreDir = join(dir, 'packages', 'core');
+      mkdirSync(coreDir, { recursive: true });
+      writeFileSync(join(coreDir, 'package.json'), JSON.stringify({ version: '0.9.9' }), 'utf8');
+      expect(() => sourceVersion(dir)).toThrow(/packages\/core\/package\.json version/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('smokeTest validates non-root uid, health version, passes remaining timeoutMs, and cleans up container', async () => {

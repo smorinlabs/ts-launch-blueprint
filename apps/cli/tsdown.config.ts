@@ -3,9 +3,9 @@
 // The shebang in src/cli.ts is preserved by tsdown and the output made
 // executable. tsc --noEmit remains the separate typecheck gate.
 //
-// The private workspace core (@ts-launch-blueprint/core, D-040) is not on
-// npm, so it is bundled into dist/ — both the JS and the .d.ts — and the
-// published package never imports it at runtime or in its types.
+// The workspace core (ts-launch-blueprint-core, ADR 0017) is bundled into the
+// CLI's dist/ — both JS and .d.ts — so ts-launch-blueprint remains standalone
+// offline and in child repositories that publish only the CLI.
 import { defineConfig } from 'tsdown';
 
 // Explicit annotation required by isolatedDeclarations (D-025).
@@ -19,8 +19,8 @@ const config: ReturnType<typeof defineConfig> = defineConfig({
   sourcemap: true,
   clean: true,
   deps: {
-    alwaysBundle: ['@ts-launch-blueprint/core'],
-    dts: { alwaysBundle: ['@ts-launch-blueprint/core'] },
+    alwaysBundle: ['ts-launch-blueprint-core'],
+    dts: { alwaysBundle: ['ts-launch-blueprint-core'] },
   },
 });
 

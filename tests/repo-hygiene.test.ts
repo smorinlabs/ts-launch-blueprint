@@ -1773,10 +1773,11 @@ describe('P12-TS01: AI readiness hub and vendor rule retirement (P12)', () => {
       'apps/cli',
       'apps/api',
       'apps/web',
-      '@ts-launch-blueprint/core',
+      'ts-launch-blueprint-core',
       '@ts-launch-blueprint/api',
       '@ts-launch-blueprint/web',
       'ts-projects',
+      'packages/core/dist',
       'apps/cli/dist',
       'apps/api/dist',
       'apps/web/dist',
@@ -2883,4 +2884,137 @@ describe('P13 M6 security, community docs, actionlint, logos & badges contract',
       });
     }
   );
+
+  describe('P15 standalone core library packaging & release wiring (ADR 0017)', () => {
+    it('packages/core/package.json meets standalone npm library best practices and stays version-synced', () => {
+      const corePkg = JSON.parse(
+        readFileSync(join(REPO_ROOT, 'packages', 'core', 'package.json'), 'utf8')
+      ) as {
+        name: string;
+        version: string;
+        private?: boolean;
+        type: string;
+        sideEffects: boolean;
+        files: string[];
+        engines: { node: string };
+        dependencies: Record<string, string>;
+        exports: Record<string, unknown>;
+        publishConfig: {
+          access: string;
+          exports: Record<string, unknown>;
+        };
+        scripts: Record<string, string>;
+      };
+
+      expect(corePkg.private).not.toBe(true);
+      expect(corePkg.version).toBe(packageJson.version);
+      expect(corePkg.version).toBe(releasePleaseManifest['.']);
+      expect(corePkg.type).toBe('module');
+      expect(corePkg.sideEffects).toBe(false);
+      expect(corePkg.files).toContain('dist');
+      expect(corePkg.engines.node).toBe(packageJson.engines.node);
+      const coreDeps = Object.keys(corePkg.dependencies);
+      coreDeps.sort();
+      expect(coreDeps).toEqual(['zod']);
+      expect(corePkg.exports).toEqual({
+        '.': {
+          types: './src/index.ts',
+          default: './src/index.ts',
+        },
+        './package.json': './package.json',
+      });
+      expect(corePkg.publishConfig).toEqual({
+        access: 'public',
+        exports: {
+          '.': {
+            types: './dist/index.d.ts',
+            default: './dist/index.js',
+          },
+          './package.json': './package.json',
+        },
+      });
+      expect(corePkg.scripts['build']).toContain('tsdown');
+      expect(corePkg.scripts['prepublishOnly']).toContain('guard-publish.mjs');
+      expect(existsSync(join(REPO_ROOT, 'packages', 'core', 'README.md'))).toBe(true);
+      expect(existsSync(join(REPO_ROOT, 'packages', 'core', 'tsdown.config.ts'))).toBe(true);
+
+      const extraFiles = (
+        releasePleaseConfig.packages['.'] as {
+          'extra-files'?: { path: string; jsonpath: string }[];
+        }
+      )['extra-files'];
+      expect(extraFiles).toContainEqual(
+        expect.objectContaining({ path: 'packages/core/package.json', jsonpath: '$.version' })
+      );
+    });
+
+    it('packages/core/scripts/guard-publish.mjs blocks bare npm publish and allows pnpm', () => {
+      const guardPath = join(REPO_ROOT, 'packages', 'core', 'scripts', 'guard-publish.mjs');
+      const npmRun = spawnSync(process.execPath, [guardPath], {
+        encoding: 'utf8',
+        env: { ...process.env, npm_execpath: '/usr/lib/node_modules/npm/bin/npm-cli.js' },
+      });
+      expect(npmRun.status).toBe(1);
+      expect(npmRun.stderr).toContain('publishConfig.exports');
+
+      const pnpmRun = spawnSync(process.execPath, [guardPath], {
+        encoding: 'utf8',
+        env: { ...process.env, npm_execpath: '/usr/local/bin/pnpm' },
+      });
+      expect(pnpmRun.status).toBe(0);
+    });
+
+    it('publish.yml verifies core version and gates parallel publish-core on vars.PUBLISH_CORE', () => {
+      const raw = readFileSync(join(REPO_ROOT, '.github', 'workflows', 'publish.yml'), 'utf8');
+      const publish = parse(raw) as {
+        jobs: {
+          verify: { steps: Array<{ run?: string }> };
+          'publish-core': {
+            needs?: string | string[];
+            if?: string;
+            environment?: string;
+            permissions?: Record<string, string>;
+            steps: Array<{ run?: string; 'working-directory'?: string }>;
+          };
+        };
+      };
+
+      const verifyVersionStep = publish.jobs.verify.steps.find((s) =>
+        s.run?.includes('./packages/core/package.json')
+      );
+      expect(verifyVersionStep).toBeDefined();
+
+      const publishCore = publish.jobs['publish-core'];
+      expect(publishCore).toBeDefined();
+      expect(publishCore.needs).toBe('verify');
+      expect(publishCore.if).toBe("vars.PUBLISH_CORE == 'true'");
+      expect(publishCore.environment).toBe('npm');
+      expect(publishCore.permissions?.['id-token']).toBe('write');
+      const packAndPublish = publishCore.steps.find(
+        (s) => s['working-directory'] === 'packages/core'
+      );
+      expect(packAndPublish?.run).toContain('pnpm pack');
+      expect(packAndPublish?.run).toContain('npm publish "$TARBALL" --access public');
+
+      const actionlintCfg = readFileSync(join(REPO_ROOT, '.github', 'actionlint.yaml'), 'utf8');
+      expect(actionlintCfg).toContain('PUBLISH_CORE');
+    });
+
+    it('ci.yml check-removable proves core-only standalone library (cli api web) and Justfile exposes pack-check-core', () => {
+      const ci = parse(readFileSync(join(REPO_ROOT, '.github', 'workflows', 'ci.yml'), 'utf8')) as {
+        jobs: {
+          'check-removable': { steps: Array<{ run?: string }> };
+        };
+      };
+      const allRemovedStep = ci.jobs['check-removable'].steps.find(
+        (s) => s.run?.trim() === 'just check-removable cli api web'
+      );
+      expect(allRemovedStep).toBeDefined();
+
+      const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8');
+      expect(justfile).toMatch(/^pack-check-core:/m);
+      expect(justfile).toMatch(/^pack-check-cli:/m);
+      expect(justfile).toContain('packages/core/LICENSE');
+    });
+  });
 });

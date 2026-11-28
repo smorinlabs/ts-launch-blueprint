@@ -33,6 +33,7 @@ paths = [
   "coverage",
   "apps/cli/README.md",
   "apps/cli/LICENSE",
+  "packages/core/LICENSE",
 ]
 
 # Compound tokens that join cli_name with a separator cannot be matched by the
@@ -98,11 +99,16 @@ pattern = "{cli_name}-e2e-"
 files = ["apps/cli/tests/**"]
 reason = "temporary directory prefix in end-to-end tests"
 
-# Fresh child repositories start at 0.1.0 with root, CLI, and release-please
-# manifest versions aligned.
+# Fresh child repositories start at 0.1.0 with root, core, CLI, and
+# release-please manifest versions aligned.
 [[edit]]
 file = "package.json"
 command = ["node", "scripts/reset-version.mjs", "package.json"]
+expect = '"version": "0.1.0"'
+
+[[edit]]
+file = "packages/core/package.json"
+command = ["node", "scripts/reset-version.mjs", "packages/core/package.json"]
 expect = '"version": "0.1.0"'
 
 [[edit]]

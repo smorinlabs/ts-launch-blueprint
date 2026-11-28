@@ -3,8 +3,8 @@ import { existsSync } from 'node:fs';
 import { posix, win32 } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { ConfigError } from '@ts-launch-blueprint/core';
 import { Argument, type Command } from 'commander';
+import { ConfigError } from 'ts-launch-blueprint-core';
 
 import { realChoicePrompter, realConfirmPrompter } from '../adapters.js';
 import {

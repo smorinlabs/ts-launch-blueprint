@@ -8,7 +8,7 @@ import {
   createCore,
   DEFAULT_IN_MEMORY_SEED,
   type Project,
-} from '@ts-launch-blueprint/core';
+} from 'ts-launch-blueprint-core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../src/app.js';
