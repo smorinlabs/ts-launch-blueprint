@@ -125,7 +125,7 @@ function writeWithChunkSchedule(workspace: string, schedule: number[]): string {
     unlinkSync,
   };
 
-  writeConfigData(target, { workspace }, { fs: scheduledFs, platform: 'linux' });
+  writeConfigData(target, { workspace }, { fs: scheduledFs });
   return readFileSync(target, 'utf8');
 }
 
@@ -809,11 +809,7 @@ describe('typed config key/value helpers and atomic writes', () => {
       unlinkSync,
     };
 
-    writeConfigData(
-      target,
-      { output: { format: 'json', color: 'never' } },
-      { fs: chunkedFs, platform: 'linux' }
-    );
+    writeConfigData(target, { output: { format: 'json', color: 'never' } }, { fs: chunkedFs });
     expect(chunks.length).toBeGreaterThan(1);
     expect(getConfigFileValue(target, 'output.format')).toBe('json');
     expect(getConfigFileValue(target, 'output.color')).toBe('never');
@@ -872,7 +868,7 @@ describe('typed config key/value helpers and atomic writes', () => {
         unlinkSync,
       };
 
-      writeConfigData(target, { workspace }, { fs: byteChunkedFs, platform: 'linux' });
+      writeConfigData(target, { workspace }, { fs: byteChunkedFs });
       const actualBytes = readFileSync(target);
       const actualText = actualBytes.toString('utf8');
       expect(actualText).not.toContain('\uFFFD');
