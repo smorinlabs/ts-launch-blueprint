@@ -14,11 +14,20 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+      day: 'monday'
+    cooldown:
+      default-days: 5
+    open-pull-requests-limit: 5
+    labels:
+      - 'dependencies'
+      - 'github-actions'
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
     groups:
-      actions-minor-patch:
-        update-types:
-          - 'minor'
-          - 'patch'
+      github-actions:
+        patterns:
+          - '*'
 
   # Runtime + dev dependencies (package.json / pnpm-lock.yaml). Dependabot's
   # ecosystem id for pnpm is still 'npm' — it reads the pnpm lockfile (D-035).
@@ -26,7 +35,64 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+      day: 'monday'
+    cooldown:
+      default-days: 5
+    open-pull-requests-limit: 5
+    labels:
+      - 'dependencies'
+      - 'npm'
+    commit-message:
+      prefix: 'chore'
+      prefix-development: 'chore'
+      include: 'scope'
     groups:
+      lint-and-format:
+        patterns:
+          - 'oxlint*'
+          - 'oxfmt*'
+          - '@commitlint/*'
+          - 'dependency-cruiser'
+          - 'publint'
+          - '@arethetypeswrong/cli'
+          - 'lefthook'
+      test:
+        patterns:
+          - 'vitest*'
+          - '@vitest/*'
+          - '@testing-library/*'
+          - 'jsdom'
+      build-and-types:
+        patterns:
+          - 'typescript'
+          - 'tsdown'
+          - 'tsx'
+          - 'vite'
+          - '@vitejs/*'
+          - '@swc/*'
+          - '@types/*'
+      runtime-core-cli:
+        patterns:
+          - 'zod'
+          - 'commander'
+          - '@inquirer/*'
+          - 'cli-table3'
+          - 'clipboardy'
+          - 'picocolors'
+          - 'smol-toml'
+          - 'yocto-spinner'
+      runtime-api-web:
+        patterns:
+          - 'hono'
+          - '@hono/*'
+          - '@trpc/*'
+          - '@tanstack/*'
+          - 'react'
+          - 'react-dom'
+          - 'pino'
+          - 'pino-pretty'
+          - 'prom-client'
+          - '@opentelemetry/*'
       npm-minor-patch:
         update-types:
           - 'minor'

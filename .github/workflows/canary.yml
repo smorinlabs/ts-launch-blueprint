@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: MIT
+# Weekly canary: re-resolve latest transitive dependencies on Node 24.x and 26.x.
+
+name: canary
+
+on:
+  schedule:
+    - cron: '0 6 * * 2' # weekly, Tuesday 06:00 UTC (offset from dep-audit's Monday)
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: canary
+  cancel-in-progress: true
+
+jobs:
+  canary:
+    name: canary (node${{ matrix.node-version }}, latest deps)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['24.x', '26.x']
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Setup just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+
+      - name: Re-resolve to the latest allowed dependency versions
+        run: pnpm update --recursive
+
+      - name: Typecheck
+        run: just typecheck
+
+      - name: Build
+        run: just build
+
+      - name: Test
+        run: just test

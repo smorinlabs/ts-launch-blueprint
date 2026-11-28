@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# CodeQL advanced setup configuration.
+
+name: 'ts-launch-blueprint codeql'
+
+queries:
+  - uses: security-extended
+
+paths-ignore:
+  - '**/tests/**'
+  - docs/**

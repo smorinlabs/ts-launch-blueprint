@@ -33,6 +33,8 @@ self-hosted-runner:
     - blacksmith-6vcpu-macos-latest
 
 config-variables:
+  # Kill-switch for the audit-triage bot (audit-triage.yml); unset = inert.
+  - MUSE_CI_ENABLED
   - RUNNER_UBUNTU
   - RUNNER_MACOS
   - RUNNER_WINDOWS

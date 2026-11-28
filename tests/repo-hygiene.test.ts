@@ -576,19 +576,24 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
     expect(mitMatches).toEqual([]);
 
     const spdxRequired = [
+      '.github/codeql/codeql-config.yml',
       '.github/dependabot.yml',
       '.github/ISSUE_TEMPLATE/01-feature-request.yml',
       '.github/ISSUE_TEMPLATE/02-documentation-request.yml',
       '.github/ISSUE_TEMPLATE/03-bug-report.yml',
       '.github/ISSUE_TEMPLATE/config.yml',
+      '.github/workflows/audit-triage.yml',
+      '.github/workflows/canary.yml',
       '.github/workflows/ci.yml',
       '.github/workflows/codeql.yml',
       '.github/workflows/commitlint.yml',
+      '.github/workflows/dep-audit.yml',
       '.github/workflows/dependency-review.yml',
       '.github/workflows/large-file-guard.yml',
       '.github/workflows/manual-pr-security-scan.yml',
       '.github/workflows/publish.yml',
       '.github/workflows/release-please.yml',
+      '.github/workflows/secret-scan.yml',
     ];
     for (const rel of spdxRequired) {
       const firstLine = readFileSync(join(REPO_ROOT, rel), 'utf8').split(/\r?\n/)[0];
@@ -960,6 +965,195 @@ describe('architecture boundaries (D-042)', () => {
       const config = JSON.parse(text) as { compilerOptions?: { paths?: unknown } };
       expect({ file, paths: config.compilerOptions?.paths }).toEqual({ file, paths: undefined });
     }
+  });
+});
+
+describe('P04 secret scanning, audits, canary, CodeQL & Dependabot', () => {
+  const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
+  const readWorkflow = (file: string): string => readFileSync(join(WORKFLOW_DIR, file), 'utf8');
+
+  it('includes secret-scan.yml, dep-audit.yml, canary.yml, and audit-triage.yml', () => {
+    const workflowFiles = readdirSync(WORKFLOW_DIR).filter(
+      (name) => name.endsWith('.yml') || name.endsWith('.yaml')
+    );
+    expect(workflowFiles).toContain('secret-scan.yml');
+    expect(workflowFiles).toContain('dep-audit.yml');
+    expect(workflowFiles).toContain('canary.yml');
+    expect(workflowFiles).toContain('audit-triage.yml');
+  });
+
+  it('secret-scan.yml runs SHA-pinned TruffleHog --only-verified with PR diff / push full scan', () => {
+    const raw = readWorkflow('secret-scan.yml');
+    expect(raw).toMatch(/trufflesecurity\/trufflehog@[0-9a-f]{40}\s*#\s*v\d/);
+    const parsed = parse(raw) as {
+      permissions?: Record<string, unknown>;
+      jobs: {
+        trufflehog: {
+          steps: Array<{ uses?: string; with?: Record<string, unknown> }>;
+        };
+      };
+    };
+    expect(parsed.permissions).toEqual({});
+    const checkout = parsed.jobs.trufflehog.steps.find((s) =>
+      s.uses?.startsWith('actions/checkout@')
+    );
+    expect(checkout?.with?.['fetch-depth']).toBe(0);
+    const trufflehog = parsed.jobs.trufflehog.steps.find((s) =>
+      s.uses?.startsWith('trufflesecurity/trufflehog@')
+    );
+    expect(trufflehog?.with?.extra_args).toBe('--only-verified');
+    expect(String(trufflehog?.with?.base ?? '')).toContain("github.event_name == 'pull_request'");
+    expect(String(trufflehog?.with?.head ?? '')).toContain("github.event_name == 'pull_request'");
+  });
+
+  it('dep-audit.yml (weekly-audit) runs pnpm audit + osv-scanner and files a rolling tracking issue', () => {
+    const raw = readWorkflow('dep-audit.yml');
+    expect(raw).toMatch(/google\/osv-scanner-action\/osv-scanner-action@[0-9a-f]{40}\s*#\s*v\d/);
+    const parsed = parse(raw) as {
+      name?: string;
+      on?: Record<string, unknown>;
+      permissions?: Record<string, unknown>;
+      jobs: Record<
+        string,
+        {
+          needs?: string[];
+          if?: string;
+          steps: Array<{ run?: string; uses?: string }>;
+        }
+      >;
+    };
+    expect(parsed.name).toBe('weekly-audit');
+    expect(parsed.permissions).toEqual({});
+    expect(parsed.on).toHaveProperty('schedule');
+    expect(parsed.on).toHaveProperty('workflow_dispatch');
+    const pnpmAuditJob = parsed.jobs['pnpm-audit'];
+    expect(pnpmAuditJob).toBeDefined();
+    expect(pnpmAuditJob!.steps.some((s) => s.run?.includes('pnpm audit --audit-level=high'))).toBe(
+      true
+    );
+    expect(parsed.jobs['osv-scanner']).toBeDefined();
+    const issueJob = parsed.jobs['file-tracking-issue'];
+    expect(issueJob?.needs).toEqual(['pnpm-audit', 'osv-scanner']);
+    expect(issueJob?.if).toBe("failure() && github.event_name == 'schedule'");
+    expect(raw).toContain('<!-- weekly-audit-tracking -->');
+  });
+
+  it('canary.yml resolves fresh dependencies weekly across Node 24.x and 26.x', () => {
+    const raw = readWorkflow('canary.yml');
+    const parsed = parse(raw) as {
+      on?: Record<string, unknown>;
+      permissions?: Record<string, unknown>;
+      jobs: {
+        canary: {
+          strategy?: { matrix?: { 'node-version'?: string[] } };
+          steps: Array<{ run?: string }>;
+        };
+      };
+    };
+    expect(parsed.permissions).toEqual({});
+    expect(parsed.on).toHaveProperty('schedule');
+    expect(parsed.on).toHaveProperty('workflow_dispatch');
+    expect(parsed.jobs.canary.strategy?.matrix?.['node-version']).toEqual(['24.x', '26.x']);
+    expect(raw).not.toContain('--frozen-lockfile');
+    const runs = parsed.jobs.canary.steps.map((s) => s.run ?? '').join('\n');
+    expect(runs).toContain('pnpm update --recursive');
+    expect(runs).toContain('just typecheck');
+    expect(runs).toContain('just build');
+    expect(runs).toContain('just test');
+  });
+
+  it('codeql.yml wires .github/codeql/codeql-config.yml with security-extended and test/docs ignores', () => {
+    const configPath = join(REPO_ROOT, '.github', 'codeql', 'codeql-config.yml');
+    expect(existsSync(configPath)).toBe(true);
+    const codeqlConfig = parse(readFileSync(configPath, 'utf8')) as {
+      queries?: Array<{ uses?: string }>;
+      'paths-ignore'?: string[];
+    };
+    expect(codeqlConfig.queries).toEqual([{ uses: 'security-extended' }]);
+    expect(codeqlConfig['paths-ignore']).toContain('**/tests/**');
+    expect(codeqlConfig['paths-ignore']).toContain('docs/**');
+
+    const codeqlWorkflow = parse(readWorkflow('codeql.yml')) as {
+      jobs: {
+        analyze: {
+          steps: Array<{ uses?: string; with?: Record<string, unknown> }>;
+        };
+      };
+    };
+    const initStep = codeqlWorkflow.jobs.analyze.steps.find((s) =>
+      s.uses?.startsWith('github/codeql-action/init@')
+    );
+    expect(initStep?.with?.['config-file']).toBe('./.github/codeql/codeql-config.yml');
+  });
+
+  it('dependabot.yml configures cooldown, limits, labels, commit-message, and groups', () => {
+    const dependabot = parse(
+      readFileSync(join(REPO_ROOT, '.github', 'dependabot.yml'), 'utf8')
+    ) as {
+      updates: Array<{
+        'package-ecosystem': string;
+        schedule?: { interval?: string; day?: string };
+        cooldown?: { 'default-days'?: number };
+        'open-pull-requests-limit'?: number;
+        labels?: string[];
+        'commit-message'?: { prefix?: string; include?: string };
+        groups?: Record<string, unknown>;
+      }>;
+    };
+    expect(dependabot.updates.length).toBeGreaterThanOrEqual(2);
+    const checks = dependabot.updates.map((u) => ({
+      ecosystem: u['package-ecosystem'],
+      day: u.schedule?.day,
+      cooldown: u.cooldown?.['default-days'],
+      limit: u['open-pull-requests-limit'],
+      hasLabels: Array.isArray(u.labels) && u.labels.length > 0,
+      prefix: u['commit-message']?.prefix,
+      include: u['commit-message']?.include,
+      hasGroups: u.groups !== undefined && Object.keys(u.groups).length > 0,
+    }));
+    for (const item of checks) {
+      expect(item.day).toBe('monday');
+      expect(item.cooldown).toBe(5);
+      expect(item.limit).toBe(5);
+      expect(item.hasLabels).toBe(true);
+      expect(item.prefix).toBe('chore');
+      expect(item.include).toBe('scope');
+      expect(item.hasGroups).toBe(true);
+    }
+  });
+
+  it('gitleaks config, ignore file, Justfile recipes, lefthook hooks, and actionlint config exist', () => {
+    const gitleaksPath = join(REPO_ROOT, '.gitleaks.toml');
+    const gitleaksIgnorePath = join(REPO_ROOT, '.gitleaksignore');
+    expect(existsSync(gitleaksPath)).toBe(true);
+    expect(existsSync(gitleaksIgnorePath)).toBe(true);
+    const gitleaksToml = readFileSync(gitleaksPath, 'utf8');
+    expect(gitleaksToml).toContain('useDefault = true');
+    expect(gitleaksToml).toContain('AKIAIOSFODNN7EXAMPLE');
+    expect(gitleaksToml).not.toMatch(/paths\s*=\s*\[/);
+
+    const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8');
+    expect(justfile).toMatch(/^@?install-gitleaks:/m);
+    expect(justfile).toMatch(/^@?check-gitleaks\b/m);
+    expect(justfile).toMatch(/^@?audit:/m);
+    expect(justfile).toContain('pnpm audit --audit-level=high');
+
+    const lefthook = parse(readFileSync(join(REPO_ROOT, 'lefthook.yml'), 'utf8')) as {
+      'pre-commit': { jobs: Array<{ name: string; run: string }> };
+      'pre-push': { jobs: Array<{ name: string; run: string }> };
+    };
+    const preCommitGitleaks = lefthook['pre-commit'].jobs.find((j) => j.name === 'gitleaks');
+    expect(preCommitGitleaks).toBeDefined();
+    expect(preCommitGitleaks!.run).toContain('check-gitleaks.sh --staged');
+    expect(preCommitGitleaks!.run).toContain('CI');
+    const prePushGitleaks = lefthook['pre-push'].jobs.find((j) => j.name === 'gitleaks-range');
+    expect(prePushGitleaks).toBeDefined();
+    expect(prePushGitleaks!.run).toContain('check-gitleaks.sh --range');
+
+    const actionlint = parse(
+      readFileSync(join(REPO_ROOT, '.github', 'actionlint.yaml'), 'utf8')
+    ) as { 'config-variables'?: string[] };
+    expect(actionlint['config-variables']).toContain('MUSE_CI_ENABLED');
   });
 });
 

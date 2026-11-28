@@ -1,0 +1,18 @@
+# gitleaks configuration — extends default rules (no narrowing).
+title = "ts-launch-blueprint gitleaks config"
+
+# Use upstream gitleaks default rule set as the foundation.
+[extend]
+useDefault = true
+
+# Global allowlist — specific placeholder regexes only (no blanket path
+# exemptions so real credentials in docs or Markdown files are still caught).
+[allowlist]
+description = "Canonical AWS documentation placeholder tokens"
+regexes = [
+  # AWS test-fixture placeholder (canonical AWS-docs example key).
+  # Used in unit tests and CONTRIBUTING examples to demo the hook itself.
+  '''AKIAIOSFODNN7EXAMPLE''',
+  # AWS secret-key test-fixture placeholder (canonical AWS-docs example).
+  '''wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY''',
+]
