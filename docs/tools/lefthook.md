@@ -20,7 +20,7 @@ just setup-hooks
 
 ### `pre-commit` (parallel jobs, staged files only)
 
-- **`format`** — runs `oxfmt` on staged `*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,md}`
+- **`format`** — runs `oxfmt` on staged `*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,toml,md}`
   files and re-stages any fixes it makes (`stage_fixed: true`). This one job
   covers what the Python source split across several pre-commit hooks:
   `end-of-file-fixer`, `trailing-whitespace`, and the parse-validity intent of
@@ -32,8 +32,15 @@ just setup-hooks
   would corrupt those references. `.claude/settings.local.json` (untracked
   local session settings) is excluded too.
 - **`check-large-files`** — a dependency-free POSIX shell job that rejects any
-  staged file over 500KB, the equivalent of pre-commit's
-  `check-added-large-files`.
+  staged file over 1MB (`1048576` bytes) outside `docs/assets/`, matching
+  `.github/workflows/large-file-guard.yml`.
+- **`editorconfig-checker`** — checks staged files against `.editorconfig`
+  using `.editorconfig-checker.json` (excluding `docs/port/` and generated trees).
+- **`cspell`** — spell-checks staged files using `cspell.json`
+  (`--no-must-find-files --files {staged_files}`).
+- **`pnpm-lock-check`** — verifies `pnpm-lock.yaml` is in sync whenever
+  `package.json`, `**/package.json`, `pnpm-workspace.yaml`, or `pnpm-lock.yaml`
+  is staged.
 - **`lint`** — runs `oxlint` on staged `*.{ts,tsx,js,mjs,cjs}` files (excluding
   `**/dist/**` and `coverage/**`), the equivalent of the source's `ruff` lint
   hook.
@@ -44,10 +51,13 @@ just setup-hooks
 ### `commit-msg`
 
 - **`commitlint`** — checks the commit message against Conventional Commits
-  (via `commitlint.config.mjs`), replacing the source's `gitlint` hook.
+  (via `commitlint.config.mjs`, 100/200/200 header/body/footer limits), replacing
+  the source's `gitlint` hook.
 
-### `pre-push` (opt-in)
+### `pre-push`
 
+- **`press-verify`** — runs `just press-verify` to verify template-press
+  rebrand hygiene before pushing.
 - **`test`** — runs the full `just test` suite, but only if you export
   `TS_PROJECTS_PREPUSH_TESTS=1`; otherwise it prints a skip notice. Unlike the
   Python source (which ran `pytest` on every commit), the test suite here does

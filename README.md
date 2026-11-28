@@ -24,7 +24,7 @@ project.
   editor and the CI type-check gate use the same compiler version after you
   approve the workspace version on first open.
 - **Modern Toolchain**: Oxlint + Oxfmt (one Rust-based toolchain for
-  linting and formatting TypeScript, JSON, YAML, and Markdown), lefthook
+  linting and formatting TypeScript, JSON, YAML, TOML, and Markdown), lefthook
   git hooks with commitlint-checked commit messages, and Vitest 4 for
   testing with v8 coverage thresholds enforced.
 - **CI/CD Ready**: GitHub Actions workflows for quality gates (lint,
@@ -167,7 +167,7 @@ just setup-hooks
 
 Pre-commit formats (oxfmt) and lints (oxlint) staged files and type-checks
 the repo; commit messages are checked by commitlint (Conventional Commits,
-50/72). Tests run on push only if you opt in: `export
+100/200/200). Tests run on push only if you opt in: `export
 TS_PROJECTS_PREPUSH_TESTS=1`.
 
 ## Documentation

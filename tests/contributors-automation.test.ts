@@ -1,6 +1,7 @@
 // Blueprint-only contributors-automation meta-tests (S6a: D-022(11), D-024(9)).
 // Removed from pressed child repositories alongside .contributors.yml,
 // CONTRIBUTORS.md, and .github/workflows/update-contributors.yml.
+// cspell:ignore smorinlabs
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
