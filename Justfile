@@ -1,5 +1,6 @@
 # Set project-wide variables (rewritten automatically by template-press)
 ts_package_name := "ts-launch-blueprint"
+core_package_name := "ts-launch-blueprint-core"
 repo_name := "ts-launch-blueprint"
 command_name := "ts-projects"
 args := " "
@@ -157,12 +158,19 @@ setup:
 @_guard:
     bash scripts/guard.sh block
 
-# Build every app present (apps/*/dist/) with tsdown. A glob filter, so a
-# deleted app never breaks it (just check-removable); publishing uses the
-# CLI package's own build (pnpm run build), not this recipe.
+# Build every library package and app present (packages/*/dist/, apps/*/dist/).
+# Guards apps/ existence so core-only repos (`just check-removable cli api web`)
+# build cleanly too.
 [group('build'), group('dev')]
 @build: _guard
-    pnpm -r --filter './apps/*' build
+    #!/usr/bin/env sh
+    set -eu
+    if [ -d packages ]; then
+        pnpm -r --if-present --filter './packages/*' build
+    fi
+    if [ -d apps ]; then
+        pnpm -r --if-present --filter './apps/*' build
+    fi
 
 alias b := build
 
@@ -319,11 +327,11 @@ alias pc := pre-commit-run
     #!/usr/bin/env sh
     if ! pnpm exec typedoc --version >/dev/null 2>&1; then
         printf "{{YELLOW}}typedoc is not installed{{NC}} (optional, not CI-gated, D-023(4)).\n"
-        printf "Run on demand:   {{BLUE}}pnpm dlx typedoc --out docs/reference/api apps/cli/src/lib.ts{{NC}}\n"
+        printf "Run on demand:   {{BLUE}}pnpm dlx typedoc --out docs/reference/api packages/core/src/index.ts apps/cli/src/lib.ts{{NC}}\n"
         printf "or add it:       {{BLUE}}pnpm add -D typedoc typedoc-plugin-markdown{{NC}}\n"
         exit 0
     fi
-    pnpm exec typedoc --out docs/reference/api apps/cli/src/lib.ts
+    pnpm exec typedoc --out docs/reference/api packages/core/src/index.ts apps/cli/src/lib.ts
 
 # Run the full CI sequence locally (mirror of .github/workflows/ci.yml).
 # Same order CI runs: install deps, all quality gates, docs link check,
@@ -436,52 +444,226 @@ alias cycle := dev
 @contributors:
     pnpm dlx contributors-please render
 
-# Show release version surface: package.json, manifest, latest tag + drift
-# (D-021(1,2)). Read-only; never touches the registry.
+# Show release version surface: root/core/cli package.json, manifest, latest tag
+# + drift (D-021(1,2), ADR 0017). Read-only; never touches the registry.
 [group('releases')]
 release-status:
     #!/usr/bin/env sh
     set -eu
     PKG=$(node -p "require('./package.json').version")
+    CORE=$(node -p "require('./packages/core/package.json').version")
+    CLI=""
+    if [ -f apps/cli/package.json ]; then
+        CLI=$(node -p "require('./apps/cli/package.json').version")
+    fi
     MAN=$(node -p "require('./.release-please-manifest.json')['.']")
     TAG=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
     [ -n "$TAG" ] || TAG="(no v* tag yet)"
-    printf "package.json : %s\n" "$PKG"
-    printf "manifest     : %s\n" "$MAN"
-    printf "latest tag   : %s\n" "$TAG"
-    if [ "$PKG" != "$MAN" ]; then
-        printf "{{YELLOW}}drift: package.json (%s) != manifest (%s){{NC}}\n" "$PKG" "$MAN"
+    printf "package.json  : %s\n" "$PKG"
+    printf "packages/core : %s\n" "$CORE"
+    if [ -n "$CLI" ]; then
+        printf "apps/cli      : %s\n" "$CLI"
+    fi
+    printf "manifest      : %s\n" "$MAN"
+    printf "latest tag    : %s\n" "$TAG"
+    if [ "$PKG" != "$MAN" ] || [ "$CORE" != "$PKG" ] || { [ -n "$CLI" ] && [ "$CLI" != "$PKG" ]; }; then
+        printf "{{YELLOW}}drift: manifests disagree (root=%s core=%s cli=%s manifest=%s){{NC}}\n" "$PKG" "$CORE" "${CLI:-n/a}" "$MAN"
     elif [ "$TAG" != "v$PKG" ] && [ "$TAG" != "(no v* tag yet)" ]; then
         printf "{{YELLOW}}drift: latest tag (%s) != v%s — unreleased commits or pending Release PR{{NC}}\n" "$TAG" "$PKG"
     else
         printf "{{CHECK}} version surface consistent\n"
     fi
 
-# Local packaging validation (D-012(7)): build, publint, attw, npm pack
-# --dry-run file-list assertion, then pack + install into a temporary
-# scratch project and smoke-test the bin + ESM lib import. Registry-free:
-# --dry-run and local install never contact npmjs.com. Build/publint/attw
-# run under pnpm; the pack + scratch-install steps deliberately use the npm
-# CLI (bundled with Node) — `pnpm pack --json` emits a single object (not the
-# array shape parsed) and runs prepare, and npm install of the tarball mirrors
-# how a published-to-npm consumer actually installs the package (D-035).
+# Standalone core library packaging validation (ADR 0017): build, publint
+# --pack pnpm --strict, pnpm pack (rewriting publishConfig.exports), attw
+# --profile esm-only, tarball file/manifest/dependency/sideEffects/external-zod
+# assertions, then isolated consumer install + ESM runtime and NodeNext/Bundler
+# TypeScript smoke tests.
 [group('releases'), group('build')]
-pack-check: _guard
+pack-check-core: _guard
     #!/usr/bin/env sh
     set -eu
-    # The published package is apps/cli (D-040); every step runs there.
-    cd apps/cli
-    echo "{{CYAN}}[1/6] build{{NC}}"
+    ROOT_DIR="$(pwd)"
+    ROOT_TSC="$ROOT_DIR/node_modules/.bin/tsc"
+    cd packages/core
+    echo "{{CYAN}}[core 1/6] build{{NC}}"
     pnpm run build
-    echo "{{CYAN}}[2/6] publint{{NC}}"
+    echo "{{CYAN}}[core 2/6] publint (--pack pnpm --strict){{NC}}"
+    pnpm exec publint --pack pnpm --strict
+    SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/ts-core-pack-check.XXXXXX")
+    trap 'rm -rf "$SCRATCH"' EXIT
+    echo "{{CYAN}}[core 3/6] pnpm pack + attw (--profile esm-only){{NC}}"
+    pnpm pack --pack-destination "$SCRATCH" >/dev/null
+    TARBALL=$(find "$SCRATCH" -maxdepth 1 -type f -name '*.tgz' | head -n 1)
+    if [ -z "$TARBALL" ] || [ ! -f "$TARBALL" ]; then
+        printf "{{RED}}pnpm pack did not produce a .tgz tarball{{NC}}\n" >&2
+        exit 1
+    fi
+    pnpm exec attw "$TARBALL" --profile esm-only
+    echo "{{CYAN}}[core 4/6] packed tarball file-list, manifest, and dependency assertions{{NC}}"
+    mkdir -p "$SCRATCH/inspect"
+    tar -xzf "$TARBALL" -C "$SCRATCH/inspect"
+    INSPECT_DIR="$SCRATCH/inspect/package" CORE_NAME="{{core_package_name}}" node -e '
+      const fs = require("node:fs");
+      const path = require("node:path");
+      const root = process.env.INSPECT_DIR;
+      const walk = (dir, base = "") => {
+        const out = [];
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const rel = base ? `${base}/${entry.name}` : entry.name;
+          if (entry.isDirectory()) out.push(...walk(path.join(dir, entry.name), rel));
+          else out.push(rel);
+        }
+        return out;
+      };
+      const files = walk(root).sort();
+      const rootWhitelist = new Set(["package.json", "README.md", "LICENSE", "CHANGELOG.md"]);
+      const bad = files.filter((p) => !p.startsWith("dist/") && !rootWhitelist.has(p));
+      if (bad.length > 0) { console.error("Unexpected packed files:", bad); process.exit(1); }
+      for (const req of ["package.json", "README.md", "LICENSE", "dist/index.js", "dist/index.js.map", "dist/index.d.ts"]) {
+        if (!files.includes(req)) { console.error("Missing required packed file:", req); process.exit(1); }
+      }
+      const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+      if (pkg.name !== process.env.CORE_NAME) { console.error("Unexpected pkg.name:", pkg.name); process.exit(1); }
+      if (pkg.private === true) { console.error("Core package must not be private"); process.exit(1); }
+      if (pkg.type !== "module") { console.error("Core package must be type: module"); process.exit(1); }
+      if (pkg.sideEffects !== false) { console.error("Core package must set sideEffects: false"); process.exit(1); }
+      const dot = pkg.exports && pkg.exports["."];
+      if (!dot || dot.types !== "./dist/index.d.ts" || dot.default !== "./dist/index.js") {
+        console.error("Packed exports[\".\"] must resolve to ./dist/index.d.ts + ./dist/index.js, got:", dot);
+        process.exit(1);
+      }
+      if (!pkg.exports || pkg.exports["./package.json"] !== "./package.json") {
+        console.error("Packed exports must include ./package.json");
+        process.exit(1);
+      }
+      const deps = Object.keys(pkg.dependencies || {}).sort();
+      if (JSON.stringify(deps) !== JSON.stringify(["zod"])) {
+        console.error("Core dependencies must be strictly [\"zod\"], got:", deps);
+        process.exit(1);
+      }
+      const distJs = fs.readFileSync(path.join(root, "dist/index.js"), "utf8");
+      if (!/from\s+["\x27]zod["\x27]/.test(distJs)) {
+        console.error("dist/index.js must keep zod external (not bundled)");
+        process.exit(1);
+      }
+      console.log("  OK:", files.length, "files, sideEffects=false, deps=[zod], exports->dist/*.js/.d.ts.");
+    '
+    VERSION=$(node -p "require('./package.json').version")
+    echo "{{CYAN}}[core 5/6] install packed tarball into isolated consumer $SCRATCH/consumer{{NC}}"
+    mkdir -p "$SCRATCH/consumer"
+    printf '{"name":"core-pack-check-consumer","private":true,"type":"module"}\n' > "$SCRATCH/consumer/package.json"
+    ( cd "$SCRATCH/consumer" && npm install --no-save --no-package-lock "$TARBALL" >/dev/null 2>&1 )
+    echo "{{CYAN}}[core 6/6] smoke: ESM runtime + TypeScript NodeNext & Bundler consumer typechecks{{NC}}"
+    ( cd "$SCRATCH/consumer" && EXPECTED_VERSION="$VERSION" node -e '
+      import("{{core_package_name}}").then(async (m) => {
+        if (m.VERSION !== process.env.EXPECTED_VERSION) {
+          console.error("ESM import: VERSION mismatch:", m.VERSION, "!==", process.env.EXPECTED_VERSION);
+          process.exit(1);
+        }
+        const core = m.createCore({ source: "memory" });
+        const out = await core.projects.listProjects({ workspaceName: "Engineering", limit: 2 });
+        if (!Array.isArray(out.projects) || out.projects.length === 0) {
+          console.error("ESM import: expected in-memory demo projects");
+          process.exit(1);
+        }
+        const project = await core.projects.getProject(out.projects[0].id);
+        if (project.id !== out.projects[0].id) {
+          console.error("ESM import: getProject mismatch");
+          process.exit(1);
+        }
+        if (!m.ListProjectsInputSchema.safeParse({ limit: 5 }).success) {
+          console.error("ESM import: ListProjectsInputSchema failed valid input");
+          process.exit(1);
+        }
+        const err = new m.ProjectNotFoundError("missing");
+        if (!(err instanceof m.NotFoundError) || err.code !== m.ERROR_CODES.projectNotFound) {
+          console.error("ESM import: domain error hierarchy check failed");
+          process.exit(1);
+        }
+        console.log("  ESM runtime OK, VERSION=" + m.VERSION + ", projects=" + out.projects.length);
+      }).catch((e) => { console.error(e); process.exit(1); });
+    ' )
+    cat > "$SCRATCH/consumer/check.ts" <<'EOF'
+    import {
+      createCore,
+      ERROR_CODES,
+      ListProjectsInputSchema,
+      NotFoundError,
+      VERSION,
+      type Core,
+      type ErrorCode,
+      type ListProjectsOutput,
+      type Project,
+      type Workspace,
+    } from '{{core_package_name}}';
+
+    const core: Core = createCore({ source: 'memory' });
+    const code: ErrorCode = ERROR_CODES.projectNotFound;
+    const parsed = ListProjectsInputSchema.parse({ limit: 1 });
+    const err: NotFoundError = new NotFoundError('missing', { code });
+
+    export async function check(): Promise<{
+      version: string;
+      out: ListProjectsOutput;
+      first: Project | undefined;
+      ws: Workspace | null;
+      errName: string;
+    }> {
+      const out = await core.projects.listProjects(parsed);
+      return { version: VERSION, out, first: out.projects[0], ws: null, errName: err.name };
+    }
+    EOF
+    cat > "$SCRATCH/consumer/tsconfig.nodenext.json" <<'EOF'
+    {
+      "compilerOptions": {
+        "target": "ES2022",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "strict": true,
+        "noEmit": true,
+        "skipLibCheck": true
+      },
+      "files": ["check.ts"]
+    }
+    EOF
+    cat > "$SCRATCH/consumer/tsconfig.bundler.json" <<'EOF'
+    {
+      "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "strict": true,
+        "noEmit": true,
+        "skipLibCheck": true
+      },
+      "files": ["check.ts"]
+    }
+    EOF
+    "$ROOT_TSC" --noEmit -p "$SCRATCH/consumer/tsconfig.nodenext.json"
+    "$ROOT_TSC" --noEmit -p "$SCRATCH/consumer/tsconfig.bundler.json"
+    echo "  TypeScript consumer checks OK (NodeNext + Bundler)"
+    printf "{{CHECK}} pack-check-core passed\n"
+
+# Local CLI packaging validation (D-012(7)): build, publint, attw, npm pack
+# --dry-run file-list assertion, then pack + install into a temporary
+# scratch project and smoke-test the bin + ESM lib import.
+[group('releases'), group('build')]
+pack-check-cli: _guard
+    #!/usr/bin/env sh
+    set -eu
+    cd apps/cli
+    echo "{{CYAN}}[cli 1/6] build{{NC}}"
+    pnpm run build
+    echo "{{CYAN}}[cli 2/6] publint (--pack npm --strict){{NC}}"
     # Pack with npm, the CLI that actually publishes (D-035); pnpm pack would
-    # also try to resolve the private workspace core's version.
-    pnpm exec publint --pack npm
-    echo "{{CYAN}}[3/6] attw (--profile esm-only: ESM-only package is intentional){{NC}}"
+    # also rewrite workspace devDependencies differently.
+    pnpm exec publint --pack npm --strict
+    echo "{{CYAN}}[cli 3/6] attw (--profile esm-only: ESM-only package is intentional){{NC}}"
     pnpm exec attw --pack . --profile esm-only
     SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/ts-pack-check.XXXXXX")
     trap 'rm -rf "$SCRATCH"' EXIT
-    echo "{{CYAN}}[4/6] npm pack --dry-run file-list assertion{{NC}}"
+    echo "{{CYAN}}[cli 4/6] npm pack --dry-run file-list assertion{{NC}}"
     npm pack --dry-run --json --ignore-scripts > "$SCRATCH/dryrun.json"
     DRYRUN_JSON="$SCRATCH/dryrun.json" node -e '
       const fs = require("node:fs");
@@ -497,11 +679,11 @@ pack-check: _guard
       console.log("  OK:", files.length, "files (dist/** + root whitelist).");
     '
     VERSION=$(node -p "require('./package.json').version")
-    echo "{{CYAN}}[5/6] pack + install tarball into $SCRATCH{{NC}}"
+    echo "{{CYAN}}[cli 5/6] pack + install tarball into $SCRATCH{{NC}}"
     TARBALL=$(npm pack --ignore-scripts --pack-destination "$SCRATCH" --json | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const e=Array.isArray(d)?d[0]:(d&&typeof d.filename==='string'?d:Object.values(d)[0]);process.stdout.write(e.filename)")
     printf '{"name":"pack-check-scratch","private":true,"type":"module"}\n' > "$SCRATCH/package.json"
     ( cd "$SCRATCH" && npm install --no-save --no-package-lock "$SCRATCH/$TARBALL" >/dev/null 2>&1 )
-    echo "{{CYAN}}[6/6] smoke: installed bin --version + ESM lib import{{NC}}"
+    echo "{{CYAN}}[cli 6/6] smoke: installed bin --version + ESM lib import{{NC}}"
     BIN_VERSION=$("$SCRATCH/node_modules/.bin/{{command_name}}" --version)
     EXPECTED="{{command_name}} $VERSION"
     if [ "$BIN_VERSION" != "$EXPECTED" ]; then
@@ -509,12 +691,23 @@ pack-check: _guard
     fi
     echo "  bin {{command_name}} --version = $BIN_VERSION"
     ( cd "$SCRATCH" && node -e 'import("{{ts_package_name}}").then((m) => { if (typeof m.VERSION !== "string") { console.error("ESM import: VERSION missing"); process.exit(1); } console.log("  ESM lib import OK, VERSION=" + m.VERSION); }).catch((e) => { console.error(e); process.exit(1); })' )
+    printf "{{CHECK}} pack-check-cli passed\n"
+
+# Validate all publishable packages locally (packages/core + apps/cli when present).
+[group('releases'), group('build')]
+pack-check: _guard
+    #!/usr/bin/env sh
+    set -eu
+    just pack-check-core
+    if [ -f apps/cli/package.json ]; then
+        just pack-check-cli
+    fi
     printf "{{CHECK}} pack-check passed\n"
 
 # Clean up build artifacts, caches, and installed dependencies
 [group('clean')]
 @clean:
-    rm -rf apps/*/dist packages/*/dist apps/cli/README.md apps/cli/LICENSE
+    rm -rf apps/*/dist packages/*/dist apps/cli/README.md apps/cli/LICENSE packages/core/LICENSE
     rm -rf coverage
     rm -rf node_modules packages/*/node_modules apps/*/node_modules
     rm -f *.tsbuildinfo packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo

@@ -1,7 +1,8 @@
 # Release process
 
 Automated release and distribution runbook for `ts-launch-blueprint` (see
-[ADR 0001](adr/0001-pnpm-monorepo-and-cli-only-publishing.md) and
+[ADR 0001](adr/0001-pnpm-monorepo-and-cli-only-publishing.md),
+[ADR 0017](adr/0017-standalone-core-library-packaging.md), and
 [Versioning and Release Management](reference/versioning.md)).
 
 ## Default flow (release-please)
@@ -12,19 +13,28 @@ Automated release and distribution runbook for `ts-launch-blueprint` (see
    `googleapis/release-please-action` against `release-please-config.json` and
    `.release-please-manifest.json`, opening or updating a standing Release PR
    (`chore(release): publish vX.Y.Z`) that bumps root `package.json`,
-   `apps/cli/package.json` (via `extra-files`), `.release-please-manifest.json`,
-   and `CHANGELOG.md` atomically.
+   `packages/core/package.json`, `apps/cli/package.json` (via `extra-files`),
+   `.release-please-manifest.json`, and `CHANGELOG.md` atomically.
 3. Merge the Release PR. `release-please` pushes a `vX.Y.Z` tag and publishes
    a GitHub Release.
-4. `.github/workflows/publish.yml` fires on the `v*` tag (publishing `apps/cli`
-   only; `packages/core`, `apps/api`, and `apps/web` remain private):
+4. `.github/workflows/publish.yml` fires on the `v*` tag (`apps/api` and
+   `apps/web` remain private):
    - `verify` (`verify-release`): confirms the tag descends from `main`,
-     confirms `tag == apps/cli/package.json version == .release-please-manifest.json`,
-     runs `just all`, and runs `just pack-check`.
+     confirms `tag == root package.json == packages/core/package.json == apps/cli/package.json == .release-please-manifest.json`,
+     runs `just all`, and runs `just pack-check` (validating both `packages/core`
+     and `apps/cli`).
    - `publish` (`publish-npm`): waits for human approval in the protected `npm`
      GitHub environment, verifies `npm publish --dry-run` triggers no `bin`
      auto-correction, and runs `npm publish` in `apps/cli` via OIDC Trusted
      Publishing (`id-token: write`, no `NPM_TOKEN`).
+   - `publish-core` (`publish-core-npm`, opt-in via repository variable
+     `PUBLISH_CORE=true`): runs in parallel with `publish` inside the protected
+     `npm` environment, packs `packages/core` with `pnpm pack` (so
+     `publishConfig.exports` rewrites exports to `./dist/index.js` and
+     `./dist/index.d.ts`), and runs `npm publish <tarball> --access public` via
+     OIDC Trusted Publishing. Because `publish-core` runs in parallel and is
+     opt-in, it never blocks `apps/cli` releases before core's Trusted Publisher
+     is configured.
 5. Independently, `.github/workflows/publish-container.yml` fires when a stable
    GitHub Release is published. It builds and smoke-tests the `apps/api` image,
    publishes the versioned image to GHCR, verifies anonymous pull access, and
@@ -45,15 +55,21 @@ Automated release and distribution runbook for `ts-launch-blueprint` (see
    reviewers (1+ maintainer) so `publish` waits for explicit approval.
 
 2. Print the exact Trusted Publisher inputs for `apps/cli/package.json` and
-   validate `.github/workflows/publish.yml`:
+   `packages/core/package.json` and validate `.github/workflows/publish.yml`:
 
    ```bash
    scripts/setup-npm-publishing.sh <owner>/<repo>
    ```
 
    Configure the printed **GitHub Actions** Trusted Publisher on `npmjs.com`
-   (`Package Name` from `apps/cli/package.json`, `Owner`, `Repository name`,
-   workflow `publish.yml`, environment `npm`).
+   (`Package Name`, `Owner`, `Repository name`, workflow `publish.yml`,
+   environment `npm`) for `apps/cli` — and, if you also want to publish the
+   standalone core library (`packages/core`), configure its Trusted Publisher on
+   `npmjs.com` and enable the repository variable:
+
+   ```bash
+   gh variable set PUBLISH_CORE --body true --repo <owner>/<repo>
+   ```
 
 ---
 
@@ -137,17 +153,19 @@ git mv .github/workflows/release-please.yml .github/workflows/release-please.yml
 
 # Bump versions consistently before tagging:
 $EDITOR package.json
+$EDITOR packages/core/package.json
 $EDITOR apps/cli/package.json
 $EDITOR .release-please-manifest.json
-git add package.json apps/cli/package.json .release-please-manifest.json
+git add package.json packages/core/package.json apps/cli/package.json .release-please-manifest.json
 git commit -m "chore(release): prepare v1.2.3"
 git tag -a v1.2.3 -m "v1.2.3"
 git push origin main v1.2.3
 ```
 
-`publish.yml` still fires on the `v*` tag and publishes `apps/cli` to npm. To
-publish the API container image as well, publish a stable GitHub Release for
-that tag. Keep root `package.json`, `apps/cli/package.json`, and
+`publish.yml` still fires on the `v*` tag and publishes `apps/cli` (plus
+`packages/core` when `PUBLISH_CORE=true`) to npm. To publish the API container
+image as well, publish a stable GitHub Release for that tag. Keep root
+`package.json`, `packages/core/package.json`, `apps/cli/package.json`, and
 `.release-please-manifest.json` equal before committing and tagging.
 
 ---
@@ -174,9 +192,10 @@ creating tags that silently fail to trigger publishing.
 
 ## First-release cutover (one-time)
 
-`template-press rebrand` resets root `package.json`, `apps/cli/package.json`
-(via `scripts/reset-version.mjs`), and `.release-please-manifest.json` to
-`0.1.0`, and resets `CHANGELOG.md` to `# Changelog\n`.
+`template-press rebrand` resets root `package.json`,
+`packages/core/package.json`, `apps/cli/package.json` (via
+`scripts/reset-version.mjs`), and `.release-please-manifest.json` to `0.1.0`,
+and resets `CHANGELOG.md` to `# Changelog\n`.
 
 Configure the release credentials above and `npm` environment / Trusted
 Publisher before merging a Release PR. For an existing repository adopting

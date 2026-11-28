@@ -414,19 +414,25 @@ describe.skipIf(process.platform === 'win32')('scripts/setup-npm-publishing.sh',
     expect(bad.stderr).toContain('owner/repo');
   });
 
-  it('prints Trusted Publisher settings from apps/cli/package.json with zero warnings in this repo', () => {
+  it('prints Trusted Publisher settings from apps/cli/package.json and packages/core/package.json with zero warnings in this repo', () => {
     const cliPkg = JSON.parse(
       readFileSync(join(REPO_ROOT, 'apps', 'cli', 'package.json'), 'utf8')
+    ) as { name: string };
+    const corePkg = JSON.parse(
+      readFileSync(join(REPO_ROOT, 'packages', 'core', 'package.json'), 'utf8')
     ) as { name: string };
     const res = runScript(NPM_SCRIPT, ['example-org/example-cli']);
     expect(res.stderr).toBe('');
     expect(res.status).toBe(0);
     expect(res.stdout).toContain(cliPkg.name);
+    expect(res.stdout).toContain(corePkg.name);
     expect(res.stdout).toContain('example-org');
     expect(res.stdout).toContain('example-cli');
     expect(res.stdout).toContain('publish.yml');
     expect(res.stdout).toContain('npm');
     expect(res.stdout).toContain(`https://www.npmjs.com/package/${cliPkg.name}/access`);
+    expect(res.stdout).toContain(`https://www.npmjs.com/package/${corePkg.name}/access`);
+    expect(res.stdout).toContain('PUBLISH_CORE');
   });
 
   it('falls back to git origin remote and fails on missing or malformed apps/cli/package.json', () => {
@@ -474,6 +480,12 @@ describe.skipIf(process.platform === 'win32')('scripts/setup-npm-publishing.sh',
       expect(noWorkflow.stdout).toContain('fallback-org');
       expect(noWorkflow.stdout).toContain('fallback-repo');
       expect(noWorkflow.stderr).toContain('warning:');
+
+      mkdirSync(join(scratch, 'packages', 'core'), { recursive: true });
+      writeFileSync(join(scratch, 'packages', 'core', 'package.json'), '{bad json', 'utf8');
+      const malformedCore = runScript(copiedScript, [], { cwd: scratch, env });
+      expect(malformedCore.status).not.toBe(0);
+      expect(malformedCore.stderr).toContain('packages/core/package.json');
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }

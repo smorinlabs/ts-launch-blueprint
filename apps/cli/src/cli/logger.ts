@@ -6,7 +6,7 @@
 import { appendFileSync, closeSync, mkdirSync, openSync, renameSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { ConfigError } from '@ts-launch-blueprint/core';
+import { ConfigError } from 'ts-launch-blueprint-core';
 
 import type { Colors } from './colors.js';
 import {

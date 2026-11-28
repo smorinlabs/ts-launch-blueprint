@@ -214,6 +214,7 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
         'coverage/stale.txt',
         'apps/cli/README.md',
         'apps/cli/LICENSE',
+        'packages/core/LICENSE',
       ];
       for (const rel of cleanableOutputs) {
         mkdirSync(dirname(join(target, rel)), { recursive: true });
@@ -322,7 +323,7 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
       };
       const corePkg = JSON.parse(
         readFileSync(join(target, 'packages/core/package.json'), 'utf8')
-      ) as { name: string };
+      ) as { name: string; version: string };
       const apiPkg = JSON.parse(readFileSync(join(target, 'apps/api/package.json'), 'utf8')) as {
         name: string;
       };
@@ -338,7 +339,8 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
       expect(cliPkg.name).toBe(DEST_IDENTITY.repo_name);
       expect(cliPkg.version).toBe('0.1.0');
       expect(cliPkg.bin).toEqual({ [DEST_IDENTITY.cli_name]: 'dist/cli.js' });
-      expect(corePkg.name).toBe(`@${DEST_IDENTITY.repo_name}/core`);
+      expect(corePkg.name).toBe(`${DEST_IDENTITY.repo_name}-core`);
+      expect(corePkg.version).toBe('0.1.0');
       expect(apiPkg.name).toBe(`@${DEST_IDENTITY.repo_name}/api`);
       expect(webPkg.name).toBe(`@${DEST_IDENTITY.repo_name}/web`);
       expect(manifest['.']).toBe('0.1.0');
@@ -378,7 +380,7 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
 
       // 6. Regenerated lockfile carries the new workspace scope and no source identity.
       const lockfile = readFileSync(join(target, 'pnpm-lock.yaml'), 'utf8');
-      expect(lockfile).toContain(`@${DEST_IDENTITY.repo_name}/core`);
+      expect(lockfile).toContain(`${DEST_IDENTITY.repo_name}-core`);
       expect(lockfile).not.toContain('ts-launch-blueprint');
 
       // 7. No stray source identity outside press/press-receipt.toml and kept external repos.
@@ -412,6 +414,8 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
       runOrThrow('just', ['all'], target);
       runOrThrow('just', ['docs-check'], target);
       runOrThrow('just', ['build'], target);
+      expect(existsSync(join(target, 'packages/core/dist/index.js'))).toBe(true);
+      expect(existsSync(join(target, 'packages/core/dist/index.d.ts'))).toBe(true);
       expect(existsSync(join(target, 'apps/web/dist/index.html'))).toBe(true);
       expect(existsSync(join(target, 'apps/api/dist/server.js'))).toBe(true);
       expect(existsSync(join(target, 'apps/cli/dist/cli.js'))).toBe(true);

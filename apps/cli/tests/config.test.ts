@@ -25,7 +25,7 @@ import {
   DomainError,
   ERROR_CODES,
   NotFoundError,
-} from '@ts-launch-blueprint/core';
+} from 'ts-launch-blueprint-core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {

@@ -153,34 +153,34 @@ The [`Justfile`](./Justfile) is the canonical command surface; every
 recipe below has a one-line doc comment above it in the file, and `just
 --list` groups them (`build`, `dev`, `docs`, `releases`, ...). Highlights:
 
-| Recipe                                      | Purpose                                                                                            |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `just setup`                                | One-command Level 2 setup: verify base tools, install analyzers, `pnpm install`, hooks, check-deps |
-| `just check-deps` (`c`)                     | Verify required tools (`node`, `npm`, `pnpm`, `just`, `git`, analyzers, `gitleaks`) are installed  |
-| `just install`                              | Install pinned analyzers and workspace dependencies (`pnpm install`)                               |
-| `just dev` (`cycle`)                        | Full developer cycle: format, lint, typecheck, test, build                                         |
-| `just build` (`b`)                          | Bundle all workspace apps (`apps/*/dist/`) with tsdown                                             |
-| `just api` / `just api-dev`                 | Build & run the API on `:8080` / run API in `tsx watch` dev mode                                   |
-| `just typecheck` (`tc`)                     | `tsc --noEmit`                                                                                     |
-| `just test` (`t`)                           | Run tests with Vitest                                                                              |
-| `just test-bun`                             | Optional/advisory: run non-e2e tiers under Bun (D-036; no-op if absent)                            |
-| `just coverage`                             | Run tests with coverage thresholds enforced                                                        |
-| `just open-coverage-report`                 | Open the local HTML coverage report (`coverage/index.html`)                                        |
-| `just format` / `format-check` (`f` / `fc`) | Format (oxfmt) / check formatting                                                                  |
-| `just lint` / `lint-fix` (`l`)              | Lint (oxlint) / lint with autofixes                                                                |
-| `just all` (`a`)                            | Every quality gate: format-check, lint, boundaries, shell/workflow, editorconfig, cspell, tc, test |
-| `just setup-hooks`                          | Install lefthook git hooks + wire the commit template                                              |
-| `just hooks-run` (`hooks`)                  | Run all lefthook pre-commit checks against the whole tree                                          |
-| `just pre-commit-run` (`pc`)                | Run `pnpm exec lefthook run pre-commit --all-files` (CI mirror)                                    |
-| `just verify-commits`                       | Verify commit messages follow Conventional Commits (`commitlint`)                                  |
-| `just docs-check`                           | Verify every relative Markdown link in `README.md` + `docs/` resolves                              |
-| `just docs-api`                             | Generate API reference docs with TypeDoc (optional, not CI-gated)                                  |
-| `just release-status`                       | Check version drift (`package.json`, manifest, latest tag)                                         |
-| `just pack-check`                           | Validate the packaged distribution locally (publint, attw, npm pack)                               |
-| `just contributors`                         | Render `CONTRIBUTORS.md` via contributors-please                                                   |
-| `just select-shell`                         | Pick a `just` recipe interactively (`just --choose`)                                               |
-| `just debug-info`                           | Collect system/tool/workspace-dependency info for bug reports                                      |
-| `just clean`                                | Remove build artifacts (`apps/*/dist`, `packages/*/dist`), caches, and `node_modules`              |
+| Recipe                                      | Purpose                                                                                              |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `just setup`                                | One-command Level 2 setup: verify base tools, install analyzers, `pnpm install`, hooks, check-deps   |
+| `just check-deps` (`c`)                     | Verify required tools (`node`, `npm`, `pnpm`, `just`, `git`, analyzers, `gitleaks`) are installed    |
+| `just install`                              | Install pinned analyzers and workspace dependencies (`pnpm install`)                                 |
+| `just dev` (`cycle`)                        | Full developer cycle: format, lint, typecheck, test, build                                           |
+| `just build` (`b`)                          | Bundle all library packages and apps (`packages/*/dist/`, `apps/*/dist/`) with tsdown/Vite           |
+| `just api` / `just api-dev`                 | Build & run the API on `:8080` / run API in `tsx watch` dev mode                                     |
+| `just typecheck` (`tc`)                     | `tsc --noEmit`                                                                                       |
+| `just test` (`t`)                           | Run tests with Vitest                                                                                |
+| `just test-bun`                             | Optional/advisory: run non-e2e tiers under Bun (D-036; no-op if absent)                              |
+| `just coverage`                             | Run tests with coverage thresholds enforced                                                          |
+| `just open-coverage-report`                 | Open the local HTML coverage report (`coverage/index.html`)                                          |
+| `just format` / `format-check` (`f` / `fc`) | Format (oxfmt) / check formatting                                                                    |
+| `just lint` / `lint-fix` (`l`)              | Lint (oxlint) / lint with autofixes                                                                  |
+| `just all` (`a`)                            | Every quality gate: format-check, lint, boundaries, shell/workflow, editorconfig, cspell, tc, test   |
+| `just setup-hooks`                          | Install lefthook git hooks + wire the commit template                                                |
+| `just hooks-run` (`hooks`)                  | Run all lefthook pre-commit checks against the whole tree                                            |
+| `just pre-commit-run` (`pc`)                | Run `pnpm exec lefthook run pre-commit --all-files` (CI mirror)                                      |
+| `just verify-commits`                       | Verify commit messages follow Conventional Commits (`commitlint`)                                    |
+| `just docs-check`                           | Verify every relative Markdown link in `README.md` + `docs/` resolves                                |
+| `just docs-api`                             | Generate API reference docs with TypeDoc (optional, not CI-gated)                                    |
+| `just release-status`                       | Check version drift (`package.json`, manifest, latest tag)                                           |
+| `just pack-check`                           | Validate packaged distributions locally (`pack-check-core` + `pack-check-cli`: publint, attw, smoke) |
+| `just contributors`                         | Render `CONTRIBUTORS.md` via contributors-please                                                     |
+| `just select-shell`                         | Pick a `just` recipe interactively (`just --choose`)                                                 |
+| `just debug-info`                           | Collect system/tool/workspace-dependency info for bug reports                                        |
+| `just clean`                                | Remove build artifacts (`apps/*/dist`, `packages/*/dist`), caches, and `node_modules`                |
 
 ### Git hooks
 

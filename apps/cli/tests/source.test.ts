@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DEFAULT_IN_MEMORY_SEED, type Project } from '@ts-launch-blueprint/core';
+import { DEFAULT_IN_MEMORY_SEED, type Project } from 'ts-launch-blueprint-core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { CONFIG_FILE_NAME, TOKEN_ENV_VAR } from '../src/cli/config.js';

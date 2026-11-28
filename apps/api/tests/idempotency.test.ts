@@ -1,6 +1,6 @@
-// Standalone Idempotency-Key middleware tests (P10-TS04, Q8.A).
-import { createCore } from '@ts-launch-blueprint/core';
 import { Hono } from 'hono';
+// Standalone Idempotency-Key middleware tests (P10-TS04, Q8.A).
+import { createCore } from 'ts-launch-blueprint-core';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 

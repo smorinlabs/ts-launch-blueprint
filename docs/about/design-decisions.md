@@ -478,3 +478,4 @@ All architectural decisions in this repository are indexed in
 | [0014](../adr/0014-hook-ci-parity-cspell-and-commitlint.md)           | Hook-CI parity, `cspell` & `commitlint`                      | `Q9.A`, `D-020`                                      |
 | [0015](../adr/0015-security-scanning-and-optional-org-automation.md)  | Secret scanning, CodeQL, OSV-Scanner & org triage            | `Q11.C`, `D-022`                                     |
 | [0016](../adr/0016-canonical-agents-md-and-plain-markdown-docs.md)    | Canonical `AGENTS.md`, CommonMark docs & press               | `Q10.A`, `D-023`, `D-024`                            |
+| [0017](../adr/0017-standalone-core-library-packaging.md)              | Standalone core library packaging & opt-in npm publishing    | `Q13.A`, `Q14.A`, `P15`                              |

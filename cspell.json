@@ -111,6 +111,7 @@
     "prepush",
     "programdata",
     "publint",
+    "pycache",
     "pycodestyle",
     "pyflakes",
     "pyperclip",

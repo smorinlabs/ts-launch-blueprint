@@ -23,8 +23,8 @@ import {
 } from 'node:fs';
 import { posix, win32 } from 'node:path';
 
-import { AuthError, ConfigError } from '@ts-launch-blueprint/core';
 import { parse, stringify } from 'smol-toml';
+import { AuthError, ConfigError } from 'ts-launch-blueprint-core';
 import { z } from 'zod';
 
 import {

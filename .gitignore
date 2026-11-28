@@ -1,10 +1,15 @@
 # Node-generated files
 node_modules/
 dist/
-# README.md/LICENSE copied next to the published package by its build
-# (apps/cli/scripts/copy-package-files.mjs); the repo-root files are canonical.
+# README.md/LICENSE copied next to published packages by their build scripts
+# (apps/cli/scripts/copy-package-files.mjs, packages/core/scripts/copy-package-files.mjs);
+# the repo-root files are canonical (packages/core/README.md is tracked separately).
 apps/cli/README.md
 apps/cli/LICENSE
+packages/core/LICENSE
+# Python bytecode from local helper script invocations
+__pycache__/
+*.pyc
 # Temporary probe files written by tests/boundaries.test.ts (always removed;
 # ignored in case a crashed run leaves one behind).
 **/__boundary-probe-*

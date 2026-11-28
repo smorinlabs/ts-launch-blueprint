@@ -43,7 +43,7 @@
     "zod": "^4.6.6"
   },
   "devDependencies": {
-    "@ts-launch-blueprint/core": "workspace:*"
+    "ts-launch-blueprint-core": "workspace:*"
   },
   "engines": {
     "node": ">=24"

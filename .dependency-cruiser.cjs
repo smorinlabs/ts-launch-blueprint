@@ -8,7 +8,7 @@
 // Parser: swc (@swc/core). TypeScript 7 ships no JS compiler API, and
 // dependency-cruiser's default TS parser then sees no .ts files at all while
 // still exiting 0; tests/boundaries.test.ts guards against that silently
-// coming back. Rules match on paths only: the @ts-launch-blueprint/core edge
+// coming back. Rules match on paths only: the ts-launch-blueprint-core edge
 // resolves with dependency type "undetermined", not "local" or "npm".
 
 const CORE_SRC = '^packages/core/src/';
@@ -82,7 +82,7 @@ module.exports = {
     {
       name: 'app-core-entry-only',
       comment:
-        '[app-core-entry-only] Apps import the core only as `@ts-launch-blueprint/core`, never by a relative path into packages/.',
+        '[app-core-entry-only] Apps import the core only as `ts-launch-blueprint-core`, never by a relative path into packages/.',
       severity: 'error',
       from: { path: '^apps/' },
       to: { path: '^packages/', dependencyTypes: ['local'] },
@@ -90,10 +90,10 @@ module.exports = {
     {
       name: 'app-core-entry-only',
       comment:
-        '[app-core-entry-only] Apps import the core only as `@ts-launch-blueprint/core`, never a `@ts-launch-blueprint/core/<subpath>`.',
+        '[app-core-entry-only] Apps import the core only as `ts-launch-blueprint-core`, never a `ts-launch-blueprint-core/<subpath>`.',
       severity: 'error',
       from: { path: '^apps/' },
-      to: { path: '^@ts-launch-blueprint/core/' },
+      to: { path: '^ts-launch-blueprint-core/' },
     },
     {
       name: 'app-no-cross-app-import',

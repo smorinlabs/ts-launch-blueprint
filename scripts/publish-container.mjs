@@ -343,6 +343,13 @@ export function sourceVersion(root = ROOT) {
   if (manifest['.'] !== version) {
     throw new Error('.release-please-manifest.json version does not match package.json');
   }
+  const corePkgPath = join(root, 'packages', 'core', 'package.json');
+  if (existsSync(corePkgPath)) {
+    const corePkg = JSON.parse(readFileSync(corePkgPath, 'utf8'));
+    if (corePkg.version !== version) {
+      throw new Error('packages/core/package.json version does not match package.json');
+    }
+  }
   const cliPkgPath = join(root, 'apps', 'cli', 'package.json');
   if (existsSync(cliPkgPath)) {
     const cliPkg = JSON.parse(readFileSync(cliPkgPath, 'utf8'));

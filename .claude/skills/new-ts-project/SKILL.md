@@ -87,9 +87,11 @@ show derived defaults, and validate the answers before creating the repository.
 How each identity key maps into the generated workspace:
 
 - `repo_name`: GitHub repository name, published CLI package name
-  (`apps/cli/package.json`), root `<repo_name>-workspace`, workspace scopes
-  (`@<repo_name>/core`, `@<repo_name>/api`, `@<repo_name>/web`), `Justfile`
-  `ts_package_name`/`repo_name`, and API container image tag `<repo_name>-api`.
+  (`apps/cli/package.json`), standalone core library package name
+  (`<repo_name>-core` in `packages/core/package.json`), root
+  `<repo_name>-workspace`, private app scopes (`@<repo_name>/api`,
+  `@<repo_name>/web`), `Justfile` `ts_package_name`/`core_package_name`/`repo_name`,
+  and API container image tag `<repo_name>-api`.
 - `cli_name`: executable command in `apps/cli/package.json` `bin`, `Justfile`
   `command_name`, XDG directory `~/.config/<cli_name>/`, and config file
   `<cli_name>_config.toml`.
@@ -238,8 +240,8 @@ test "$(just version)" = "<cli_name> 0.1.0"
 ```
 
 Require every command to pass. Check that the receipt matches the answers and
-that root `package.json`, `apps/cli/package.json`, and
-`.release-please-manifest.json` all start at `0.1.0`:
+that root `package.json`, `packages/core/package.json`, `apps/cli/package.json`,
+and `.release-please-manifest.json` all start at `0.1.0`:
 
 ```bash
 node - "$bootstrap_answers" <<'NODE'
@@ -251,11 +253,17 @@ for (const line of readFileSync(process.argv[2], 'utf8').split(/\r?\n/)) {
   if (m) answers[m[1]] = m[2];
 }
 const rootPkg = JSON.parse(readFileSync('package.json', 'utf8'));
+const corePkg = JSON.parse(readFileSync('packages/core/package.json', 'utf8'));
 const cliPkg = JSON.parse(readFileSync('apps/cli/package.json', 'utf8'));
 const manifest = JSON.parse(readFileSync('.release-please-manifest.json', 'utf8'));
 const receipt = readFileSync('press/press-receipt.toml', 'utf8');
 
-if (rootPkg.version !== '0.1.0' || cliPkg.version !== '0.1.0' || manifest['.'] !== '0.1.0') {
+if (
+  rootPkg.version !== '0.1.0' ||
+  corePkg.version !== '0.1.0' ||
+  cliPkg.version !== '0.1.0' ||
+  manifest['.'] !== '0.1.0'
+) {
   throw new Error('Initial 0.1.0 version mismatch across manifests');
 }
 if (!receipt.includes('verified = true')) {

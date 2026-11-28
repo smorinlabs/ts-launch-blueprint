@@ -4,7 +4,7 @@
 // client may see. 4xx carry the domain's own wording; 5xx carry a generic
 // message, and the original stays in `cause` for the server log.
 import { TRPCError } from '@trpc/server';
-import { ApiError, AuthError, ConflictError, NotFoundError } from '@ts-launch-blueprint/core';
+import { ApiError, AuthError, ConflictError, NotFoundError } from 'ts-launch-blueprint-core';
 
 /** Client message for an AuthError: the token is server configuration, so
  * the caller can't fix it (502, not 401). */

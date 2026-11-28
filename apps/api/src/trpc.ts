@@ -6,7 +6,7 @@ import { SpanStatusCode, trace } from '@opentelemetry/api';
 import { ATTR_ERROR_TYPE } from '@opentelemetry/semantic-conventions';
 import { initTRPC } from '@trpc/server';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
-import type { Core } from '@ts-launch-blueprint/core';
+import type { Core } from 'ts-launch-blueprint-core';
 
 import { toTRPCError } from './errors.js';
 import type { Logger } from './logger.js';

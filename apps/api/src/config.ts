@@ -4,7 +4,7 @@
 // ([app-no-cross-app-import]); if both copies grow, move it into the core.
 import { isIP } from 'node:net';
 
-import { ConfigError } from '@ts-launch-blueprint/core';
+import { ConfigError } from 'ts-launch-blueprint-core';
 import { z } from 'zod';
 
 /** Env var selecting the data source; the API defaults to `memory`. */

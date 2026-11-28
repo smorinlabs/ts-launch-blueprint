@@ -152,10 +152,18 @@ describe('template-press configuration contract', () => {
       'coverage',
       'apps/cli/README.md',
       'apps/cli/LICENSE',
+      'packages/core/LICENSE',
     ]) {
       expect(cleanSection).toContain(`"${expectedPath}"`);
     }
     expect(cleanSection).not.toContain('*');
+  });
+
+  it('resets packages/core/package.json version to 0.1.0 alongside root and CLI (P15)', () => {
+    expect(rulesToml).toContain('file = "packages/core/package.json"');
+    expect(rulesToml).toContain(
+      'command = ["node", "scripts/reset-version.mjs", "packages/core/package.json"]'
+    );
   });
 
   it('resets .github/SECURITY.md via press/stubs/security.md and keeps guard files in pressed children (P07)', () => {

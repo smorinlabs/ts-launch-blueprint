@@ -4,7 +4,7 @@ import {
   NotFoundError,
   type Project,
   type Workspace,
-} from '@ts-launch-blueprint/core';
+} from 'ts-launch-blueprint-core';
 // API client tests — port of tests/test_api.py with the transport
 // mocked at the injected fetchImpl seam (D-019(5)), the TS equivalent of
 // patching requests.Session.request and nothing else.

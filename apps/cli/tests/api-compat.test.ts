@@ -1,4 +1,4 @@
-import type { Project } from '@ts-launch-blueprint/core';
+import type { Project } from 'ts-launch-blueprint-core';
 // createApiClient compatibility details not covered by tests/api.test.ts
 // (which stays unedited as the P1-3 regression proof).
 import { describe, expect, it } from 'vitest';

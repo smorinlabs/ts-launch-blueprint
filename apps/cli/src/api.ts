@@ -1,5 +1,5 @@
 // API client — compatibility wrapper over the HTTP projects repository and
-// the projects service, both from @ts-launch-blueprint/core; kept because
+// the projects service, both from ts-launch-blueprint-core; kept because
 // createApiClient is public API (D-012(3)); candidate for removal in the
 // public-API cleanup. No business rules live here.
 import {
@@ -8,9 +8,9 @@ import {
   type HttpProjectsRepositoryOptions,
   type Project,
   type Workspace,
-} from '@ts-launch-blueprint/core';
+} from 'ts-launch-blueprint-core';
 
-export { BASE_URL, DEFAULT_LIMIT, DEFAULT_TIMEOUT_MS } from '@ts-launch-blueprint/core';
+export { BASE_URL, DEFAULT_LIMIT, DEFAULT_TIMEOUT_MS } from 'ts-launch-blueprint-core';
 
 /** Constructor inputs; fetchImpl is the injected transport seam. */
 export type ApiClientOptions = HttpProjectsRepositoryOptions;

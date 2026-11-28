@@ -1,8 +1,8 @@
+import Table from 'cli-table3';
 // Pure output formatting, generic CliTableResult rendering (text, json, csv,
 // markdown), JSON/human error envelopes (ADR 0006), and terminal string helpers
 // (relativeTime, richLink per ADR 0010).
-import type { Project } from '@ts-launch-blueprint/core';
-import Table from 'cli-table3';
+import type { Project } from 'ts-launch-blueprint-core';
 
 import type { Colors } from './colors.js';
 import type { ExitCode } from './exit-codes.js';

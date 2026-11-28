@@ -1,8 +1,8 @@
 // createTracing (D-053): off without an endpoint or exporter, the resource,
 // the global registration cycle, and parent-based sampling.
 import { propagation, SpanKind } from '@opentelemetry/api';
-import { createCore } from '@ts-launch-blueprint/core';
 import { Hono } from 'hono';
+import { createCore } from 'ts-launch-blueprint-core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';

@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 
-import type { Project } from '@ts-launch-blueprint/core';
+import type { Project } from 'ts-launch-blueprint-core';
 // Real-world implementations of the interactive CliDeps seams: prompt
 // (@inquirer/prompts), clipboard (clipboardy), spinner (yocto-spinner),
 // and pager (spawnSync). All interactive prompts render on stderr — stdout

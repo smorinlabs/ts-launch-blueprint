@@ -2,7 +2,7 @@
 
 > A production-ready TypeScript CLI, API, and web workspace template with best
 > practices baked in: a gh-style noun-verb CLI (`ts-projects`) on Commander, a
-> typed core library (`@ts-launch-blueprint/core` with Zod schemas), a Hono +
+> typed core library (`ts-launch-blueprint-core` with Zod schemas), a Hono +
 > tRPC API (`@ts-launch-blueprint/api`), a React + Vite web app
 > (`@ts-launch-blueprint/web`), and a fork-ready rename system (`template-press`)
 > so the whole stack can be rebranded in one command.

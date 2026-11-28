@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { Project } from '@ts-launch-blueprint/core';
+import type { Project } from 'ts-launch-blueprint-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { PagerRunner } from '../src/cli/adapters.js';

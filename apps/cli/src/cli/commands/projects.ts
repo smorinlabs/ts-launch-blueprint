@@ -1,3 +1,5 @@
+import Table from 'cli-table3';
+import { type Command, InvalidArgumentError } from 'commander';
 // `ts-projects projects` noun group: `list` and `get <id>` (Q3.A, Q4.A).
 // Clean noun-verb cutover: no `{ isDefault: true }`.
 import {
@@ -6,9 +8,7 @@ import {
   DEFAULT_LIMIT,
   GetProjectInputSchema,
   type Project,
-} from '@ts-launch-blueprint/core';
-import Table from 'cli-table3';
-import { type Command, InvalidArgumentError } from 'commander';
+} from 'ts-launch-blueprint-core';
 
 import { requireToken } from '../config.js';
 import type { CliContext, CliDeps } from '../deps.js';

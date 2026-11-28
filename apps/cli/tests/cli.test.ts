@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { Project } from '@ts-launch-blueprint/core';
+import type { Project } from 'ts-launch-blueprint-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClipboardWriter, Prompter, SpinnerFactory } from '../src/cli/adapters.js';

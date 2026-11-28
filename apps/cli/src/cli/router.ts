@@ -3,8 +3,8 @@
 // while preserving showSuggestionAfterError(true) on typos.
 import { homedir as osHomedir } from 'node:os';
 
-import { DomainError, ERROR_CODES } from '@ts-launch-blueprint/core';
 import { Command, CommanderError, type HelpContext, Option } from 'commander';
+import { DomainError, ERROR_CODES } from 'ts-launch-blueprint-core';
 
 import { VERSION } from '../version.js';
 import {

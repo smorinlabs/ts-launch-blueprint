@@ -1,26 +1,30 @@
 # Versioning and Release Management
 
 This project uses automatic version management powered by
-**release-please**. The `version` field in the root `package.json` and in
-`apps/cli/package.json` (the published package) is the single source of
-truth; release-please bumps both together (the CLI's through
+**release-please**. The `version` field in the root `package.json`,
+`packages/core/package.json` (the standalone core library), and
+`apps/cli/package.json` (the published CLI package) moves in lockstep;
+release-please bumps all three together (core and CLI through
 `extra-files`), exclusively in its generated Release PRs — never
-hand-edited. A repo-hygiene test keeps the two and the manifest equal.
+hand-edited. A repo-hygiene test keeps all manifests aligned.
 
 ## Key Features
 
 - **Automatic Versioning**: release-please scans Conventional Commits
   on every push to `main` and maintains a standing "Release PR" that
-  bumps the root and `apps/cli` `package.json`, `.release-please-manifest.json`, and
+  bumps root `package.json`, `packages/core/package.json`,
+  `apps/cli/package.json`, `.release-please-manifest.json`, and
   regenerates `CHANGELOG.md`.
-- **Single Source of Truth**: `apps/cli/src/version.ts` imports `apps/cli/package.json`
+- **Single Source of Truth**: `packages/core/src/version.ts` and
+  `apps/cli/src/version.ts` import their package's `package.json`
   directly (`import packageJson from '../package.json' with { type:
-"json" }`) and re-exports its `version` as `VERSION`; the bundler
+"json" }`) and re-export `version` as `VERSION`; `tsdown`
   inlines it at build time. There is no separate generated version
   file to keep in sync.
 - **CI/CD Integration**: the `publish.yml` workflow's `verify` job
-  asserts the release tag, `apps/cli/package.json`, and the manifest all agree
-  before anything is published.
+  asserts the release tag, root `package.json`,
+  `packages/core/package.json`, `apps/cli/package.json`, and the manifest all
+  agree before anything is published.
 - **Semantic Versioning**: `bump-minor-pre-major: true` and
   `bump-patch-for-minor-pre-major: true` keep bumps semver-correct
   before and after 1.0.0.
@@ -102,16 +106,19 @@ Two workflows implement the release pipeline end to end:
 
 ### `publish.yml`
 
-- **Trigger**: push of a `v*` tag (plus `workflow_dispatch` from a `v*` tag; `apps/cli` only).
+- **Trigger**: push of a `v*` tag (plus `workflow_dispatch` from a `v*` tag).
 - **`verify` job** (unprivileged, no registry access): checks out full
   history, confirms the tag is an ancestor of `main`, confirms
-  `tag == package.json version == manifest version`, runs `just all`,
-  builds, and asserts the packed file list is exactly `dist/**` plus
-  the `package.json`/`README.md`/`LICENSE`/`CHANGELOG.md` whitelist.
+  `tag == root == packages/core == apps/cli == manifest`, runs `just all`,
+  and runs `just pack-check` (`pack-check-core` + `pack-check-cli`).
 - **`publish` job** (needs `verify`): runs inside the protected `npm`
   GitHub Environment (human-approved), mints an OIDC token, and runs
-  `npm publish` — npm Trusted Publishing exchanges the OIDC token for a
-  short-lived credential, so no npm token secret is stored anywhere.
+  `npm publish` for `apps/cli` — npm Trusted Publishing exchanges the OIDC
+  token for a short-lived credential, so no npm token secret is stored anywhere.
+- **`publish-core` job** (needs `verify`, opt-in via `vars.PUBLISH_CORE == 'true'`):
+  runs in parallel inside the protected `npm` environment, builds and packs
+  `packages/core` via `pnpm pack` (rewriting `publishConfig.exports`), and runs
+  `npm publish <tarball> --access public` via OIDC Trusted Publishing.
 
 ### `publish-container.yml`
 

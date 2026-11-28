@@ -4,7 +4,7 @@
 // Everything after config is logged as JSON (D-051); a config error comes
 // before the logger exists, so it is the one plain stderr line.
 import { serve } from '@hono/node-server';
-import { createCore } from '@ts-launch-blueprint/core';
+import { createCore } from 'ts-launch-blueprint-core';
 
 import { createApp } from './app.js';
 import { resolveApiConfig } from './config.js';

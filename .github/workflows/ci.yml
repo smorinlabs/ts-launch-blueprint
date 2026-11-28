@@ -73,12 +73,12 @@ jobs:
 
           # Release-please fast path: same-repo release-please branch AND a
           # diff that is only the manifest, CHANGELOG.md, and the version
-          # line in package.json / apps/cli/package.json.
+          # line in package.json / packages/core/package.json / apps/cli/package.json.
           release_only() {
             local allowed ver old new strip base_manifest head_manifest
             case "${HEAD_REF}" in release-please--*) ;; *) return 1 ;; esac
             [ "${HEAD_REPO}" = "${REPOSITORY}" ] || return 1
-            allowed='^(\.release-please-manifest\.json|CHANGELOG\.md|package\.json|apps/cli/package\.json)$'
+            allowed='^(\.release-please-manifest\.json|CHANGELOG\.md|package\.json|packages/core/package\.json|apps/cli/package\.json)$'
             if printf '%s\n' "$changed" | grep -vE "$allowed" | grep . >/dev/null; then
               return 1
             fi
@@ -92,7 +92,7 @@ jobs:
               | sed -E "$strip")" || return 1
             head_manifest="$(sed -E "$strip" .release-please-manifest.json)"
             [ "$head_manifest" = "$base_manifest" ] || return 1
-            if git diff -U0 "${BASE_SHA}...HEAD" -- package.json apps/cli/package.json \
+            if git diff -U0 "${BASE_SHA}...HEAD" -- package.json packages/core/package.json apps/cli/package.json \
                 | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) ' \
                 | grep -vxF -e "-  \"version\": \"${old}\"," -e "+  \"version\": \"${new}\"," \
                 | grep . >/dev/null; then
@@ -105,13 +105,14 @@ jobs:
             exit 0
           fi
 
-          # README.md is markdown but NOT skippable: apps/cli packs it into
-          # the published tarball, so pack-check and code jobs must run.
+          # README.md and packages/core/README.md are markdown but NOT
+          # skippable: apps/cli and packages/core pack them into published
+          # tarballs, so pack-check and code jobs must run.
           skip='^docs/|^assets/|^\.vscode/|^\.cursor/|^\.windsurf|\.md$'
           skip="$skip|^LICENSE$|^\.github/ISSUE_TEMPLATE/"
           skip="$skip|^\.contributors\.jsonl$"
           code_changed=false
-          if printf '%s\n' "$changed" | grep -x 'README\.md' >/dev/null \
+          if printf '%s\n' "$changed" | grep -xE '(packages/core/)?README\.md' >/dev/null \
               || printf '%s\n' "$changed" \
               | grep -vE "$skip" \
               | grep . >/dev/null; then
@@ -351,6 +352,9 @@ jobs:
       - name: Removable app check (apps/web)
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: just check-removable web
+      - name: Removable app check (all apps — standalone core library)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: just check-removable cli api web
 
   # API container (D-050): build the image, smoke-test it, check graceful SIGTERM stop.
   api-image:

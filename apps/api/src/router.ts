@@ -6,7 +6,7 @@ import {
   GetProjectOutputSchema,
   ListProjectsInputSchema,
   ListProjectsOutputSchema,
-} from '@ts-launch-blueprint/core';
+} from 'ts-launch-blueprint-core';
 import { z } from 'zod';
 
 import { publicProcedure, router } from './trpc.js';

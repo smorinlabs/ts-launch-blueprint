@@ -8,9 +8,9 @@ automatically; see [Architecture Boundary Rules](../reference/boundary-rules.md)
 
 The repo is a pnpm workspace with four parts:
 
-- **The core library** (`packages/core`, `@ts-launch-blueprint/core`): the
-  data shapes, data access and business rules. It knows nothing about who
-  calls it.
+- **The core library** (`packages/core`, `ts-launch-blueprint-core`): the
+  standalone data shapes, data access and business rules. It knows nothing about
+  who calls it and can be built and published independently of every app.
 - **The CLI** (`apps/cli`, the `ts-projects` command and the published npm
   package): one controller that calls the core.
 - **The API** (`apps/api`, Hono + tRPC): a second controller over the same
@@ -31,7 +31,7 @@ still works; `just check-removable cli` proves it on every CI run.
 | Repositories     | [`packages/core/src/repositories/`](../../packages/core/src/repositories/)   | Data access behind the `ProjectsRepository` interface, with an HTTP and an in-memory implementation                 | `schemas/`                                                     | `services/`, `composition.ts`, any framework           |
 | Services         | [`packages/core/src/services/`](../../packages/core/src/services/)           | Business rules: the case-insensitive workspace lookup, the default limit (200), `NotFoundError`                     | `schemas/`, and the repository interface as `import type` only | Concrete repositories, `composition.ts`, any framework |
 | Composition root | [`packages/core/src/composition.ts`](../../packages/core/src/composition.ts) | `createCore`: the only place that picks a repository implementation and builds the services on it                   | Repositories, services                                         | Apps, any framework                                    |
-| Controllers      | [`apps/cli/`](../../apps/cli/), [`apps/api/`](../../apps/api/)               | Turn input (flags, a request) into a service call, and the result or error into output                              | The core, only as `@ts-launch-blueprint/core`                  | `packages/core/src/...` paths, other apps              |
+| Controllers      | [`apps/cli/`](../../apps/cli/), [`apps/api/`](../../apps/api/)               | Turn input (flags, a request) into a service call, and the result or error into output                              | The core, only as `ts-launch-blueprint-core`                   | `packages/core/src/...` paths, other apps              |
 
 Apps reach the core only through its entry,
 [`packages/core/src/index.ts`](../../packages/core/src/index.ts). Nothing in
@@ -248,4 +248,4 @@ internal (D-047). The core public-API test
   layout.
 - [Design Decisions](design-decisions.md) and [ADRs](../adr/README.md): the
   monorepo layers, workspace package boundaries, API/web stack, runtime, and
-  CLI-only publishing rationale.
+  standalone library / CLI publishing rationale.

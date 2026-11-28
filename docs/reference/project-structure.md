@@ -72,14 +72,19 @@ ts-launch-blueprint/
 │   ├── RELEASE.md                   # Release runbook (one-time setup + routine flow)
 │   ├── docs.md                      # Docs-about-docs
 │   └── github-templates.md          # GitHub issue/PR template reference
-├── packages/core/                   # @ts-launch-blueprint/core (private, no build step)
+├── packages/core/                   # ts-launch-blueprint-core (standalone library, tsdown build)
 │   ├── src/
 │   │   ├── schemas/                 # Zod schemas, converters, domain & ConfigError definitions
 │   │   ├── repositories/            # ProjectsRepository interface + HTTP / in-memory
 │   │   ├── services/                # Business rules (projects service)
 │   │   ├── composition.ts           # Composition root: picks the repository
+│   │   ├── version.ts               # VERSION, read from package.json at build time
 │   │   └── index.ts                 # The core's only public entry
-│   └── tests/                       # Core unit, contract, and public-API tests
+│   ├── scripts/                     # copy-package-files.mjs (LICENSE) + guard-publish.mjs
+│   ├── tests/                       # Core unit, contract, version, and public-API tests
+│   ├── dist/                        # tsdown ESM + .d.ts + sourcemap output (gitignored)
+│   ├── README.md                    # Focused library README shipped in npm tarball
+│   └── tsdown.config.ts             # Standalone library build configuration (zod external)
 ├── apps/cli/                        # ts-launch-blueprint (the published package)
 │   ├── src/
 │   │   ├── cli/                     # CLI controller: router, noun-verb commands, xdg-paths,
@@ -161,14 +166,16 @@ ts-launch-blueprint/
 
 ### `packages/core/`
 
-The shared core library, `@ts-launch-blueprint/core`. `schemas/` owns
+The standalone shared core library, `ts-launch-blueprint-core`. `schemas/` owns
 the data shapes and domain errors, `repositories/` the data access
 (behind the `ProjectsRepository` interface, with HTTP and in-memory
 implementations), and `services/` the business rules. `composition.ts`
-is the only place that picks an implementation. Apps import the core
-only through `src/index.ts`; it imports nothing from `apps/`. It has no
-build step: tsdown bundles its source into the CLI, and Vitest and `tsc`
-read the TypeScript directly.
+is the only place that picks an implementation, and `version.ts` exports
+`VERSION`. Apps import the core only through `src/index.ts`; it imports nothing
+from `apps/` and depends only on `zod`. Workspace dev/test/typecheck resolve
+`src/index.ts` directly, while `just build` / `just pack-check-core` build
+`packages/core/dist/` and `pnpm pack` rewrites `exports` via
+`publishConfig.exports` for npm consumers.
 
 ### `apps/cli/`
 
@@ -241,8 +248,8 @@ install-just`) — not a build system. See
 ### `package.json` and `pnpm-workspace.yaml`
 
 The private workspace root manifest (shared dev tooling, scripts, the
-pinned pnpm version) and the workspace package list. The published
-manifest is `apps/cli/package.json`. See
+pinned pnpm version) and the workspace package list. The publishable
+manifests are `packages/core/package.json` and `apps/cli/package.json`. See
 [Configuration Files](./configuration-files.md).
 
 ### `tsconfig.base.json`, `tsconfig.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `vitest.config.ts`, `apps/cli/tsdown.config.ts`

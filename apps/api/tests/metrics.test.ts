@@ -1,6 +1,6 @@
 // The metrics module (D-052): the label functions that keep cardinality
 // bounded, and per-app registries.
-import { createCore } from '@ts-launch-blueprint/core';
+import { createCore } from 'ts-launch-blueprint-core';
 import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.js';

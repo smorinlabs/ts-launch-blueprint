@@ -3,8 +3,8 @@
 //
 // Reset a package.json manifest's "version" field to "0.1.0" during a
 // template-press [[edit]] pass so pressed child repositories start at 0.1.0
-// with root package.json, apps/cli/package.json, and
-// .release-please-manifest.json aligned.
+// with root package.json, packages/core/package.json, apps/cli/package.json,
+// and .release-please-manifest.json aligned.
 //
 // Usage: node scripts/reset-version.mjs <path-to-package.json>
 
