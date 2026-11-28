@@ -127,12 +127,9 @@ fresh repository with `press rebrand`:
 2. Verify tools, preview the plan, and apply the rebrand:
 
    ```bash
-   uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
-     press check-tools --target .
-   uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
-     press rebrand --target . --config ../press-answers.toml --dry-run
-   uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
-     press rebrand --target . --config ../press-answers.toml
+   uvx --from template-press==5.0.0 press check-tools --target .
+   uvx --from template-press==5.0.0 press rebrand --target . --config ../press-answers.toml --dry-run
+   uvx --from template-press==5.0.0 press rebrand --target . --config ../press-answers.toml
    ```
 
    This rewrites all identity surfaces (including workspace packages, CLI binary

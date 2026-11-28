@@ -456,7 +456,7 @@ press-verify:
     if command -v press >/dev/null 2>&1; then
         exec press verify
     elif command -v uvx >/dev/null 2>&1; then
-        exec uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" press verify
+        exec uvx --from template-press==5.0.0 press verify
     else
         printf "{{YELLOW}}press or uvx is not installed{{NC}} — install uv (https://docs.astral.sh/uv/) or template-press to run press verify\n" >&2
         exit 1

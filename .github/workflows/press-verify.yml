@@ -38,13 +38,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
 
-      # Pinned to the template-press main commit providing Node targets,
-      # pnpm-lock.yaml exemption, and [rules] keep_names (post-v4.1.0; v5.0.0
-      # is not yet published on PyPI). Protected from owner rewriting via
-      # [rules] keep_names = ["smorinlabs/template-press"]. Switch to
-      # `uvx --from template-press==5.0.0 press verify` once v5.0.0 ships.
+      # Pinned to PyPI template-press==5.0.0 (providing Node targets,
+      # pnpm-lock.yaml exemption, and [rules] keep_names).
       - name: Run press verify
-        run: >-
-          uvx --from
-          "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb"
-          press verify
+        run: uvx --from template-press==5.0.0 press verify

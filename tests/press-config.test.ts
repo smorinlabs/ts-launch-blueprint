@@ -119,7 +119,14 @@ describe('template-press configuration contract', () => {
     expect(parsed.permissions).toEqual({});
     expect(parsed.jobs['press-verify']).toBeDefined();
     expect(raw).toMatch(/astral-sh\/setup-uv@[0-9a-f]{40}\s*#\s*v\d/);
-    expect(raw).toContain('press verify');
+    expect(raw).toContain('uvx --from template-press==5.0.0 press verify');
+    expect(raw).not.toContain('04769b24b7b5665d8932cac3a6c1ac876b8a98bb');
+  });
+
+  it('runs Justfile press-verify via PyPI template-press==5.0.0 without the old SHA pin', () => {
+    const justfile = readText('Justfile');
+    expect(justfile).toContain('uvx --from template-press==5.0.0 press verify');
+    expect(justfile).not.toContain('04769b24b7b5665d8932cac3a6c1ac876b8a98bb');
   });
 
   it('keeps template-receipt-guard.yml only when no press receipt is committed', () => {
