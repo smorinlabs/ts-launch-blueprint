@@ -249,6 +249,11 @@ test-bun:
 @coverage:
     pnpm run test:coverage
 
+# Run Playwright Chromium E2E tests against built apps/api and apps/web
+[group('test')]
+@test-web-e2e: build
+    pnpm --filter @ts-launch-blueprint/web test:e2e
+
 # Open the local HTML coverage report (macOS: open / Linux: xdg-open)
 [group('test')]
 @open-coverage-report:

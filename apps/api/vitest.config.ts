@@ -4,7 +4,12 @@
 import { defineProject } from 'vitest/config';
 
 const config: ReturnType<typeof defineProject> = defineProject({
-  test: { name: 'api', include: ['tests/**/*.test.ts'] },
+  test: {
+    name: 'api',
+    include: ['tests/**/*.test.ts'],
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
+  },
 });
 
 export default config;

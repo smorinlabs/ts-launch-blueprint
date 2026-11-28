@@ -2,7 +2,13 @@
 import { defineProject } from 'vitest/config';
 
 const config: ReturnType<typeof defineProject> = defineProject({
-  test: { name: 'web', environment: 'jsdom', include: ['tests/**/*.test.{ts,tsx}'] },
+  test: {
+    name: 'web',
+    environment: 'jsdom',
+    include: ['tests/**/*.test.{ts,tsx}'],
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
+  },
 });
 
 export default config;

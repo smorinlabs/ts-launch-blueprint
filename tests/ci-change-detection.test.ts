@@ -155,6 +155,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     expect(runDetect({ 'docs/index.md': '# Updated\n' }, { event: 'push' })).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -162,6 +163,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     expect(runDetect({ 'docs/index.md': '# Updated\n' }, { event: 'merge_group' })).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -179,20 +181,60 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     ).toEqual({
       code: 'false',
       release: 'false',
+      web: 'false',
     });
   });
 
-  it('README.md-only pull request is treated as code (packaging input)', () => {
+  it('README.md-only pull request is treated as code (packaging input) without web E2E', () => {
     expect(runDetect({ 'README.md': '# Updated README\n' })).toEqual({
       code: 'true',
       release: 'false',
+      web: 'false',
     });
   });
 
-  it('code pull request runs code jobs and skips release fast path', () => {
+  it('code pull request touching packages/core runs code and web E2E jobs', () => {
     expect(runDetect({ 'packages/core/src/index.ts': 'export const version = 2;\n' })).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
+    });
+  });
+
+  it('apps/web pull request runs code and web E2E jobs', () => {
+    expect(runDetect({ 'apps/web/src/App.tsx': 'export const App = () => null;\n' })).toEqual({
+      code: 'true',
+      release: 'false',
+      web: 'true',
+    });
+  });
+
+  it('apps/api pull request runs code and web E2E jobs', () => {
+    expect(runDetect({ 'apps/api/src/app.ts': 'export const app = null;\n' })).toEqual({
+      code: 'true',
+      release: 'false',
+      web: 'true',
+    });
+  });
+
+  it('apps/cli-only pull request runs code jobs but skips web E2E', () => {
+    expect(runDetect({ 'apps/cli/src/cli.ts': 'export const cli = true;\n' })).toEqual({
+      code: 'true',
+      release: 'false',
+      web: 'false',
+    });
+  });
+
+  it('manifest/tsconfig pull request runs code and web E2E jobs', () => {
+    expect(runDetect({ 'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n" })).toEqual({
+      code: 'true',
+      release: 'false',
+      web: 'true',
+    });
+    expect(runDetect({ 'tsconfig.json': '{}\n' })).toEqual({
+      code: 'true',
+      release: 'false',
+      web: 'true',
     });
   });
 
@@ -213,6 +255,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     ).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -220,6 +263,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     expect(runDetect(RELEASE_BUMP, { headRef: RELEASE_BRANCH })).toEqual({
       code: 'false',
       release: 'true',
+      web: 'false',
     });
   });
 
@@ -232,6 +276,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     ).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -247,6 +292,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     ).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -265,6 +311,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     ).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -277,6 +324,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     ).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -288,6 +336,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     ).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -299,6 +348,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     expect(runDetect(change)).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -314,6 +364,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     ).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -321,6 +372,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     expect(runDetect(RELEASE_BUMP, { headRef: RELEASE_BRANCH, headRepo: 'fork/repo' })).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -328,6 +380,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     expect(runDetect(RELEASE_BUMP, { headRef: 'feature/bump' })).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 
@@ -340,6 +393,7 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
     ).toEqual({
       code: 'true',
       release: 'false',
+      web: 'true',
     });
   });
 });

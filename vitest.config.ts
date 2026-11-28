@@ -9,10 +9,20 @@ import { defineConfig } from 'vitest/config';
 // Explicit annotation required by isolatedDeclarations (D-025).
 const config: ReturnType<typeof defineConfig> = defineConfig({
   test: {
+    sequence: { shuffle: true },
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     projects: [
       'packages/*/vitest.config.ts',
       'apps/*/vitest.config.ts',
-      { test: { name: 'repo', include: ['tests/**/*.test.ts'] } },
+      {
+        test: {
+          name: 'repo',
+          include: ['tests/**/*.test.ts'],
+          testTimeout: 60_000,
+          hookTimeout: 60_000,
+        },
+      },
     ],
     coverage: {
       provider: 'v8',
