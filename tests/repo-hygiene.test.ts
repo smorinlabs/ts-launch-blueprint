@@ -1300,6 +1300,7 @@ describe('slim PR CI, merge_group, concurrency, and parallel Justfile (P03)', ()
     expect(ci.jobs['changes']?.outputs).toEqual({
       code: '${{ steps.detect.outputs.code }}',
       release: '${{ steps.detect.outputs.release }}',
+      web: '${{ steps.detect.outputs.web }}',
     });
     expect(ci.jobs['lint']?.if).toBeUndefined();
     expect(ci.jobs['lint']?.['runs-on']).toContain('RUNNER_UBUNTU');
@@ -2261,4 +2262,94 @@ describe('P12-TS02: AI review configs, CODEOWNERS, PR template, llms.txt, and Cl
       }
     }
   );
+});
+
+const isFinitePositive = (value: unknown): boolean =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0;
+
+describe('Testing resilience and web browser E2E contract (P08)', () => {
+  it('vitest.config.ts enables sequence.shuffle and finite positive timeouts across root and all 5 projects', async () => {
+    const rootTest = (vitestConfig as ViteUserConfig).test as
+      | {
+          sequence?: { shuffle?: boolean };
+          testTimeout?: unknown;
+          hookTimeout?: unknown;
+          projects?: Array<
+            string | { test?: { name?: string; testTimeout?: unknown; hookTimeout?: unknown } }
+          >;
+        }
+      | undefined;
+
+    expect(rootTest?.sequence?.shuffle).toBe(true);
+    expect(isFinitePositive(rootTest?.testTimeout)).toBe(true);
+    expect(isFinitePositive(rootTest?.hookTimeout)).toBe(true);
+
+    const repoProject = rootTest?.projects?.find(
+      (
+        project
+      ): project is { test?: { name?: string; testTimeout?: unknown; hookTimeout?: unknown } } =>
+        typeof project === 'object' && project !== null && project.test?.name === 'repo'
+    );
+    expect(repoProject).toBeDefined();
+    expect(isFinitePositive(repoProject?.test?.testTimeout)).toBe(true);
+    expect(isFinitePositive(repoProject?.test?.hookTimeout)).toBe(true);
+
+    const subProjectConfigs = [
+      'packages/core/vitest.config.ts',
+      'apps/cli/vitest.config.ts',
+      'apps/api/vitest.config.ts',
+      'apps/web/vitest.config.ts',
+    ];
+    for (const relPath of subProjectConfigs) {
+      const fullPath = join(REPO_ROOT, relPath);
+      expect(existsSync(fullPath), `${relPath} must exist`).toBe(true);
+      const mod = (await import(pathToFileURL(fullPath).href)) as {
+        default?: { test?: { testTimeout?: unknown; hookTimeout?: unknown } };
+      };
+      expect(
+        isFinitePositive(mod.default?.test?.testTimeout),
+        `${relPath} must set a finite positive testTimeout`
+      ).toBe(true);
+      expect(
+        isFinitePositive(mod.default?.test?.hookTimeout),
+        `${relPath} must set a finite positive hookTimeout`
+      ).toBe(true);
+    }
+  });
+
+  it('ci.yml wires Chromium-only, apps/web-guarded web-e2e job into ci-ok', () => {
+    const ci = parse(readFileSync(join(REPO_ROOT, '.github', 'workflows', 'ci.yml'), 'utf8')) as {
+      jobs: Record<
+        string,
+        {
+          needs?: string | string[];
+          if?: string;
+          permissions?: Record<string, unknown>;
+          'runs-on'?: string;
+          steps?: Array<{ id?: string; if?: string; run?: string; uses?: string }>;
+        }
+      >;
+    };
+
+    const webE2e = ci.jobs['web-e2e'];
+    expect(webE2e).toBeDefined();
+    expect(webE2e?.['runs-on']).toContain('RUNNER_UBUNTU');
+    expect(webE2e?.needs).toBe('changes');
+    expect(webE2e?.if).toBe("needs.changes.outputs.web == 'true'");
+    expect(webE2e?.permissions).toEqual({ contents: 'read' });
+
+    const steps = webE2e?.steps ?? [];
+    const hasWebCheck = steps.some(
+      (step) => typeof step.run === 'string' && step.run.includes('apps/web/package.json')
+    );
+    expect(hasWebCheck).toBe(true);
+
+    const runsText = steps.map((step) => step.run ?? '').join('\n');
+    expect(runsText).toContain('playwright install');
+    expect(runsText).toContain('chromium');
+    expect(runsText).not.toMatch(/playwright install[^\n]*\b(firefox|webkit)\b/);
+    expect(runsText).toContain('just test-web-e2e');
+
+    expect(ci.jobs['ci-ok']?.needs).toContain('web-e2e');
+  });
 });

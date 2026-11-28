@@ -4,10 +4,15 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+const apiTarget = process.env['E2E_API_URL'] ?? 'http://localhost:8080';
+
 const config: ReturnType<typeof defineConfig> = defineConfig({
   plugins: [react()],
   server: {
-    proxy: { '/trpc': 'http://localhost:8080' },
+    proxy: { '/trpc': apiTarget },
+  },
+  preview: {
+    proxy: { '/trpc': apiTarget },
   },
 });
 

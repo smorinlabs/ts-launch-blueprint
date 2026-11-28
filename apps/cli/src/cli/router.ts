@@ -73,6 +73,8 @@ function buildProgram(deps: CliDeps): Command {
     .configureOutput({
       writeOut: (text) => deps.stdout(text),
       writeErr: (text) => deps.stderr(text),
+      getOutHelpWidth: () => (deps.stdoutIsTTY ? (process.stdout.columns ?? 80) : 80),
+      getErrHelpWidth: () => (deps.stderrIsTTY ? (process.stderr.columns ?? 80) : 80),
     })
     .option(
       '-v, --verbose',

@@ -36,6 +36,7 @@ jobs:
     outputs:
       code: ${{ steps.detect.outputs.code }}
       release: ${{ steps.detect.outputs.release }}
+      web: ${{ steps.detect.outputs.web }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -56,10 +57,11 @@ jobs:
             {
               echo "code=$1"
               echo "release=$2"
+              echo "web=$3"
             } >> "$GITHUB_OUTPUT"
           }
           if [ "${EVENT_NAME}" != "pull_request" ]; then
-            emit true false
+            emit true false true
             echo "INFO: ${EVENT_NAME} event - running all jobs"
             exit 0
           fi
@@ -97,7 +99,7 @@ jobs:
             fi
           }
           if release_only; then
-            emit false true
+            emit false true false
             echo "INFO: release-please version bump - skipping heavy jobs"
             exit 0
           fi
@@ -107,16 +109,22 @@ jobs:
           skip='^docs/|^assets/|^\.vscode/|^\.cursor/|^\.windsurf|\.md$'
           skip="$skip|^LICENSE$|^\.github/ISSUE_TEMPLATE/"
           skip="$skip|^\.contributors\.jsonl$"
+          code_changed=false
           if printf '%s\n' "$changed" | grep -x 'README\.md' >/dev/null \
               || printf '%s\n' "$changed" \
               | grep -vE "$skip" \
               | grep . >/dev/null; then
-            emit true false
-            echo "INFO: code paths changed - running all jobs"
-          else
-            emit false false
-            echo "INFO: docs-only diff - skipping heavy jobs"
+            code_changed=true
           fi
+
+          web_paths='^(apps/web/|apps/api/|packages/core/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.nvmrc$|tsconfig.*\.json$|Justfile$|\.github/workflows/ci\.yml$)'
+          web_changed=false
+          if printf '%s\n' "$changed" | grep -E "$web_paths" >/dev/null; then
+            web_changed=true
+          fi
+
+          emit "$code_changed" false "$web_changed"
+          echo "INFO: code=${code_changed} web=${web_changed}"
 
   # Always runs (even on docs-only PRs) so markdown links, formatting, shell
   # scripts, workflows, and lint are always validated.
@@ -399,6 +407,72 @@ jobs:
       - name: Test under Bun (non-e2e tiers)
         run: bun run vitest run --exclude tests/e2e.test.ts
 
+  # Playwright Chromium browser E2E for apps/web against built apps/api (Q6.A).
+  # Step-guarded on apps/web/package.json existence so trimmed/pressed repos
+  # without apps/web skip cleanly.
+  web-e2e:
+    name: web-e2e
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check whether apps/web exists
+        id: web-check
+        run: |
+          if [ -f apps/web/package.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "INFO: apps/web/package.json not present - skipping web-e2e"
+          fi
+      - name: Install pnpm
+        if: steps.web-check.outputs.exists == 'true'
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.3
+      - name: Set up Node.js
+        if: steps.web-check.outputs.exists == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+      - name: Install just
+        if: steps.web-check.outputs.exists == 'true'
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+      - name: Install dependencies
+        id: setup
+        if: steps.web-check.outputs.exists == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Cache Playwright Chromium browser
+        id: playwright-cache
+        if: ${{ !cancelled() && steps.web-check.outputs.exists == 'true' && steps.setup.outcome == 'success' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Playwright Chromium and OS deps
+        if: ${{ !cancelled() && steps.web-check.outputs.exists == 'true' && steps.setup.outcome == 'success' && steps.playwright-cache.outputs.cache-hit != 'true' }}
+        run: pnpm --filter @ts-launch-blueprint/web exec playwright install chromium --with-deps
+      - name: Install Playwright OS deps (cache hit)
+        if: ${{ !cancelled() && steps.web-check.outputs.exists == 'true' && steps.setup.outcome == 'success' && steps.playwright-cache.outputs.cache-hit == 'true' }}
+        run: pnpm --filter @ts-launch-blueprint/web exec playwright install-deps chromium
+      - name: Run Playwright Chromium E2E
+        if: ${{ !cancelled() && steps.web-check.outputs.exists == 'true' && steps.setup.outcome == 'success' }}
+        run: just test-web-e2e
+      - name: Upload Playwright report on failure
+        if: ${{ failure() && steps.web-check.outputs.exists == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
+
   # Single required status gate: skipped jobs count as success; failure or
   # cancellation fails the gate.
   ci-ok:
@@ -413,6 +487,7 @@ jobs:
       - check-removable
       - api-image
       - bun-lane
+      - web-e2e
     if: always()
     permissions: {}
     steps:

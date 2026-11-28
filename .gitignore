@@ -19,6 +19,9 @@ build/
 
 # Test / coverage
 coverage/
+playwright-report/
+test-results/
+playwright/.cache/
 
 # Logs
 *.log

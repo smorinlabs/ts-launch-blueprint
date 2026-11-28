@@ -1,0 +1,56 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'config' 1`] = `
+"Usage: ts-projects config [options]
+
+inspect the resolved configuration
+
+Options:
+  --show      print effective configuration values (secrets redacted) (default:
+              false)
+  -h, --help  display help for command
+"
+`;
+
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'projects' 1`] = `
+"Usage: ts-projects projects [options]
+
+search and select projects
+
+Options:
+  --workspace <name>  filter projects by workspace name
+  --limit <n>         maximum number of projects to retrieve (default: 200)
+  --format <format>   output format (choices: "text", "json", "csv", default:
+                      "text")
+  --json              output json (alias for --format json)
+  --output <file>     write results to file
+  --copy              copy results to clipboard (default: false)
+  --source <name>     data source: http (default) or memory (demo data, no
+                      token)
+  -h, --help          display help for command
+"
+`;
+
+exports[`CLI --help golden snapshots > matches committed 80-column --help snapshot for 'root' 1`] = `
+"Usage: ts-projects [options] [command]
+
+Search and select projects.
+
+Options:
+  -V, --version       output the version number
+  -v, --verbose       increase verbosity (repeatable: -v debug, -vv trace)
+  -q, --quiet         only show warnings and errors (default: false)
+  --debug             maximum diagnostics; implies -v and overrides -q (default:
+                      false)
+  --no-color          disable colored output
+  --no-input          never prompt; select all fetched projects
+  --config <path>     path to config file (replaces discovery)
+  --token <token>     personal access token
+  -h, --help          display help for command
+
+Commands:
+  projects [options]  search and select projects
+  config [options]    inspect the resolved configuration
+  help [command]      display help for command
+"
+`;

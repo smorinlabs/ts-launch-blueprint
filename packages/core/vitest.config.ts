@@ -5,7 +5,12 @@ import { defineProject } from 'vitest/config';
 
 // Explicit annotation required by isolatedDeclarations (D-025).
 const config: ReturnType<typeof defineProject> = defineProject({
-  test: { name: 'core', include: ['tests/**/*.test.ts'] },
+  test: {
+    name: 'core',
+    include: ['tests/**/*.test.ts'],
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
+  },
 });
 
 export default config;
