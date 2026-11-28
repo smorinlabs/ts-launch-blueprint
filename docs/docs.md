@@ -89,10 +89,10 @@ under `docs/`) and reference them with standard Markdown image syntax:
 ```
 
 There is no `{figure}` directive, no `_static/` convention, and no Sphinx
-theme logo configuration — this template currently ships without a
-project logo (a placeholder note lives where the source repo's logo
-asset would have been carried; add one under `docs/` and reference it
-from `README.md` when a real logo exists).
+theme logo configuration — template logo artwork lives in
+`assets/images/logos/` (blueprint-only; removed on `press rebrand`), and
+application-specific images belong under `docs/` so relative links resolve in
+both the template and stamped repositories.
 
 ## Callouts
 

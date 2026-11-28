@@ -281,6 +281,7 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
         'docs/port',
         'projects',
         'assets/images/logos',
+        '.oss-scanner',
       ]) {
         expect(existsSync(join(target, removed)), `expected removed: ${removed}`).toBe(false);
       }

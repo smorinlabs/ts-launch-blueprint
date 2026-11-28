@@ -178,6 +178,17 @@ describe('template-press configuration contract', () => {
       /\[\[reset\]\]\s+file\s*=\s*"docs\/POST_INIT\.md"\s+stub_file\s*=\s*"press\/stubs\/post-init\.md"/
     );
   });
+
+  it('removes .oss-scanner and assets/images/logos and keeps press/stubs/security.md aligned (P13 M6)', () => {
+    expect(rulesToml).toMatch(/\[\[remove\]\]\s+dir\s*=\s*"\.oss-scanner"/);
+    expect(rulesToml).toMatch(/\[\[remove\]\]\s+dir\s*=\s*"assets\/images\/logos"/);
+    expect(rulesToml).not.toContain('template logo placeholder');
+
+    const securityStub = readText('press/stubs/security.md');
+    expect(securityStub).toContain('Reporting a Vulnerability');
+    expect(securityStub).toContain('Code Scanning Setup');
+    expect(securityStub).toContain('not-configured');
+  });
 });
 
 describe('scripts/reset-version.mjs', () => {

@@ -1,5 +1,12 @@
-![CI](https://github.com/smorinlabs/ts-launch-blueprint/actions/workflows/ci.yml/badge.svg)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+[![npm version](https://img.shields.io/npm/v/ts-launch-blueprint.svg)](https://www.npmjs.com/package/ts-launch-blueprint)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![CI](https://github.com/smorinlabs/ts-launch-blueprint/actions/workflows/ci.yml/badge.svg)](https://github.com/smorinlabs/ts-launch-blueprint/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/smorinlabs/ts-launch-blueprint/branch/main/graph/badge.svg)](https://codecov.io/gh/smorinlabs/ts-launch-blueprint)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Oxc](https://img.shields.io/badge/Oxc-oxlint%20%2B%20oxfmt-7C3AED)](https://oxc.rs/)
+[![pnpm](https://img.shields.io/badge/pnpm-10-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://www.conventionalcommits.org/)
 
 # TS Launch Blueprint
 
@@ -8,6 +15,8 @@ strong developer-experience, CI, release, and open-source-readiness
 baseline. It is the TypeScript port of
 [py-launch-blueprint](https://github.com/smorinlabs/py-launch-blueprint),
 built in tested vertical slices (see `docs/port/TS_PORT_PLAN.md`).
+
+![TS Launch Blueprint Logo](./assets/images/logos/ts_launch_blueprint_logo_100x100.png)
 
 Zero-config development environment with type safety built in: stamp it with
 [template-press](https://github.com/smorinlabs/template-press) and you have a

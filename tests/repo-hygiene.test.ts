@@ -1,5 +1,6 @@
 // Repo-hygiene meta-tests (plan S2 field 7): the quality-gate configs must
 // stay internally consistent, and the formatter gate must actually bite.
+// cspell:ignore IHDR
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -2569,4 +2570,214 @@ describe('P13 M5 setup/release docs, ADRs, and design-decisions contract', () =>
     }
     expect(badLinks).toEqual([]);
   });
+});
+
+describe('P13 M6 security, community docs, actionlint, logos & badges contract', () => {
+  it('ships aligned Code Scanning Setup and Reporting sections in .github/SECURITY.md', () => {
+    const security = readFileSync(join(REPO_ROOT, '.github', 'SECURITY.md'), 'utf8');
+    expect(security).toContain('Reporting a Vulnerability');
+    expect(security).toContain('Code Scanning Setup');
+    expect(security).toContain('not-configured');
+  });
+
+  it('repairs .github/CONTRIBUTING.md setup, workflow, releases, commitlint types/limits, and ShellCheck footer', () => {
+    const contributing = readFileSync(join(REPO_ROOT, '.github', 'CONTRIBUTING.md'), 'utf8');
+    expect(contributing).not.toMatch(
+      /Each commit message should be structured as follows:\s+## Getting Help/
+    );
+    expect(contributing).toContain('## Setup');
+    expect(contributing).toContain('## Daily workflow');
+    expect(contributing).toContain('## Releases');
+    expect(contributing).toContain('### Commit Message Format');
+    expect(contributing).toContain('make bootstrap');
+    expect(contributing).toContain('just setup');
+    expect(contributing).toContain('just all');
+    expect(contributing).toContain('just check-shell');
+    expect(contributing).toContain('docs/RELEASE.md');
+    expect(contributing).toContain('100');
+    expect(contributing).toContain('200');
+
+    const commitTypes = commitlintConfig.rules['type-enum'][2] as string[];
+    const missingTypes = commitTypes.filter((t) => !contributing.includes(`\`${t}\``));
+    expect(missingTypes).toEqual([]);
+  });
+
+  it('includes alternatives in 01-feature-request.yml and pre-filing-verification + pnpm in 03-bug-report.yml', () => {
+    const featureForm = parse(
+      readFileSync(join(REPO_ROOT, '.github', 'ISSUE_TEMPLATE', '01-feature-request.yml'), 'utf8')
+    ) as { body?: Array<{ id?: string; type?: string }> };
+    const alternativesField = (featureForm.body ?? []).find((item) => item.id === 'alternatives');
+    expect(alternativesField).toBeDefined();
+    expect(alternativesField?.type).toBe('textarea');
+
+    const bugRaw = readFileSync(
+      join(REPO_ROOT, '.github', 'ISSUE_TEMPLATE', '03-bug-report.yml'),
+      'utf8'
+    );
+    const bugForm = parse(bugRaw) as { body?: Array<{ id?: string; type?: string }> };
+    const preFilingField = (bugForm.body ?? []).find(
+      (item) => item.id === 'pre-filing-verification'
+    );
+    expect(preFilingField).toBeDefined();
+    expect(preFilingField?.type).toBe('checkboxes');
+    expect(bugRaw).toContain('pnpm:');
+  });
+
+  it('refreshes .github/pull_request_template.md and removes dead publish.yml ignore from .github/actionlint.yaml', () => {
+    const prTpl = readFileSync(join(REPO_ROOT, '.github', 'pull_request_template.md'), 'utf8');
+    expect(prTpl).not.toContain('docs/tasks/using_ci_cd.md');
+    expect(prTpl).toContain('docs/tasks/using-ci-cd.md');
+    expect(prTpl).toContain('just all');
+    expect(prTpl).toContain('just coverage');
+
+    const actionlint = parse(
+      readFileSync(join(REPO_ROOT, '.github', 'actionlint.yaml'), 'utf8')
+    ) as {
+      paths?: Record<string, unknown>;
+      'config-variables'?: string[];
+    };
+    expect(actionlint.paths?.['.github/workflows/publish.yml']).toBeUndefined();
+    expect(actionlint.paths?.['.github/workflows/release-please.yml']).toBeDefined();
+    expect(actionlint['config-variables']).toEqual(
+      expect.arrayContaining(['MUSE_CI_ENABLED', 'RUNNER_UBUNTU', 'RUNNER_MACOS', 'RUNNER_WINDOWS'])
+    );
+  });
+
+  it('removes PLACEHOLDER.md references and refreshes drifted CI, versioning, and structure docs', () => {
+    const aboutIndex = readFileSync(join(REPO_ROOT, 'docs', 'about', 'index.md'), 'utf8');
+    const docsGuide = readFileSync(join(REPO_ROOT, 'docs', 'docs.md'), 'utf8');
+    expect(aboutIndex).not.toContain('PLACEHOLDER.md');
+    expect(docsGuide).not.toContain('PLACEHOLDER.md');
+    expect(docsGuide).not.toContain('without a project logo');
+
+    const ghActions = readFileSync(join(REPO_ROOT, 'docs', 'tools', 'github-actions.md'), 'utf8');
+    const usingCiCd = readFileSync(join(REPO_ROOT, 'docs', 'tasks', 'using-ci-cd.md'), 'utf8');
+    expect(ghActions).not.toContain('commented-out `pnpm audit`');
+    expect(ghActions).not.toContain('# v5.0.0');
+    expect(ghActions).toContain('ci-ok');
+    expect(ghActions).toContain('merge_group');
+    expect(ghActions).toContain('dep-audit.yml');
+
+    expect(usingCiCd).not.toContain('Commented-but-documented');
+    expect(usingCiCd).not.toContain('actions/setup-node@v6');
+    expect(usingCiCd).toContain('ci-ok');
+    expect(usingCiCd).toContain('merge_group');
+    expect(usingCiCd).toContain('just coverage');
+    expect(usingCiCd).toContain('just pack-check');
+
+    const versioning = readFileSync(join(REPO_ROOT, 'docs', 'reference', 'versioning.md'), 'utf8');
+    expect(versioning).not.toContain('Uses the built-in `GITHUB_TOKEN` by default');
+    expect(versioning).toContain('RELEASE_PLEASE_CLIENT_ID');
+
+    const structure = readFileSync(
+      join(REPO_ROOT, 'docs', 'reference', 'project-structure.md'),
+      'utf8'
+    );
+    expect(structure).not.toContain('implements the default `projects` command');
+    expect(structure).toContain('.oss-scanner/');
+  });
+
+  describe.skipIf(existsSync(join(REPO_ROOT, 'press', 'press-receipt.toml')))(
+    'blueprint-only M6 security, .oss-scanner/, tutorial, logo PNGs, and README badges',
+    () => {
+      it('upgrades .github/SECURITY.md for TS 0.x scope, SLA, controls, and CodeQL default setup', () => {
+        const security = readFileSync(join(REPO_ROOT, '.github', 'SECURITY.md'), 'utf8');
+        expect(security).toContain('## Supported Versions');
+        expect(security).toContain('0.x');
+        expect(security).toContain('## Scope');
+        expect(security).toContain('## What to Expect');
+        expect(security).toContain('## Security Controls');
+        expect(security).toContain('dep-audit.yml');
+        expect(security).toContain('secret-scan.yml');
+        expect(security).toContain('gitleaks');
+        expect(security).toContain('steve.morin@gmail.com');
+        expect(security).not.toContain('commented; uncomment to enable');
+      });
+
+      it('ships .oss-scanner/Dockerfile and .oss-scanner/threat_model.md grounded in real TS paths', () => {
+        const dockerfilePath = join(REPO_ROOT, '.oss-scanner', 'Dockerfile');
+        const threatModelPath = join(REPO_ROOT, '.oss-scanner', 'threat_model.md');
+        expect(existsSync(dockerfilePath)).toBe(true);
+        expect(existsSync(threatModelPath)).toBe(true);
+
+        const dockerfile = readFileSync(dockerfilePath, 'utf8');
+        expect(dockerfile).toContain('node:24-slim@sha256:');
+        expect(dockerfile).toContain('pnpm@10.34.3');
+        expect(dockerfile).toContain('pnpm install --frozen-lockfile --ignore-scripts');
+
+        const threatModel = readFileSync(threatModelPath, 'utf8');
+        expect(threatModel).toContain('apps/api/src/');
+        expect(threatModel).toContain('apps/cli/src/');
+        expect(threatModel).toContain('packages/core/src/');
+        expect(threatModel).toContain('.github/workflows/');
+      });
+
+      it('refreshes docs/tutorials/full-project-setup.md command table and POST_INIT pointer', () => {
+        const tutorial = readFileSync(
+          join(REPO_ROOT, 'docs', 'tutorials', 'full-project-setup.md'),
+          'utf8'
+        );
+        expect(tutorial).toContain('just check-boundaries');
+        expect(tutorial).toContain('just pack-check');
+        expect(tutorial).toContain('just release-status');
+        expect(tutorial).toContain('docs/POST_INIT.md');
+      });
+
+      it('replaces PLACEHOLDER.md with valid <1 MiB TS logo PNGs (100x100, 150x150, 1024x1024)', () => {
+        expect(existsSync(join(REPO_ROOT, 'assets', 'images', 'logos', 'PLACEHOLDER.md'))).toBe(
+          false
+        );
+
+        const expectedSpecs: Array<[string, number, number]> = [
+          ['ts_launch_blueprint_logo_100x100.png', 100, 100],
+          ['ts_launch_blueprint_logo_150x150.png', 150, 150],
+          ['ts_launch_blueprint_logo_1024x1024.png', 1024, 1024],
+        ];
+        const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+        const violations: string[] = [];
+
+        for (const [filename, expectedW, expectedH] of expectedSpecs) {
+          const absPath = join(REPO_ROOT, 'assets', 'images', 'logos', filename);
+          if (!existsSync(absPath)) {
+            violations.push(`missing ${filename}`);
+            continue;
+          }
+          const size = statSync(absPath).size;
+          if (size <= 0 || size >= 1_048_576) {
+            violations.push(`${filename} size ${size} out of (0, 1048576)`);
+          }
+          const buf = readFileSync(absPath);
+          if (buf.length < 24 || !buf.subarray(0, 8).equals(pngSignature)) {
+            violations.push(`${filename} invalid PNG signature`);
+            continue;
+          }
+          if (buf.subarray(12, 16).toString('ascii') !== 'IHDR') {
+            violations.push(`${filename} missing IHDR chunk`);
+            continue;
+          }
+          const width = buf.readUInt32BE(16);
+          const height = buf.readUInt32BE(20);
+          if (width !== expectedW || height !== expectedH) {
+            violations.push(
+              `${filename} dimensions ${width}x${height} !== ${expectedW}x${expectedH}`
+            );
+          }
+        }
+        expect(violations).toEqual([]);
+      });
+
+      it('wires the 100x100 TS logo and expanded badges row in README.md', () => {
+        const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
+        expect(readme).toContain('./assets/images/logos/ts_launch_blueprint_logo_100x100.png');
+        expect(readme).toContain('npm/v/ts-launch-blueprint');
+        expect(readme).toContain('ci.yml/badge.svg');
+        expect(readme).toContain('codecov.io/gh/smorinlabs/ts-launch-blueprint');
+        expect(readme).toContain('License-MIT');
+        expect(readme).toContain('TypeScript');
+        expect(readme).toContain('Oxc');
+        expect(readme).toContain('pnpm');
+        expect(readme).toContain('Conventional%20Commits');
+      });
+    }
+  );
 });

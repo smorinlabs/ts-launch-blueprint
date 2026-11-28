@@ -1,9 +1,9 @@
-# contributors-please configuration (D-024(9)).
+# cspell:ignore smorinlabs husnain husnainasghar husnainasghr
+# yaml-language-server: $schema=https://raw.githubusercontent.com/smorinlabs/contributors-please/main/schemas/config.schema.json
+# contributors-please configuration (D-024(9), P13-T07).
 #
 # Drives both the `just contributors` recipe and the
-# .github/workflows/update-contributors.yml bot-PR workflow — a single
-# implementation, fixing the source Python repo's divergent script-vs-recipe
-# defect (docs/port/TS_PORT_INDEX.md "Contributors automation" entry).
+# .github/workflows/update-contributors.yml bot-PR workflow.
 classifier: path
 output_file: CONTRIBUTORS.md
 state_file: .contributors.jsonl
@@ -11,6 +11,18 @@ in_place: true
 in_place_marker_start: '<!-- contributors-please:start -->'
 in_place_marker_end: '<!-- contributors-please:end -->'
 entry_template: '- [{{name}}]({{profile}}) - {{title}} ({{commits}} commits)'
+columns_per_row: 1
+sort: contributions
+min_contributions: 1
+
+ignore:
+  - Copilot
+  - copilot-swe-agent[bot]
+  - claude
+  - github-actions[bot]
+  - dependabot[bot]
+  - release-please-smorinlabs[bot]
+  - blacksmith-sh[bot]
 
 classification:
   categories:
@@ -19,6 +31,28 @@ classification:
       paths:
         - 'docs/**'
         - '*.md'
+        - '.github/**'
+    - id: quality
+      label: Quality Contributor
+      paths:
+        - 'tests/**'
+        - 'scripts/check-*'
+        - '.gitleaks.toml'
   default:
     id: code
     label: Code Contributor
+  combinations:
+    - id: project
+      label: Project Contributor
+      when: [docs, quality, code]
+  multi_category_resolution: priority
+
+identity_map:
+  - login: smorin
+    emails:
+      - steve.morin@gmail.com
+  - login: husnain067
+    emails:
+      - 52630357+husnain067@users.noreply.github.com
+      - husnainasghar066@gmail.com
+      - husnainasghr066@gmail.com

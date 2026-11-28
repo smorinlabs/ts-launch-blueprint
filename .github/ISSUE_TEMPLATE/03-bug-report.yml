@@ -14,6 +14,19 @@ body:
 
         Please provide as much detail as possible so volunteers can reproduce and fix the issue efficiently.
 
+  - type: checkboxes
+    id: pre-filing-verification
+    attributes:
+      label: Pre-filing verification
+      description: Please confirm before filing.
+      options:
+        - label: I reproduced this on the latest version or `main`.
+          required: true
+        - label: I searched existing issues for duplicates.
+          required: true
+        - label: I ran `make hook-check` and the relevant `just` command (e.g. `just all` / `just debug-info`) and pasted the output below.
+          required: true
+
   - type: dropdown
     id: severity
     attributes:
@@ -95,9 +108,10 @@ body:
 
         ### Development Tools
         node: v24.3.0
+        pnpm: 10.34.3
         npm: 11.3.0
         git: git version 2.43.0
-        just: just 1.55.1
+        just: just 1.59.0
     validations:
       required: true
 
