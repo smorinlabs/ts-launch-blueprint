@@ -1,6 +1,6 @@
 // Repo-hygiene meta-tests (plan S2 field 7): the quality-gate configs must
 // stay internally consistent, and the formatter gate must actually bite.
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdtempSync,
@@ -591,7 +591,7 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
       '.github/workflows/release-please.yml',
     ];
     for (const rel of spdxRequired) {
-      const firstLine = readFileSync(join(REPO_ROOT, rel), 'utf8').split('\n')[0];
+      const firstLine = readFileSync(join(REPO_ROOT, rel), 'utf8').split(/\r?\n/)[0];
       expect({ file: rel, firstLine }).toEqual({
         file: rel,
         firstLine: '# SPDX-License-Identifier: MIT',
@@ -602,7 +602,7 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
     const difftreeFirstLine = readFileSync(
       join(WORKFLOW_DIR, 'difftree-pr-comment.yml'),
       'utf8'
-    ).split('\n')[0];
+    ).split(/\r?\n/)[0];
     expect(difftreeFirstLine).toBe('# Canonical consumer workflow for smorinlabs/difftree-action.');
   });
 
@@ -610,7 +610,7 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
   it.skipIf(!existsSync(UPDATE_CONTRIBUTORS_PATH))(
     'update-contributors.yml carries the SPDX one-liner header (D-024(7), P05)',
     () => {
-      const firstLine = readFileSync(UPDATE_CONTRIBUTORS_PATH, 'utf8').split('\n')[0];
+      const firstLine = readFileSync(UPDATE_CONTRIBUTORS_PATH, 'utf8').split(/\r?\n/)[0];
       expect(firstLine).toBe('# SPDX-License-Identifier: MIT');
     }
   );
@@ -1107,10 +1107,18 @@ describe('EditorConfig, cspell, and Justfile quality gates (P05)', () => {
   });
 
   it('scripts/install-editorconfig-checker.sh is executable and checksum-verified', () => {
-    const installerPath = join(REPO_ROOT, 'scripts', 'install-editorconfig-checker.sh');
+    const installerRelPath = 'scripts/install-editorconfig-checker.sh';
+    const installerPath = join(REPO_ROOT, installerRelPath);
     expect(existsSync(installerPath)).toBe(true);
-    const mode = statSync(installerPath).mode;
-    expect(mode & 0o111).toBeGreaterThan(0);
+    const gitStageLine = execFileSync('git', ['ls-files', '--stage', installerRelPath], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    }).trim();
+    expect(gitStageLine).toMatch(/^100755\s/);
+    // NTFS does not store POSIX execute bits, so check working-tree mode on POSIX only.
+    const workingTreeExecMode =
+      process.platform === 'win32' ? 0o111 : statSync(installerPath).mode & 0o111;
+    expect(workingTreeExecMode).not.toBe(0);
     const script = readFileSync(installerPath, 'utf8');
     expect(script).toContain('EC_VERSION');
     expect(script).toContain('checksums.txt');
@@ -1147,8 +1155,9 @@ describe('EditorConfig, cspell, and Justfile quality gates (P05)', () => {
     expect(justfile).toMatch(/^@?check-editorconfig:/m);
     expect(justfile).toMatch(/^@?check-spelling:/m);
 
-    const allLine = justfile.split('\n').find((l) => l.startsWith('@all:')) ?? '';
-    const preCommitLine = justfile.split('\n').find((l) => l.startsWith('@pre-commit-run:')) ?? '';
+    const allLine = justfile.split(/\r?\n/).find((l) => l.startsWith('@all:')) ?? '';
+    const preCommitLine =
+      justfile.split(/\r?\n/).find((l) => l.startsWith('@pre-commit-run:')) ?? '';
     expect(allLine).toContain('check-editorconfig');
     expect(allLine).toContain('check-spelling');
     expect(preCommitLine).toContain('check-editorconfig');
