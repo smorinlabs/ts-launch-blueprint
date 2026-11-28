@@ -35,4 +35,4 @@ Add merge_group, PR concurrency, change fast paths, ci-ok gate, and 3-OS matrix
 - [x] [P03-TS02] Guard POSIX-only signal assertions (`SIGINT`/`SIGTERM`) in `apps/cli/tests/e2e.test.ts` on Windows (`process.platform === 'win32'`).
 - [x] [P03-T01] Add `merge_group`, PR-only `concurrency`, `changes` path detector, 4-cell OS matrix, Linux-only static/Docker/removable jobs, and `ci-ok` aggregate gate to `.github/workflows/ci.yml` (plus `merge_group`/PR-only `concurrency` on sibling workflows and `cancel-in-progress: false` on `publish.yml`).
 - [x] [P03-T02] Add `[parallel]` attribute to `@all` in `Justfile`.
-- [ ] [P03-T03] Run `just all`, `just coverage`, `just pack-check`, `just docs-check`, and `project-audit P03`; open PR, run `ci-fix --optimize` closeout on green CI, resolve review threads, mark `P03` `[x]`, and merge via `--merge`.
+- [x] [P03-T03] Run `just all`, `just coverage`, `just pack-check`, `just docs-check`, and `project-audit P03`; open PR, run `ci-fix --optimize` closeout on green CI, resolve review threads, mark `P03` `[x]`, and merge via `--merge`.
