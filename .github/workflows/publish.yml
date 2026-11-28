@@ -115,43 +115,8 @@ jobs:
       - name: Quality gates (just all)
         run: just all
 
-      - name: Build
-        run: pnpm run build
-
-      # Local-only integrity check: `--dry-run` never contacts the registry.
-      # Asserts the tarball contains ONLY dist/** plus the root whitelist.
-      # Uses the npm CLI (bundled with Node 24): `pnpm pack --json` returns a
-      # single object and runs the prepare script, whereas `npm pack` yields the
-      # array shape this assertion parses and honours --ignore-scripts (D-035).
-      - name: Assert packed file list (dist + package.json/README/LICENSE/CHANGELOG)
-        working-directory: apps/cli
-        run: |-
-          set -euo pipefail
-          npm pack --dry-run --json --ignore-scripts > pack.json
-          node -e '
-            const pack = require("./pack.json");
-            const files = pack[0].files.map((f) => f.path);
-            const rootWhitelist = new Set([
-              "package.json",
-              "README.md",
-              "LICENSE",
-              "CHANGELOG.md",
-            ]);
-            const bad = files.filter(
-              (p) => !p.startsWith("dist/") && !rootWhitelist.has(p)
-            );
-            if (bad.length > 0) {
-              console.error("Unexpected packed files:", bad);
-              process.exit(1);
-            }
-            for (const required of ["package.json", "README.md", "LICENSE", "dist/cli.js", "dist/lib.js", "dist/lib.d.ts"]) {
-              if (!files.includes(required)) {
-                console.error("Missing required packed file:", required);
-                process.exit(1);
-              }
-            }
-            console.log("Packed file list OK:", files.length, "files.");
-          '
+      - name: Packaging validation and smoke test (just pack-check)
+        run: just pack-check
 
   # --- Registry publish: runs ONLY inside the protected `npm` environment,
   #     after human approval, on GitHub-hosted runners. Never runs locally. ---

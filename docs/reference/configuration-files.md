@@ -177,12 +177,21 @@ test. See
 ### `vitest.config.ts`
 
 Configures Vitest, the test runner. Node environment, no injected
-globals, v8 coverage with 95/95/90/95 (lines/functions/branches/
-statements) thresholds. `apps/cli/src/cli.ts` and `apps/cli/src/cli/adapters.ts` are
-excluded from coverage as thin I/O adapters exercised by the
-subprocess/e2e test tier instead. See
+globals, v8 coverage with `['text', 'html', 'lcov']` reporters and
+95/95/90/95 (lines/functions/branches/statements) thresholds.
+`apps/cli/src/cli.ts` and `apps/cli/src/cli/adapters.ts` are excluded
+from coverage as thin I/O adapters exercised by the subprocess/e2e test
+tier instead. See
 [vitest.config.ts](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/vitest.config.ts)
 and [Vitest](../tools/vitest.md).
+
+### `.codecov.yml`
+
+Configures Codecov coverage checks and PR comments: requires CI to pass
+(`require_ci_to_pass: true`), enforces `auto` ±1% project coverage and
+`80%` patch coverage, and scopes the `unittests` flag to `packages/`
+and `apps/`. Uploaded tokenlessly via OIDC on Node `24.x` in CI. See
+[.codecov.yml](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/.codecov.yml).
 
 ### `apps/cli/tsdown.config.ts`
 

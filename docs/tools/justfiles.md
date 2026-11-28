@@ -35,6 +35,10 @@ just typecheck
 # Run tests
 just test
 
+# Run tests with coverage and open HTML report
+just coverage
+just open-coverage-report
+
 # Run all quality gates (format-check, lint, shell/workflow checks, typecheck, test)
 just all
 

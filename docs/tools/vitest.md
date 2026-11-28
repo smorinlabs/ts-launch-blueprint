@@ -47,8 +47,9 @@ pnpm install
    or via [`just`](justfiles.md):
 
    ```bash
-   just test        # alias: just t
-   just coverage     # runs with coverage thresholds enforced
+   just test                   # alias: just t
+   just coverage               # runs with coverage thresholds enforced
+   just open-coverage-report   # open coverage/index.html in browser
    ```
 
 ## Key Features
@@ -75,6 +76,7 @@ const config: ReturnType<typeof defineConfig> = defineConfig({
     ],
     coverage: {
       provider: 'v8',
+      reporter: ['text', 'html', 'lcov'],
       include: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts'],
       exclude: ['apps/cli/src/cli.ts', 'apps/cli/src/cli/adapters.ts'],
       thresholds: {
@@ -91,6 +93,7 @@ export default config;
 ```
 
 - **`test.projects`**: one project per workspace package plus `repo` for the root `tests/`; coverage stays at the root so the thresholds cover the whole workspace.
+- **`test.coverage.reporter`**: `['text', 'html', 'lcov']` — prints the terminal table, generates `coverage/index.html` (opened via `just open-coverage-report`), and writes `coverage/lcov.info` for Codecov upload in CI.
 - **`test.coverage.include`**: required as of Vitest 4 — every package's `src/**/*.ts` is the set of files coverage is computed over.
 - **`test.coverage.thresholds`**: the org-standard 95% lines / 95% functions / 90% branches / 95% statements gate, enforced whenever `--coverage` runs (`just coverage`, and in CI). The everyday `just test` loop stays coverage-free for a fast inner loop.
 - **`test.coverage.exclude`**: only two files are excluded, both thin I/O adapters rather than logic:
@@ -109,8 +112,9 @@ Tests are organized into tiers of increasing realism, mirroring (and, for the CL
 4. **Repo-hygiene meta-tests** — `tests/repo-hygiene.test.ts`: assert that the project's own config files stay internally consistent (e.g. `.nvmrc`'s major version equals `package.json`'s `engines.node` floor, and the commitlint `type-enum` matches `.gitmessage`'s type list) — not application behavior, but the same "guard the guardrails" spirit as the source project's config-consistency checks.
 
 ```bash
-just test              # unit + in-process + e2e + repo-hygiene tiers, no coverage
-just coverage           # same, with coverage thresholds enforced
+just test                   # unit + in-process + e2e + repo-hygiene tiers, no coverage
+just coverage               # same, with coverage thresholds enforced
+just open-coverage-report   # open coverage/index.html in your browser
 pnpm exec vitest run apps/cli/tests/e2e.test.ts   # run a single tier directly
 ```
 
@@ -168,7 +172,7 @@ This mirrors `unittest.mock`'s hermetic-boundary intent, but the DI shape catche
   - Confirm the file lives under a package's `tests/` (or the root `tests/`) and ends in `.test.ts`.
   - Check `vitest.config.ts` hasn't scoped `include`/`exclude` away from it.
 - **Coverage threshold failures**:
-  - Run `just coverage` locally to see exactly which file/metric is under threshold before pushing.
+  - Run `just coverage` locally (and `just open-coverage-report` to inspect `coverage/index.html`) to see exactly which file/metric is under threshold before pushing.
   - Only `apps/cli/src/cli.ts` and `apps/cli/src/cli/adapters.ts` are pre-approved exclusions; adding a new exclusion needs the same "thin I/O adapter, exercised elsewhere" justification as those two.
 - **e2e tier failures**:
   - Confirm `apps/cli/dist/cli.js` actually rebuilt — delete `apps/cli/dist/` and rerun if `buildIfStale()`'s mtime comparison seems stale.

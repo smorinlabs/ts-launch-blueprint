@@ -35,13 +35,16 @@ Steps:
 5. `pnpm install --frozen-lockfile`
 6. `just format-check`
 7. `just lint`
-8. `just typecheck`
-9. `just test`
-10. `just docs-check`
-11. `just build`
-12. `pnpm exec lefthook run pre-commit --all-files` — dual enforcement: the same gates that ran as named steps above are re-run through the committed hook suite, so the pre-commit discipline itself is exercised in CI, not just the individual recipes.
+8. `just check-boundaries`
+9. `just typecheck`
+10. `just coverage` on Node `24.x` (enforces 95/95/90/95 thresholds and writes `coverage/lcov.info`), or `just test` on `26.x`
+11. `codecov/codecov-action` on Node `24.x` (tokenless OIDC upload via `id-token: write`, `fail_ci_if_error: false`)
+12. `just docs-check`
+13. `just build`
+14. `just pack-check` on Node `24.x` (validates `apps/cli` build, `publint`, `attw`, packed file list, and tarball install + CLI/ESM smoke test)
+15. `pnpm exec lefthook run pre-commit --all-files` — dual enforcement: the same gates that ran as named steps above are re-run through the committed hook suite, so the pre-commit discipline itself is exercised in CI, not just the individual recipes.
 
-Commented-but-documented scaffolding (uncomment to enable): a Codecov upload step, and an always-on `pnpm audit --audit-level high` SCA step gated to same-repo pull requests (never runs against a fork, where secrets/attack surface differ).
+Commented-but-documented scaffolding (uncomment to enable): an always-on `pnpm audit --audit-level high` SCA step gated to same-repo pull requests (never runs against a fork, where secrets/attack surface differ).
 
 ### CodeQL Advanced (`codeql.yml`)
 
@@ -63,7 +66,7 @@ Runs on every push to `main` (plus manual re-trigger). Watches Conventional Comm
 
 Normally triggered by a `v*` tag push; **paused during the V1 restructure (D-045)**, so it currently runs only on manual dispatch from a `v*` tag. Two jobs, both packing and publishing from `apps/cli` (the published package):
 
-- `verify` — cheap, unprivileged: asserts the tag descends from `main`, asserts `tag == package.json version == manifest version`, runs `just all`, builds, and asserts the packed file list is exactly `dist/**` plus the root whitelist (`package.json`, `README.md`, `LICENSE`, `CHANGELOG.md`).
+- `verify` — cheap, unprivileged: asserts the tag descends from `main`, asserts `tag == package.json version == manifest version`, runs `just all`, and runs `just pack-check` (builds `apps/cli`, checks `publint` and `attw`, asserts the packed file list is `dist/**` plus the root whitelist, and smoke-tests installing the tarball).
 - `publish` — runs only inside the protected `npm` GitHub environment (human-approved), mints an OIDC token, and runs `npm publish` via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) — no long-lived `NPM_TOKEN` anywhere.
 
 ### Difftree PR Comment (`difftree-pr-comment.yml`)

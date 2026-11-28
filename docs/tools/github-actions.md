@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -36,8 +37,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      - uses: actions/setup-node@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -45,10 +46,23 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: just format-check
       - run: just lint
+      - run: just check-boundaries
       - run: just typecheck
-      - run: just test
+      - if: matrix.node-version == '24.x'
+        run: just coverage
+      - if: matrix.node-version != '24.x'
+        run: just test
+      - if: matrix.node-version == '24.x'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          files: ./coverage/lcov.info
+          flags: unittests
+          fail_ci_if_error: false
       - run: just docs-check
       - run: just build
+      - if: matrix.node-version == '24.x'
+        run: just pack-check
       - run: pnpm exec lefthook run pre-commit --all-files
 ```
 
@@ -63,7 +77,7 @@ Every third-party action reference in this repository follows one of two rules:
   ```yaml
   - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
   ```
-  This covers `pnpm/action-setup`, `extractions/setup-just`, `oven-sh/setup-bun`, `astral-sh/setup-uv`, `google/osv-scanner-action/osv-scanner-action`, `googleapis/release-please-action`, and `smorinlabs/difftree-action`. [Dependabot's `github-actions` ecosystem](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#package-ecosystem) keeps these SHAs fresh via automated PRs.
+  This covers `pnpm/action-setup`, `extractions/setup-just`, `oven-sh/setup-bun`, `astral-sh/setup-uv`, `codecov/codecov-action`, `google/osv-scanner-action/osv-scanner-action`, `googleapis/release-please-action`, and `smorinlabs/difftree-action`. [Dependabot's `github-actions` ecosystem](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#package-ecosystem) keeps these SHAs fresh via automated PRs.
 
 **SHA-pin exception within the "official action" bucket**: `actions/dependency-review-action` is an official `actions/*` action but is nonetheless pinned to a full SHA (`@a1d282b...` / `# v5.0.0`), because this action publishes **no floating major tag at all** (no `v5`, and no `v4` either — the Python source repo's `@v4` reference carried this exact latent resolution bug and would never have resolved). Only exact point-release tags exist upstream, so a SHA pin is the only reliable reference; Dependabot still keeps it current.
 
@@ -72,12 +86,12 @@ Every third-party action reference in this repository follows one of two rules:
 Every workflow declares an explicit top-level `permissions:` block:
 
 - **Deny-all baseline**: workflows that don't need to write anything declare `permissions: {}` at the workflow level, then re-grant only what each job needs (e.g. `contents: read` for a read-only checkout).
-- **Token-bearing workflows** grant precisely the scopes their job performs — `contents: write` + `pull-requests: write` for Release Please and Update Contributors (they open/update PRs); `pull-requests: write` for Dependency Review (it posts a PR comment); `security-events: write` + `packages: read` + `actions: read` + `contents: read` for CodeQL (per GitHub's documented CodeQL requirements); `id-token: write` (OIDC only, no long-lived secret) for the `publish` job in `publish.yml`.
+- **Token-bearing workflows** grant precisely the scopes their job performs — `contents: write` + `pull-requests: write` for Release Please and Update Contributors (they open/update PRs); `pull-requests: write` for Dependency Review (it posts a PR comment); `security-events: write` + `packages: read` + `actions: read` + `contents: read` for CodeQL (per GitHub's documented CodeQL requirements); `id-token: write` (OIDC only, no long-lived secret) for Codecov upload in `ci.yml` and the `publish` job in `publish.yml`.
 - Every checkout step sets `persist-credentials: false` — no job here pushes using the checked-out token, so the persisted credential is dropped (closing the "artipacked" token-leak pattern that security scanners like `zizmor` flag).
 
 ## Best Practices
 
-- **Keep It Simple**: start small and expand as needed — the commented-out scaffolding in `ci.yml` (Codecov upload, `pnpm audit`) is deliberately left as uncomment-to-enable rather than wired in by default.
+- **Keep It Simple**: start small and expand as needed — the commented-out `pnpm audit` scaffolding in `ci.yml` is left as uncomment-to-enable rather than wired in by default, while coverage thresholds (`just coverage`), tokenless Codecov OIDC upload (`24.x`), and `just pack-check` (`24.x`) are active.
 - **Use Matrix Builds**: test across the Node.js Active-LTS floor and the next Current release (`['24.x', '26.x']`).
 - **Cache Dependencies**: `pnpm/action-setup` (pinned before `actions/setup-node`) with `actions/setup-node`'s `cache: 'pnpm'`, keyed to the committed `pnpm-lock.yaml`, needs no separate `actions/cache` step.
 - **Fail Fast, But Not Across the Matrix**: `fail-fast: false` so a failure on one Node version doesn't hide results from the other.

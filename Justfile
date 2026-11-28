@@ -199,6 +199,12 @@ test-bun:
 @coverage:
     pnpm run test:coverage
 
+# Open the local HTML coverage report (macOS: open / Linux: xdg-open)
+[group('test')]
+@open-coverage-report:
+    if [ ! -f coverage/index.html ]; then printf "{{YELLOW}}No coverage report found — run 'just coverage' first{{NC}}\n" >&2; exit 1; fi
+    if command -v open >/dev/null 2>&1; then open coverage/index.html; elif command -v xdg-open >/dev/null 2>&1; then xdg-open coverage/index.html; else printf "Open coverage/index.html in your browser\n" >&2; fi
+
 # Run all quality gates, including shell scripts and workflow commands.
 [group('test'), group('dev'), group('quick start')]
 @all: format-check lint check-boundaries check-shell check-workflows typecheck test
@@ -322,7 +328,7 @@ release-status:
     fi
 
 # Local packaging validation (D-012(7)): build, publint, attw, npm pack
-# --dry-run file-list assertion, then pack + install into a /private/tmp
+# --dry-run file-list assertion, then pack + install into a temporary
 # scratch project and smoke-test the bin + ESM lib import. Registry-free:
 # --dry-run and local install never contact npmjs.com. Build/publint/attw
 # run under pnpm; the pack + scratch-install steps deliberately use the npm
@@ -343,11 +349,15 @@ pack-check:
     pnpm exec publint --pack npm
     echo "{{CYAN}}[3/6] attw (--profile esm-only: ESM-only package is intentional){{NC}}"
     pnpm exec attw --pack . --profile esm-only
+    SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/ts-pack-check.XXXXXX")
+    trap 'rm -rf "$SCRATCH"' EXIT
     echo "{{CYAN}}[4/6] npm pack --dry-run file-list assertion{{NC}}"
-    npm pack --dry-run --json --ignore-scripts > /tmp/ts-pack-dryrun.json
-    node -e '
-      const pack = require("/tmp/ts-pack-dryrun.json");
-      const files = pack[0].files.map((f) => f.path);
+    npm pack --dry-run --json --ignore-scripts > "$SCRATCH/dryrun.json"
+    DRYRUN_JSON="$SCRATCH/dryrun.json" node -e '
+      const fs = require("node:fs");
+      const raw = JSON.parse(fs.readFileSync(process.env.DRYRUN_JSON, "utf8"));
+      const entry = Array.isArray(raw) ? raw[0] : (raw && Array.isArray(raw.files) ? raw : Object.values(raw)[0]);
+      const files = entry.files.map((f) => f.path);
       const rootWhitelist = new Set(["package.json", "README.md", "LICENSE", "CHANGELOG.md"]);
       const bad = files.filter((p) => !p.startsWith("dist/") && !rootWhitelist.has(p));
       if (bad.length > 0) { console.error("Unexpected packed files:", bad); process.exit(1); }
@@ -357,10 +367,8 @@ pack-check:
       console.log("  OK:", files.length, "files (dist/** + root whitelist).");
     '
     VERSION=$(node -p "require('./package.json').version")
-    SCRATCH=$(mktemp -d /private/tmp/ts-pack-check.XXXXXX)
-    trap 'rm -rf "$SCRATCH"' EXIT
     echo "{{CYAN}}[5/6] pack + install tarball into $SCRATCH{{NC}}"
-    TARBALL=$(npm pack --ignore-scripts --pack-destination "$SCRATCH" --json | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));process.stdout.write(d[0].filename)")
+    TARBALL=$(npm pack --ignore-scripts --pack-destination "$SCRATCH" --json | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const e=Array.isArray(d)?d[0]:(d&&typeof d.filename==='string'?d:Object.values(d)[0]);process.stdout.write(e.filename)")
     printf '{"name":"pack-check-scratch","private":true,"type":"module"}\n' > "$SCRATCH/package.json"
     ( cd "$SCRATCH" && npm install --no-save --no-package-lock "$SCRATCH/$TARBALL" >/dev/null 2>&1 )
     echo "{{CYAN}}[6/6] smoke: installed bin --version + ESM lib import{{NC}}"
