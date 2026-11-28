@@ -407,3 +407,107 @@ describe('idempotency middleware mounted in createApp with a tRPC mutation (Q8.A
     expect(executions).toBe(2);
   });
 });
+
+describe('idempotency middleware outer pre-next() header preservation', () => {
+  it('preserves both outer and inner Set-Cookie headers on initial and replayed responses', async () => {
+    let calls = 0;
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      c.header('Set-Cookie', 'outer=1; Path=/', { append: true });
+      await next();
+    });
+    app.use('*', idempotency());
+    app.post('/cookies-both', (c) => {
+      calls += 1;
+      c.header('Set-Cookie', 'inner=1; Path=/', { append: true });
+      return c.json({ calls }, 201);
+    });
+
+    const first = await app.request('/cookies-both', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'outer-cookie-1' },
+    });
+    expect(first.status).toBe(201);
+    expect(first.headers.get('Idempotency-Replayed')).toBeNull();
+    expect(first.headers.getSetCookie()).toEqual(['outer=1; Path=/', 'inner=1; Path=/']);
+
+    const replay = await app.request('/cookies-both', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'outer-cookie-1' },
+    });
+    expect(replay.status).toBe(201);
+    expect(replay.headers.get('Idempotency-Replayed')).toBe('true');
+    expect(replay.headers.getSetCookie()).toEqual(['outer=1; Path=/', 'inner=1; Path=/']);
+    expect(calls).toBe(1);
+  });
+
+  it('preserves both outer and inner Vary tokens without dropping or duplicating on initial and replayed responses', async () => {
+    let calls = 0;
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      c.header('Vary', 'Accept-Encoding', { append: true });
+      await next();
+    });
+    app.use('*', idempotency());
+    app.post('/vary-both', (c) => {
+      calls += 1;
+      c.header('Vary', 'Accept-Language', { append: true });
+      return c.json({ calls }, 201);
+    });
+
+    const first = await app.request('/vary-both', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'outer-vary-1' },
+    });
+    expect(first.status).toBe(201);
+    expect(first.headers.get('Idempotency-Replayed')).toBeNull();
+    expect(first.headers.get('Vary')).toBe('Accept-Encoding, Accept-Language');
+
+    const replay = await app.request('/vary-both', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'outer-vary-1' },
+    });
+    expect(replay.status).toBe(201);
+    expect(replay.headers.get('Idempotency-Replayed')).toBe('true');
+    expect(replay.headers.get('Vary')).toBe('Accept-Encoding, Accept-Language');
+    expect(calls).toBe(1);
+  });
+
+  it('deduplicates Vary tokens case-insensitively and preserves overwritten vs appended custom headers on replay', async () => {
+    let includeOuterVary = false;
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      if (includeOuterVary) {
+        c.header('Vary', 'accept-encoding', { append: true });
+      }
+      c.header('X-Mode', 'outer');
+      c.header('X-Tags', 'alpha', { append: true });
+      await next();
+    });
+    app.use('*', idempotency());
+    app.post('/edge', (c) => {
+      c.header('Vary', 'Accept-Encoding, Accept-Language', { append: true });
+      c.header('X-Mode', 'inner');
+      c.header('X-Tags', 'beta', { append: true });
+      return c.json({ ok: true }, 201);
+    });
+
+    const first = await app.request('/edge', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'edge-1' },
+    });
+    expect(first.headers.get('Vary')).toBe('Accept-Encoding, Accept-Language');
+    expect(first.headers.get('X-Mode')).toBe('inner');
+    expect(first.headers.get('X-Tags')).toBe('alpha, beta');
+
+    includeOuterVary = true;
+    const replay = await app.request('/edge', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'edge-1' },
+    });
+    expect(replay.headers.get('Idempotency-Replayed')).toBe('true');
+    expect(replay.headers.get('Vary')).toBe('accept-encoding, Accept-Language');
+    expect(replay.headers.get('X-Mode')).toBe('inner');
+    expect(replay.headers.get('X-Tags')).toBe('alpha, beta');
+  });
+});

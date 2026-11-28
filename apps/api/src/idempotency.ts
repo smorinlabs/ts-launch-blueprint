@@ -21,10 +21,16 @@ export interface IdempotencyOptions {
   now?: (() => number) | undefined;
 }
 
+interface CachedHeader {
+  name: string;
+  value: string;
+  appended: boolean;
+}
+
 interface CacheEntry {
   storedAt: number;
   status: number;
-  headers: [string, string][];
+  headers: CachedHeader[];
   body: ArrayBuffer;
 }
 
@@ -32,6 +38,101 @@ function buildHeaders(pairs: readonly [string, string][]): Headers {
   const headers = new Headers();
   for (const [name, value] of pairs) {
     headers.append(name, value);
+  }
+  return headers;
+}
+
+function splitCommaTokens(value: string): string[] {
+  return value
+    .split(',')
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+}
+
+function mergeHeaderTokens(existing: string, incoming: string, caseInsensitive: boolean): string {
+  const existingTokens = splitCommaTokens(existing);
+  const incomingTokens = splitCommaTokens(incoming);
+  const seen = new Set(
+    existingTokens.map((token) => (caseInsensitive ? token.toLowerCase() : token))
+  );
+  const merged = [...existingTokens];
+  for (const token of incomingTokens) {
+    const key = caseInsensitive ? token.toLowerCase() : token;
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(token);
+    }
+  }
+  return merged.join(', ');
+}
+
+function extractRouteHeaders(
+  initialPairs: readonly [string, string][],
+  preHeaders: readonly [string, string][]
+): CachedHeader[] {
+  const remainingPre = [...preHeaders];
+  const cached: CachedHeader[] = [];
+
+  for (const [name, value] of initialPairs) {
+    const lower = name.toLowerCase();
+    const exactIdx = remainingPre.findIndex(
+      ([preName, preValue]) => preName.toLowerCase() === lower && preValue === value
+    );
+    if (exactIdx !== -1) {
+      remainingPre.splice(exactIdx, 1);
+      continue;
+    }
+
+    if (lower !== 'set-cookie') {
+      const prefixIdx = remainingPre.findIndex(([preName, preValue]) => {
+        if (preName.toLowerCase() !== lower || preValue.length === 0) {
+          return false;
+        }
+        return (
+          value.startsWith(preValue) &&
+          value.length > preValue.length &&
+          value[preValue.length] === ','
+        );
+      });
+      if (prefixIdx !== -1) {
+        const [, preValue] = remainingPre[prefixIdx]!;
+        remainingPre.splice(prefixIdx, 1);
+        const suffix = value.slice(preValue.length + 1).trimStart();
+        if (suffix.length > 0) {
+          cached.push({ name, value: suffix, appended: true });
+        }
+        continue;
+      }
+    }
+
+    cached.push({ name, value, appended: false });
+  }
+
+  return cached;
+}
+
+function buildReplayHeaders(
+  preHeaders: readonly [string, string][],
+  cachedHeaders: readonly CachedHeader[]
+): Headers {
+  const headers = new Headers();
+  for (const [name, value] of preHeaders) {
+    headers.append(name, value);
+  }
+  for (const { name, value, appended } of cachedHeaders) {
+    const lower = name.toLowerCase();
+    if (lower === 'set-cookie') {
+      headers.append(name, value);
+      continue;
+    }
+    const existing = headers.get(name);
+    if (existing === null) {
+      headers.append(name, value);
+    } else if (appended || lower === 'vary') {
+      headers.set(name, mergeHeaderTokens(existing, value, lower === 'vary'));
+    } else {
+      headers.set(name, value);
+    }
   }
   return headers;
 }
@@ -61,11 +162,11 @@ export function idempotency(options: IdempotencyOptions = {}): MiddlewareHandler
       if (currentTime - cached.storedAt < ttlMs) {
         store.delete(cacheKey);
         store.set(cacheKey, cached);
-        const replayHeaders = buildHeaders(cached.headers);
-        for (const [name, value] of preHeaders) {
-          replayHeaders.append(name, value);
-        }
+        const replayHeaders = buildReplayHeaders(preHeaders, cached.headers);
         replayHeaders.set(REPLAYED_HEADER, 'true');
+        for (const [name] of preHeaders) {
+          c.res.headers.delete(name);
+        }
         c.header(REPLAYED_HEADER, undefined);
         c.res = new Response(responseBodyFor(cached.status, cached.body), {
           status: cached.status,
@@ -85,17 +186,7 @@ export function idempotency(options: IdempotencyOptions = {}): MiddlewareHandler
     const initialHeaderPairs = [...original.headers.entries()].filter(
       ([name]) => name.toLowerCase() !== REPLAYED_HEADER.toLowerCase()
     );
-    const remainingPre = [...preHeaders];
-    const cacheHeaderPairs = initialHeaderPairs.filter(([name, value]) => {
-      const matchIdx = remainingPre.findIndex(
-        ([preName, preValue]) => preName.toLowerCase() === name.toLowerCase() && preValue === value
-      );
-      if (matchIdx !== -1) {
-        remainingPre.splice(matchIdx, 1);
-        return false;
-      }
-      return true;
-    });
+    const cacheHeaderPairs = extractRouteHeaders(initialHeaderPairs, preHeaders);
     const rebuiltHeaders = buildHeaders(initialHeaderPairs);
     c.header(REPLAYED_HEADER, undefined);
     c.res = new Response(responseBodyFor(original.status, body), {
