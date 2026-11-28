@@ -34,7 +34,7 @@ every app) writes the static site to `apps/web/dist/`.
   a value import of it doesn't even resolve, and the
   `[web-types-only-from-api]` rule fails anything but `import type`
   ([Architecture Boundary Rules](./boundary-rules.md)). A test checks the
-  built bundle contains no API code (Hono, pino, prom-client,
+  built bundle contains no API code (Hono, pino, `@prometheus-io/client`,
   OpenTelemetry, the procedures).
 - **Types end to end.** `trpc.projects.list.queryOptions()` returns exactly
   the core's `ListProjectsOutput`; a type test (`tests/types.test.ts`)
@@ -56,8 +56,9 @@ else:
 VITE_API_URL=https://api.example.com pnpm --filter @ts-launch-blueprint/web build
 ```
 
-A different origin needs CORS on the API, which isn't set up yet. That's
-decided with the deploy.
+A different origin needs CORS enabled on the API via `CORS_ORIGINS` (for
+example `CORS_ORIGINS=https://web.example.com`; see the
+[API Reference](./api-reference.md#environment-variables)).
 
 ## The Projects Screen
 

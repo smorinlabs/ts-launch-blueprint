@@ -175,7 +175,7 @@ For **every** review comment (human or bot), complete all three steps:
   `@opentelemetry/context-async-hooks`, `@opentelemetry/core`,
   `@opentelemetry/exporter-trace-otlp-http`, `@opentelemetry/resources`,
   `@opentelemetry/sdk-trace`, `@opentelemetry/semantic-conventions`,
-  `@trpc/server`, `hono`, `pino`, `prom-client` (plus `@ts-launch-blueprint/core`)
+  `@trpc/server`, `@prometheus-io/client`, `hono`, `pino`, `zod` (plus `@ts-launch-blueprint/core`)
 - `apps/web`: `@tanstack/react-query`, `@trpc/client`, `@trpc/server`,
   `@trpc/tanstack-react-query`, `react`, `react-dom` (with
   `@ts-launch-blueprint/api` and `@ts-launch-blueprint/core` in devDependencies)

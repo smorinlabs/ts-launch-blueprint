@@ -648,6 +648,7 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
       '.github/workflows/dependency-review.yml',
       '.github/workflows/large-file-guard.yml',
       '.github/workflows/manual-pr-security-scan.yml',
+      '.github/workflows/publish-container.yml',
       '.github/workflows/publish.yml',
       '.github/workflows/release-please.yml',
       '.github/workflows/secret-scan.yml',
@@ -1157,7 +1158,8 @@ describe('P04 secret scanning, audits, canary, CodeQL & Dependabot', () => {
         groups?: Record<string, unknown>;
       }>;
     };
-    expect(dependabot.updates.length).toBeGreaterThanOrEqual(2);
+    expect(dependabot.updates.length).toBeGreaterThanOrEqual(3);
+    expect(dependabot.updates.map((u) => u['package-ecosystem'])).toContain('docker');
     const checks = dependabot.updates.map((u) => ({
       ecosystem: u['package-ecosystem'],
       day: u.schedule?.day,

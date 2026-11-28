@@ -50,14 +50,14 @@ function buildIfStale(): void {
 }
 
 describe('web bundle', () => {
-  it('contains no API runtime code (Hono, pino, prom-client, OpenTelemetry, the procedures)', () => {
+  it('contains no API runtime code (Hono, pino, @prometheus-io/client, OpenTelemetry, the procedures)', () => {
     buildIfStale();
     const code = readdirSync(ASSETS)
       .filter((file) => file.endsWith('.js'))
       .map((file) => readFileSync(join(ASSETS, file), 'utf8'))
       .join('\n');
     expect(code).toContain('/trpc');
-    const markers = ['hono', 'pino', 'prom-client', 'opentelemetry', 'listProjects'];
+    const markers = ['hono', 'pino', '@prometheus-io/client', 'opentelemetry', 'listProjects'];
     expect(markers.filter((marker) => code.includes(marker))).toEqual([]);
   }, 60_000);
 });

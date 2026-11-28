@@ -101,7 +101,14 @@ describe('request completed lines', () => {
     });
     const response = await app.request('/boom');
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: 'Internal server error' });
+    expect(response.headers.get('content-type')).toContain('application/problem+json');
+    expect(await response.json()).toEqual({
+      type: 'about:blank',
+      title: 'Internal Server Error',
+      status: 500,
+      detail: 'Internal server error',
+      instance: '/boom',
+    });
     expect(completed(lines)[0]).toMatchObject({
       severity: 'ERROR',
       status: 500,

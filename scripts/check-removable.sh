@@ -60,7 +60,7 @@ git init -q
 git add -A
 
 step "install (the lockfile still lists $apps, so it is updated)"
-pnpm install --no-frozen-lockfile --prefer-offline
+pnpm install --no-frozen-lockfile --prefer-offline --ignore-scripts
 
 step "core: typecheck"
 pnpm exec tsc --noEmit -p packages/core/tsconfig.json

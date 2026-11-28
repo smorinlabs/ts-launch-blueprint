@@ -2,6 +2,7 @@
 // server.ts turns a ConfigError into a non-zero exit at startup. The source
 // parser duplicates the CLI's on purpose: one app never imports another
 // ([app-no-cross-app-import]); if both copies grow, move it into the core.
+import { z } from 'zod';
 
 /** Env var selecting the data source; the API defaults to `memory`. */
 export const SOURCE_ENV_VAR = 'TS_PROJECTS_SOURCE';
@@ -9,8 +10,20 @@ export const SOURCE_ENV_VAR = 'TS_PROJECTS_SOURCE';
 export const TOKEN_ENV_VAR = 'TS_PROJECTS_TOKEN';
 /** Optional API root override for the `http` source. */
 export const API_URL_ENV_VAR = 'TS_PROJECTS_API_URL';
+/** Bind host; defaults to loopback locally, overridden to 0.0.0.0 in containers. */
+export const HOST_ENV_VAR = 'HOST';
+/** Default bind host when HOST is unset. */
+export const DEFAULT_HOST = '127.0.0.1';
 /** Cloud Run's default port. */
 export const DEFAULT_PORT = 8080;
+/** Opt-in CORS allowed origins (JSON array or comma-separated list). */
+export const CORS_ORIGINS_ENV_VAR = 'CORS_ORIGINS';
+/** Opt-in fixed-window rate limit (`<count>/<second|minute|hour|day>`). */
+export const RATE_LIMIT_ENV_VAR = 'RATE_LIMIT';
+/** Graceful shutdown timeout in milliseconds. */
+export const SHUTDOWN_TIMEOUT_ENV_VAR = 'SHUTDOWN_TIMEOUT_MS';
+/** Default graceful shutdown timeout in milliseconds. */
+export const DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000;
 /** Log level: debug | info (default) | warn | error | silent. */
 export const LOG_LEVEL_ENV_VAR = 'LOG_LEVEL';
 /** Optional GCP project, for Cloud Logging's full trace name (Cloud Run
@@ -36,6 +49,13 @@ export const LOG_LEVELS = ['debug', 'info', 'warn', 'error', 'silent'] as const;
 /** A LOG_LEVEL value. */
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
+/** Parsed rate-limit specification. */
+export interface RateLimitConfig {
+  limit: number;
+  windowMs: number;
+  unit: 'second' | 'minute' | 'hour' | 'day';
+}
+
 /** A configuration problem, reported at startup. */
 export class ConfigError extends Error {
   constructor(message: string) {
@@ -53,11 +73,15 @@ export interface TracingConfig {
 
 /** Settings shared by both data sources. */
 interface BaseConfig {
+  host: string;
   port: number;
   logLevel: LogLevel;
   gcpProjectId: string | undefined;
   metricsEnabled: boolean;
   tracing: TracingConfig;
+  corsOrigins: string[];
+  rateLimit: RateLimitConfig | undefined;
+  shutdownTimeoutMs: number;
 }
 
 /** The effective API configuration. */
@@ -65,112 +89,323 @@ export type ApiConfig =
   | (BaseConfig & { source: 'memory' })
   | (BaseConfig & { source: 'http'; token: string; baseUrl: string | undefined });
 
-function parseLogLevel(value: string | undefined): LogLevel {
-  if (value === undefined || value === '') {
-    return 'info';
-  }
-  const level = LOG_LEVELS.find((candidate) => candidate === value);
-  if (level === undefined) {
-    throw new ConfigError(`Invalid LOG_LEVEL "${value}": expected one of ${LOG_LEVELS.join(', ')}`);
-  }
-  return level;
-}
+const UNIT_MS: Record<RateLimitConfig['unit'], number> = {
+  second: 1_000,
+  minute: 60_000,
+  hour: 3_600_000,
+  day: 86_400_000,
+};
 
-function parseMetricsEnabled(value: string | undefined): boolean {
-  if (value === undefined || value === '' || value === 'true') {
+const RATE_LIMIT_RE = /^([1-9]\d*)\/(second|minute|hour|day)s?$/i;
+
+function isValidHttpOrigin(entry: string): boolean {
+  if (entry === '*') {
     return true;
   }
-  if (value === 'false') {
+  try {
+    const url = new URL(entry);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === entry;
+  } catch {
     return false;
   }
-  throw new ConfigError(`Invalid METRICS_ENABLED "${value}": expected "true" or "false"`);
 }
 
-function parseOtlpUrl(name: string, value: string): string {
-  let url: URL;
+function isValidHttpUrl(value: string): boolean {
   try {
-    url = new URL(value);
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
   } catch {
-    throw new ConfigError(`Invalid ${name} "${value}": expected an http(s) URL`);
+    return false;
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new ConfigError(`Invalid ${name} "${value}": expected an http(s) URL`);
-  }
-  return value;
 }
 
-function parseSampleRatio(value: string | undefined): number {
+/** Parse a `RATE_LIMIT` string (`"<count>/<second|minute|hour|day>"`). */
+export function parseRateLimit(value: string): RateLimitConfig {
+  const match = RATE_LIMIT_RE.exec(value.trim());
+  if (match === null) {
+    throw new ConfigError(
+      `Invalid ${RATE_LIMIT_ENV_VAR} "${value}": expected "<count>/<second|minute|hour|day>" (e.g. "100/minute")`
+    );
+  }
+  const parsed = z
+    .object({
+      limit: z.number().int().positive(),
+      unit: z.enum(['second', 'minute', 'hour', 'day']),
+    })
+    .safeParse({
+      limit: Number(match[1]),
+      unit: match[2]!.toLowerCase(),
+    });
+  if (!parsed.success) {
+    throw new ConfigError(
+      `Invalid ${RATE_LIMIT_ENV_VAR} "${value}": expected "<count>/<second|minute|hour|day>" (e.g. "100/minute")`
+    );
+  }
+  return {
+    limit: parsed.data.limit,
+    windowMs: UNIT_MS[parsed.data.unit],
+    unit: parsed.data.unit,
+  };
+}
+
+function parseCorsOrigins(value: string | undefined): string[] {
+  if (value === undefined || value.trim() === '') {
+    return [];
+  }
+  const trimmed = value.trim();
+  const invalidMessage = `Invalid ${CORS_ORIGINS_ENV_VAR} "${value}": expected "*" or a list of http(s) origins`;
+
+  let rawEntries: unknown;
+  if (trimmed.startsWith('[')) {
+    try {
+      rawEntries = JSON.parse(trimmed);
+    } catch {
+      throw new ConfigError(invalidMessage);
+    }
+  } else {
+    rawEntries = trimmed.split(',').map((item) => item.trim());
+  }
+
+  const parsed = z.array(z.string().trim().min(1)).safeParse(rawEntries);
+  if (!parsed.success) {
+    throw new ConfigError(invalidMessage);
+  }
+  for (const origin of parsed.data) {
+    if (!isValidHttpOrigin(origin)) {
+      throw new ConfigError(invalidMessage);
+    }
+  }
+  return parsed.data;
+}
+
+const emptyOrString = z.string().optional();
+
+const hostSchema = emptyOrString.transform((value, ctx) => {
+  if (value === undefined || value === '') {
+    return DEFAULT_HOST;
+  }
+  const trimmed = value.trim();
+  if (trimmed === '') {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Invalid ${HOST_ENV_VAR} "${value}": expected a non-empty host`,
+    });
+    return z.NEVER;
+  }
+  return trimmed;
+});
+
+const portSchema = emptyOrString.transform((value, ctx) => {
+  if (value === undefined || value === '') {
+    return DEFAULT_PORT;
+  }
+  const num = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  const parsed = z.number().int().min(1).max(65_535).safeParse(num);
+  if (!parsed.success) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Invalid PORT "${value}": expected an integer from 1 to 65535`,
+    });
+    return z.NEVER;
+  }
+  return parsed.data;
+});
+
+const logLevelSchema = emptyOrString.transform((value, ctx) => {
+  if (value === undefined || value === '') {
+    return 'info' as const;
+  }
+  const parsed = z.enum(LOG_LEVELS).safeParse(value);
+  if (!parsed.success) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Invalid ${LOG_LEVEL_ENV_VAR} "${value}": expected one of ${LOG_LEVELS.join(', ')}`,
+    });
+    return z.NEVER;
+  }
+  return parsed.data;
+});
+
+const metricsEnabledSchema = emptyOrString.transform((value, ctx) => {
+  if (value === undefined || value === '') {
+    return true;
+  }
+  const parsed = z.enum(['true', 'false']).safeParse(value);
+  if (!parsed.success) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Invalid ${METRICS_ENABLED_ENV_VAR} "${value}": expected "true" or "false"`,
+    });
+    return z.NEVER;
+  }
+  return parsed.data === 'true';
+});
+
+const sampleRatioSchema = emptyOrString.transform((value, ctx) => {
   if (value === undefined || value === '') {
     return 1;
   }
   const ratio = /^\d+(\.\d+)?$/.test(value) ? Number(value) : Number.NaN;
-  if (!(ratio >= 0 && ratio <= 1)) {
-    throw new ConfigError(
-      `Invalid ${SAMPLER_ARG_ENV_VAR} "${value}": expected a number from 0 to 1`
-    );
+  const parsed = z.number().min(0).max(1).safeParse(ratio);
+  if (!parsed.success) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Invalid ${SAMPLER_ARG_ENV_VAR} "${value}": expected a number from 0 to 1`,
+    });
+    return z.NEVER;
   }
-  return ratio;
-}
+  return parsed.data;
+});
 
-function parseTracing(env: Record<string, string | undefined>): TracingConfig {
-  const traces = env[OTLP_TRACES_ENDPOINT_ENV_VAR];
-  const base = env[OTLP_ENDPOINT_ENV_VAR];
-  let tracesUrl: string | undefined;
-  if (traces !== undefined && traces !== '') {
-    tracesUrl = parseOtlpUrl(OTLP_TRACES_ENDPOINT_ENV_VAR, traces);
-  } else if (base !== undefined && base !== '') {
-    // Trailing slashes dropped: `http://host:4318/` must not give `//v1/traces`.
-    tracesUrl = `${parseOtlpUrl(OTLP_ENDPOINT_ENV_VAR, base).replace(/\/+$/, '')}/v1/traces`;
+const corsOriginsSchema = emptyOrString.transform((value, ctx) => {
+  try {
+    return parseCorsOrigins(value);
+  } catch (err) {
+    ctx.addIssue({
+      code: 'custom',
+      message: (err as Error).message,
+    });
+    return z.NEVER;
   }
-  const serviceName = env[SERVICE_NAME_ENV_VAR];
-  return {
-    tracesUrl,
-    serviceName:
-      serviceName === undefined || serviceName === '' ? DEFAULT_SERVICE_NAME : serviceName,
-    sampleRatio: parseSampleRatio(env[SAMPLER_ARG_ENV_VAR]),
-  };
-}
+});
 
-function parsePort(value: string | undefined): number {
+const rateLimitSchema = emptyOrString.transform((value, ctx) => {
   if (value === undefined || value === '') {
-    return DEFAULT_PORT;
+    return undefined;
   }
-  const port = /^\d+$/.test(value) ? Number(value) : Number.NaN;
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new ConfigError(`Invalid PORT "${value}": expected an integer from 1 to 65535`);
+  try {
+    return parseRateLimit(value);
+  } catch (err) {
+    ctx.addIssue({
+      code: 'custom',
+      message: (err as Error).message,
+    });
+    return z.NEVER;
   }
-  return port;
-}
+});
 
-function parseSource(value: string | undefined): 'http' | 'memory' {
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
+const shutdownTimeoutMsSchema = emptyOrString.transform((value, ctx) => {
   if (value === undefined || value === '') {
-    return 'memory';
+    return DEFAULT_SHUTDOWN_TIMEOUT_MS;
   }
-  if (value === 'http' || value === 'memory') {
-    return value;
+  const num = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  const parsed = z.number().int().positive().max(MAX_TIMEOUT_MS).safeParse(num);
+  if (!parsed.success) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Invalid ${SHUTDOWN_TIMEOUT_ENV_VAR} "${value}": expected an integer from 1 to ${MAX_TIMEOUT_MS}`,
+    });
+    return z.NEVER;
   }
-  throw new ConfigError(`Invalid source "${value}": expected "http" or "memory"`);
-}
+  return parsed.data;
+});
+
+const sourceSchema = emptyOrString.transform((value, ctx) => {
+  if (value === undefined || value === '') {
+    return 'memory' as const;
+  }
+  const parsed = z.enum(['http', 'memory']).safeParse(value);
+  if (!parsed.success) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Invalid source "${value}": expected "http" or "memory"`,
+    });
+    return z.NEVER;
+  }
+  return parsed.data;
+});
+
+const ApiEnvSchema = z
+  .object({
+    [HOST_ENV_VAR]: hostSchema,
+    PORT: portSchema,
+    [LOG_LEVEL_ENV_VAR]: logLevelSchema,
+    [GCP_PROJECT_ENV_VAR]: emptyOrString.transform((v) => (v === '' ? undefined : v)),
+    [METRICS_ENABLED_ENV_VAR]: metricsEnabledSchema,
+    [OTLP_TRACES_ENDPOINT_ENV_VAR]: emptyOrString.transform((v) => (v === '' ? undefined : v)),
+    [OTLP_ENDPOINT_ENV_VAR]: emptyOrString.transform((v) => (v === '' ? undefined : v)),
+    [SERVICE_NAME_ENV_VAR]: emptyOrString.transform((v) =>
+      v === undefined || v === '' ? DEFAULT_SERVICE_NAME : v
+    ),
+    [SAMPLER_ARG_ENV_VAR]: sampleRatioSchema,
+    [CORS_ORIGINS_ENV_VAR]: corsOriginsSchema,
+    [RATE_LIMIT_ENV_VAR]: rateLimitSchema,
+    [SHUTDOWN_TIMEOUT_ENV_VAR]: shutdownTimeoutMsSchema,
+    [SOURCE_ENV_VAR]: sourceSchema,
+    [TOKEN_ENV_VAR]: emptyOrString.transform((v) =>
+      v === undefined || v.trim() === '' ? undefined : v
+    ),
+    [API_URL_ENV_VAR]: emptyOrString.transform((v) => (v === '' ? undefined : v)),
+  })
+  .transform((parsed, ctx): ApiConfig => {
+    const tracesEndpoint = parsed[OTLP_TRACES_ENDPOINT_ENV_VAR];
+    const baseEndpoint = parsed[OTLP_ENDPOINT_ENV_VAR];
+    let tracesUrl: string | undefined;
+    if (tracesEndpoint !== undefined) {
+      if (!isValidHttpUrl(tracesEndpoint)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Invalid ${OTLP_TRACES_ENDPOINT_ENV_VAR} "${tracesEndpoint}": expected an http(s) URL`,
+        });
+        return z.NEVER;
+      }
+      tracesUrl = tracesEndpoint;
+    } else if (baseEndpoint !== undefined) {
+      if (!isValidHttpUrl(baseEndpoint)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Invalid ${OTLP_ENDPOINT_ENV_VAR} "${baseEndpoint}": expected an http(s) URL`,
+        });
+        return z.NEVER;
+      }
+      // Trailing slashes dropped: `http://host:4318/` must not give `//v1/traces`.
+      tracesUrl = `${baseEndpoint.replace(/\/+$/, '')}/v1/traces`;
+    }
+
+    const base: BaseConfig = {
+      host: parsed[HOST_ENV_VAR],
+      port: parsed.PORT,
+      logLevel: parsed[LOG_LEVEL_ENV_VAR],
+      gcpProjectId: parsed[GCP_PROJECT_ENV_VAR],
+      metricsEnabled: parsed[METRICS_ENABLED_ENV_VAR],
+      tracing: {
+        tracesUrl,
+        serviceName: parsed[SERVICE_NAME_ENV_VAR],
+        sampleRatio: parsed[SAMPLER_ARG_ENV_VAR],
+      },
+      corsOrigins: parsed[CORS_ORIGINS_ENV_VAR],
+      rateLimit: parsed[RATE_LIMIT_ENV_VAR],
+      shutdownTimeoutMs: parsed[SHUTDOWN_TIMEOUT_ENV_VAR],
+    };
+
+    const source = parsed[SOURCE_ENV_VAR];
+    if (source === 'memory') {
+      return { ...base, source };
+    }
+    const token = parsed[TOKEN_ENV_VAR];
+    if (token === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `${SOURCE_ENV_VAR}=http needs ${TOKEN_ENV_VAR}; set it, or use ${SOURCE_ENV_VAR}=memory for the demo data`,
+      });
+      return z.NEVER;
+    }
+    return {
+      ...base,
+      source,
+      token,
+      baseUrl: parsed[API_URL_ENV_VAR],
+    };
+  });
 
 /** Resolve the API configuration; throws ConfigError on a bad value. */
 export function resolveApiConfig(env: Record<string, string | undefined>): ApiConfig {
-  const base: BaseConfig = {
-    port: parsePort(env['PORT']),
-    logLevel: parseLogLevel(env[LOG_LEVEL_ENV_VAR]),
-    gcpProjectId: env[GCP_PROJECT_ENV_VAR] === '' ? undefined : env[GCP_PROJECT_ENV_VAR],
-    metricsEnabled: parseMetricsEnabled(env[METRICS_ENABLED_ENV_VAR]),
-    tracing: parseTracing(env),
-  };
-  const source = parseSource(env[SOURCE_ENV_VAR]);
-  if (source === 'memory') {
-    return { ...base, source };
+  const result = ApiEnvSchema.safeParse(env);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    throw new ConfigError(issue?.message ?? 'Invalid API configuration');
   }
-  const token = env[TOKEN_ENV_VAR];
-  if (token === undefined || token === '') {
-    throw new ConfigError(
-      `${SOURCE_ENV_VAR}=http needs ${TOKEN_ENV_VAR}; set it, or use ${SOURCE_ENV_VAR}=memory for the demo data`
-    );
-  }
-  const baseUrl = env[API_URL_ENV_VAR];
-  return { ...base, source, token, baseUrl: baseUrl === '' ? undefined : baseUrl };
+  return result.data;
 }

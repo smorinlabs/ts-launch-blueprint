@@ -154,7 +154,7 @@ logs, serves metrics and records traces (D-051 to D-053,
 [Observability](../reference/observability.md)), and the core stays free of
 all three, so it reports failures only by throwing. The
 `[core-no-framework-import]` rule enforces it: the core can't import `pino`,
-`prom-client` or `@opentelemetry/*`.
+`@prometheus-io/client` or `@opentelemetry/*`.
 
 ## Swapping the Data Source
 

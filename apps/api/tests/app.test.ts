@@ -17,6 +17,9 @@ import {
   UPSTREAM_AUTH_MESSAGE,
   UPSTREAM_ERROR_MESSAGE,
 } from '../src/errors.js';
+import { createMetrics } from '../src/metrics.js';
+import { PROBLEM_CONTENT_TYPE } from '../src/problems.js';
+import { VERSION } from '../src/version.js';
 import { captureLogger, type LogLine } from './log-capture.js';
 
 /** The `procedure failed` lines, as `<procedure> failed: <name>: <message>`. */
@@ -60,20 +63,221 @@ interface TrpcError {
 }
 
 describe('operational routes', () => {
-  it('GET /healthz -> 200 {status: ok}', async () => {
+  it('GET /healthz -> 200 {status: ok, version, runtime}', async () => {
     const response = await app.request('/healthz');
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: 'ok' });
+    expect(await response.json()).toEqual({
+      status: 'ok',
+      version: VERSION,
+      runtime: process.version,
+    });
   });
 
-  it('GET /readyz -> 200 {status: ready}', async () => {
+  it('GET /readyz -> 200 {status: ready, checks}', async () => {
     const response = await app.request('/readyz');
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: 'ready' });
+    expect(await response.json()).toEqual({
+      status: 'ready',
+      checks: [
+        { name: 'runtime', status: 'ok', detail: process.version },
+        { name: 'core', status: 'ok', detail: 'initialized' },
+      ],
+    });
   });
 
-  it('an unknown path -> 404', async () => {
-    expect((await app.request('/nope')).status).toBe(404);
+  it('GET /readyz -> 503 application/problem+json when checkReadiness reports an error', async () => {
+    const unreadyApp = createApp({
+      core: createCore({ source: 'memory' }),
+      logger: captureLogger().logger,
+      checkReadiness: () => [{ name: 'database', status: 'error', detail: 'connection refused' }],
+    });
+    const response = await unreadyApp.request('/readyz');
+    expect(response.status).toBe(503);
+    expect(response.headers.get('content-type')).toContain(PROBLEM_CONTENT_TYPE);
+    expect(response.headers.get('x-frame-options')).toBe('DENY');
+    expect(await response.json()).toEqual({
+      type: 'about:blank',
+      title: 'Service Unavailable',
+      status: 503,
+      detail: 'Readiness checks failed.',
+      instance: '/readyz',
+      checks: [{ name: 'database', status: 'error', detail: 'connection refused' }],
+    });
+  });
+
+  it('GET /readyz -> 503 application/problem+json when checkReadiness throws without leaking secrets', async () => {
+    const { logger, lines } = captureLogger();
+    const throwingApp = createApp({
+      core: createCore({ source: 'memory' }),
+      logger,
+      checkReadiness: () => {
+        throw new Error('postgres://user:secret@db.internal:5432 failed');
+      },
+    });
+    const response = await throwingApp.request('/readyz');
+    expect(response.status).toBe(503);
+    expect(response.headers.get('content-type')).toContain(PROBLEM_CONTENT_TYPE);
+    const body = await response.json();
+    expect(body).toEqual({
+      type: 'about:blank',
+      title: 'Service Unavailable',
+      status: 503,
+      detail: 'Readiness checks failed.',
+      instance: '/readyz',
+      checks: [{ name: 'readiness', status: 'error', detail: 'Readiness check failed' }],
+    });
+    expect(JSON.stringify(body)).not.toContain('secret');
+    expect(lines.find((l) => l.message === 'readiness check failed')).toBeDefined();
+  });
+
+  it('an unknown path -> 404 application/problem+json', async () => {
+    const response = await app.request('/nope');
+    expect(response.status).toBe(404);
+    expect(response.headers.get('content-type')).toContain(PROBLEM_CONTENT_TYPE);
+    expect(await response.json()).toEqual({
+      type: 'about:blank',
+      title: 'Not Found',
+      status: 404,
+      detail: 'Route not found: /nope',
+      instance: '/nope',
+    });
+  });
+});
+
+describe('security headers, CORS, and rate limiting', () => {
+  const EXPECTED_HEADERS = {
+    'x-content-type-options': 'nosniff',
+    'x-frame-options': 'DENY',
+    'referrer-policy': 'no-referrer',
+    'strict-transport-security': 'max-age=63072000; includeSubDomains',
+  };
+
+  it('sets conservative security headers on 200, 404, and 500 responses', async () => {
+    const testApp = createApp({
+      core: createCore({ source: 'memory' }),
+      logger: captureLogger().logger,
+    });
+    testApp.get('/boom', () => {
+      throw new Error('explode');
+    });
+    for (const path of ['/healthz', '/nope', '/boom']) {
+      const response = await testApp.request(path);
+      for (const [header, value] of Object.entries(EXPECTED_HEADERS)) {
+        expect(response.headers.get(header)).toBe(value);
+      }
+      expect(response.headers.get('cross-origin-resource-policy')).toBe('same-origin');
+    }
+  });
+
+  it('disables CORS by default', async () => {
+    const response = await app.request('/healthz', {
+      headers: { origin: 'https://evil.example' },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
+  it('mounts opt-in CORS with allowed origins, preflight OPTIONS, and security headers', async () => {
+    const corsApp = createApp({
+      core: createCore({ source: 'memory' }),
+      logger: captureLogger().logger,
+      corsOrigins: ['https://app.example.com'],
+    });
+
+    const allowed = await corsApp.request('/healthz', {
+      headers: { origin: 'https://app.example.com' },
+    });
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers.get('access-control-allow-origin')).toBe('https://app.example.com');
+    expect(allowed.headers.get('cross-origin-resource-policy')).toBe('cross-origin');
+
+    const disallowed = await corsApp.request('/healthz', {
+      headers: { origin: 'https://evil.example' },
+    });
+    expect(disallowed.status).toBe(200);
+    expect(disallowed.headers.get('access-control-allow-origin')).toBeNull();
+
+    const preflight = await corsApp.request('/trpc/projects.list', {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://app.example.com',
+        'access-control-request-method': 'GET',
+      },
+    });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get('access-control-allow-origin')).toBe('https://app.example.com');
+    for (const [header, value] of Object.entries(EXPECTED_HEADERS)) {
+      expect(preflight.headers.get(header)).toBe(value);
+    }
+    expect(preflight.headers.get('x-request-id')).toBeTruthy();
+  });
+
+  it('supports wildcard CORS_ORIGINS=["*"]', async () => {
+    const wildcardApp = createApp({
+      core: createCore({ source: 'memory' }),
+      logger: captureLogger().logger,
+      corsOrigins: ['*'],
+    });
+    const response = await wildcardApp.request('/healthz', {
+      headers: { origin: 'https://any.example' },
+    });
+    expect(response.headers.get('access-control-allow-origin')).toBe('*');
+  });
+
+  it('disables rate limiting by default (30 requests succeed)', async () => {
+    for (let i = 0; i < 30; i += 1) {
+      const response = await app.request('/healthz');
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-ratelimit-limit')).toBeNull();
+    }
+  });
+
+  it('enforces opt-in rate limit and preserves security headers + x-request-id on 429', async () => {
+    const limitedApp = createApp({
+      core: createCore({ source: 'memory' }),
+      logger: captureLogger().logger,
+      rateLimit: { limit: 2, windowMs: 60_000, unit: 'minute' },
+    });
+
+    const r1 = await limitedApp.request('/healthz', { headers: { 'x-real-ip': '203.0.113.5' } });
+    const r2 = await limitedApp.request('/healthz', { headers: { 'x-real-ip': '203.0.113.5' } });
+    const r3 = await limitedApp.request('/healthz', { headers: { 'x-real-ip': '203.0.113.5' } });
+
+    expect(r1.status).toBe(200);
+    expect(r2.status).toBe(200);
+    expect(r3.status).toBe(429);
+    expect(r3.headers.get('content-type')).toContain(PROBLEM_CONTENT_TYPE);
+    expect(r3.headers.get('retry-after')).toBeTruthy();
+    expect(r3.headers.get('x-ratelimit-limit')).toBe('2');
+    expect(r3.headers.get('x-ratelimit-remaining')).toBe('0');
+    expect(r3.headers.get('x-ratelimit-reset')).toBeTruthy();
+    expect(r3.headers.get('x-request-id')).toBeTruthy();
+    for (const [header, value] of Object.entries(EXPECTED_HEADERS)) {
+      expect(r3.headers.get(header)).toBe(value);
+    }
+  });
+
+  it('applies CORS and rate-limit middleware to GET /metrics while counting rejected requests', async () => {
+    const metrics = createMetrics({ collectDefaults: false });
+    const metricsApp = createApp({
+      core: createCore({ source: 'memory' }),
+      logger: captureLogger().logger,
+      metrics,
+      corsOrigins: ['https://app.example.com'],
+      rateLimit: { limit: 1, windowMs: 60_000, unit: 'minute' },
+    });
+
+    const first = await metricsApp.request('/metrics', {
+      headers: { origin: 'https://app.example.com', 'x-real-ip': '203.0.113.9' },
+    });
+    expect(first.status).toBe(200);
+    expect(first.headers.get('access-control-allow-origin')).toBe('https://app.example.com');
+
+    const limited = await metricsApp.request('/metrics', {
+      headers: { origin: 'https://app.example.com', 'x-real-ip': '203.0.113.9' },
+    });
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('access-control-allow-origin')).toBe('https://app.example.com');
   });
 });
 

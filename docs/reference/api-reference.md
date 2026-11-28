@@ -22,20 +22,20 @@ The server logs JSON lines to stdout (D-051); the first says it's ready:
 For readable output locally, pipe it: `just api | pnpm exec pino-pretty`.
 See [Observability](./observability.md) for the log fields.
 
-A configuration error (a bad `PORT`, `TS_PROJECTS_SOURCE` or `LOG_LEVEL`, or
-the `http` source without a token) stops it at startup, with a plain message
-on stderr and a non-zero exit. A port that is already in use exits 1 with one
-`CRITICAL` log line.
+A configuration error (a bad `HOST`, `PORT`, `TS_PROJECTS_SOURCE`, `LOG_LEVEL`,
+`CORS_ORIGINS`, `RATE_LIMIT`, `SHUTDOWN_TIMEOUT_MS`, or the `http` source without
+a token) stops it at startup, with a plain message on stderr and a non-zero
+exit. A port that is already in use exits 1 with one `CRITICAL` log line.
 
 ## Endpoints
 
 | Method | Path                  | What it does                                                                                         |
 | ------ | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `GET`  | `/healthz`            | Liveness: `200 {"status":"ok"}` while the process is up                                              |
-| `GET`  | `/readyz`             | Readiness: `200 {"status":"ready"}` once the core is built                                           |
+| `GET`  | `/healthz`            | Liveness: `200 {"status":"ok","version":"…","runtime":"v…"}` while the process is up                 |
+| `GET`  | `/readyz`             | Readiness: `200 {"status":"ready","checks":[…]}` or `503 application/problem+json` when failing      |
 | `GET`  | `/trpc/projects.list` | tRPC query: list projects (optional input, see below)                                                |
 | `GET`  | `/metrics`            | Prometheus metrics (unless `METRICS_ENABLED=false`); see [Observability](./observability.md#metrics) |
-| any    | anything else         | `404`                                                                                                |
+| any    | anything else         | `404 application/problem+json`                                                                       |
 
 ### `projects.list`
 
@@ -80,8 +80,15 @@ Domain errors from the core are mapped in `apps/api/src/errors.ts` (D-049):
   original error is logged as one JSON `procedure failed` line on stdout,
   with the request's `requestId` (see [Observability](./observability.md)).
   4xx errors aren't logged.
-- **Errors outside tRPC** (a plain Hono route that throws) return `500`
-  with `{"error":"Internal server error"}`, not the tRPC envelope.
+- **Errors outside tRPC** (`404`, `429` rate limit, `500` thrown handler error,
+  `503` readiness failure) return RFC 9457 `application/problem+json`
+  (`{"type":"about:blank","title":"…","status":…,"detail":"…","instance":"…"}`),
+  not the tRPC envelope. Rate-limited `429` responses also include `Retry-After`
+  and `X-RateLimit-*` headers.
+- **Security headers** (`X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`,
+  `Strict-Transport-Security`) are set on every response, including `404`,
+  `429`, `OPTIONS` preflight, `500`, and `503`.
 - Error bodies never contain a stack trace or file paths, whatever `NODE_ENV`
   says (`isDev: false`).
 
@@ -106,7 +113,11 @@ the server generates a UUID. The same ID is on the request's log lines.
 
 | Variable                             | Effect                                                                               |
 | ------------------------------------ | ------------------------------------------------------------------------------------ |
+| `HOST`                               | Bind address (default `127.0.0.1`; `0.0.0.0` in `apps/api/Dockerfile`)               |
 | `PORT`                               | Port to listen on (default `8080`, Cloud Run's default); an integer from 1 to 65535  |
+| `CORS_ORIGINS`                       | Optional opt-in CORS origins (`*`, comma-separated, or JSON array); off when unset   |
+| `RATE_LIMIT`                         | Optional opt-in rate limit (`<count>/<second\|minute\|hour\|day>`); off when unset   |
+| `SHUTDOWN_TIMEOUT_MS`                | Graceful shutdown timeout in ms (default `10000`, integer `1` to `2147483647`)       |
 | `TS_PROJECTS_SOURCE`                 | `memory` (**default for the API**: demo data, no token) or `http` (the projects API) |
 | `TS_PROJECTS_TOKEN`                  | Required with `TS_PROJECTS_SOURCE=http`; checked at startup                          |
 | `TS_PROJECTS_API_URL`                | Optional API root override for the `http` source                                     |
@@ -125,8 +136,9 @@ the [CLI Reference](./cli-reference.md).
 
 `apps/api/Dockerfile` builds a small image (D-050): every dependency is
 bundled into `dist/server.js`, so the runtime stage holds only `dist/` (no
-`node_modules`) on `node:24-slim`, running as the non-root `node` user, with
-`PORT=8080`. Build it from the repo root (Docker must be running):
+`node_modules`) on digest-pinned `node:24-slim`, running as the non-root
+`node` user, with `HOST=0.0.0.0`, `PORT=8080`, and a Node `HEALTHCHECK`
+polling `/healthz`. Build it from the repo root (Docker must be running):
 
 ```bash
 just docker-build   # docker build -f apps/api/Dockerfile -t ts-launch-blueprint-api .
@@ -142,8 +154,9 @@ the image (`/healthz`, `/readyz`, `projects.list`, an unknown workspace →
 
 On `SIGTERM` (Cloud Run, `docker stop`) or `SIGINT` (Ctrl-C), the server logs
 `shutting down (SIGTERM)`, stops accepting connections, lets in-flight
-requests finish, and exits **0**. If closing takes longer than 10 seconds it
-exits 1. CI checks that `docker stop` on the image exits 0.
+requests finish, and exits **0**. If closing takes longer than
+`SHUTDOWN_TIMEOUT_MS` (default 10 seconds) it exits 1. CI checks that
+`docker stop` on the image exits 0.
 
 ## See Also
 

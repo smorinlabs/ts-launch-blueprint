@@ -1,12 +1,12 @@
 // Prometheus metrics for the API (D-052): a per-app Registry (never
-// prom-client's global one, so every app and test is isolated), request
+// @prometheus-io/client's global one, so every app and test is isolated), request
 // count and duration by route pattern, and tRPC errors by procedure and code.
 // Labels only ever hold values from small fixed sets: a raw path or a
 // caller-sent procedure name would create a new time series per URL, so
 // unknown ones fall into `unmatched` / `unknown` buckets.
+import { collectDefaultMetrics, Counter, Histogram, Registry } from '@prometheus-io/client';
 import type { MiddlewareHandler } from 'hono';
 import { matchedRoutes } from 'hono/route';
-import { collectDefaultMetrics, Counter, Histogram, Registry } from 'prom-client';
 
 import { appRouter } from './router.js';
 
@@ -68,7 +68,7 @@ export interface Metrics {
 }
 
 /** Build a metrics instance with its own registry; `collectDefaults` adds
- * prom-client's default Node metrics (CPU, memory, event loop, heap, GC). */
+ * @prometheus-io/client's default Node metrics (CPU, memory, event loop, heap, GC). */
 export function createMetrics(options: { collectDefaults: boolean }): Metrics {
   const registry = new Registry();
   if (options.collectDefaults) {

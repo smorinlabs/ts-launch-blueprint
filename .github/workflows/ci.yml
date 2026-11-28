@@ -31,6 +31,7 @@ jobs:
   changes:
     name: changes
     runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    timeout-minutes: 5
     permissions:
       contents: read
     outputs:
@@ -131,6 +132,7 @@ jobs:
   lint:
     name: lint
     runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -142,6 +144,7 @@ jobs:
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 10.34.3
+          standalone: true
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -185,6 +188,7 @@ jobs:
     runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
     needs: changes
     if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -196,6 +200,7 @@ jobs:
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 10.34.3
+          standalone: true
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -224,6 +229,7 @@ jobs:
       }}
     needs: changes
     if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 15
     permissions:
       contents: read
       id-token: write
@@ -244,6 +250,7 @@ jobs:
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 10.34.3
+          standalone: true
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v7
         with:
@@ -279,6 +286,7 @@ jobs:
     if: >-
       needs.changes.outputs.code == 'true' ||
       needs.changes.outputs.release == 'true'
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -290,6 +298,7 @@ jobs:
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 10.34.3
+          standalone: true
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -310,6 +319,7 @@ jobs:
     runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
     needs: changes
     if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -321,6 +331,7 @@ jobs:
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 10.34.3
+          standalone: true
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -347,6 +358,7 @@ jobs:
     runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
     needs: changes
     if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -378,6 +390,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     continue-on-error: true
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -389,6 +402,7 @@ jobs:
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 10.34.3
+          standalone: true
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -437,6 +451,7 @@ jobs:
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 10.34.3
+          standalone: true
       - name: Set up Node.js
         if: steps.web-check.outputs.exists == 'true'
         uses: actions/setup-node@v7
@@ -485,6 +500,7 @@ jobs:
   ci-ok:
     name: ci-ok
     runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    timeout-minutes: 5
     needs:
       - changes
       - lint
