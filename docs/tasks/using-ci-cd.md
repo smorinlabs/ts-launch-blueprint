@@ -6,23 +6,23 @@ This guide explains how testing, linting, security scanning, and releases are au
 
 The repository ships the following workflows under `.github/workflows/`:
 
-| Workflow                  | File                          | Trigger                                                       |
-| ------------------------- | ----------------------------- | ------------------------------------------------------------- |
-| API Contract              | `api-contract.yml`            | PRs touching `docs/api/contract.snapshot.json`, `merge_group` |
-| Canary                    | `canary.yml`                  | weekly schedule (`0 6 * * 2`), `workflow_dispatch`            |
-| CI                        | `ci.yml`                      | push to `main`, PRs targeting `main`, `merge_group`           |
-| CodeQL Advanced           | `codeql.yml`                  | push/PR to `main`, weekly schedule                            |
-| Commitlint                | `commitlint.yml`              | push to `main`, PRs, `merge_group`                            |
-| Dependency Audit          | `dep-audit.yml`               | weekly schedule (`0 5 * * 1`), `workflow_dispatch`            |
-| Dependency review         | `dependency-review.yml`       | pull requests targeting `main`                                |
-| Difftree PR Comment       | `difftree-pr-comment.yml`     | pull requests (`opened`, `reopened`, `synchronize`, `edited`) |
-| Large File Guard          | `large-file-guard.yml`        | pull requests                                                 |
-| Manual PR Security Review | `manual-pr-security-scan.yml` | `workflow_dispatch` (manual)                                  |
-| Press Verify              | `press-verify.yml`            | pull requests, `merge_group`, push to `main`                  |
-| Publish                   | `publish.yml`                 | `v*` tag push, `workflow_dispatch` (from a `v*` tag)          |
-| Publish Container         | `publish-container.yml`       | PRs touching API/core, `merge_group`, `release: [published]`  |
-| Release Please            | `release-please.yml`          | push to `main`, `workflow_dispatch`                           |
-| Secret Scan               | `secret-scan.yml`             | push to `main`, pull requests                                 |
+| Workflow                  | File                          | Trigger                                                                |
+| ------------------------- | ----------------------------- | ---------------------------------------------------------------------- |
+| API Contract              | `api-contract.yml`            | PRs touching `docs/api/contract.snapshot.json`                         |
+| Canary                    | `canary.yml`                  | weekly schedule (`0 6 * * 2`), `workflow_dispatch`                     |
+| CI                        | `ci.yml`                      | push to `main`, PRs targeting `main`, `merge_group`                    |
+| CodeQL Advanced           | `codeql.yml`                  | push/PR to `main`, `merge_group`, weekly schedule, `public`            |
+| Commitlint                | `commitlint.yml`              | push to `main`, PRs, `merge_group`                                     |
+| Dependency Audit          | `dep-audit.yml`               | weekly schedule (`0 5 * * 1`), `workflow_dispatch`                     |
+| Dependency review         | `dependency-review.yml`       | pull requests targeting `main`                                         |
+| Difftree PR Comment       | `difftree-pr-comment.yml`     | pull requests (`opened`, `reopened`, `synchronize`, `edited`)          |
+| Large File Guard          | `large-file-guard.yml`        | push to `main`, pull requests, `merge_group`                           |
+| Manual PR Security Review | `manual-pr-security-scan.yml` | `workflow_dispatch` (manual)                                           |
+| Press Verify              | `press-verify.yml`            | pull requests, `merge_group`, push to `main`                           |
+| Publish                   | `publish.yml`                 | `v*` tag push, `workflow_dispatch` (from a `v*` tag)                   |
+| Publish Container         | `publish-container.yml`       | PRs to `main` touching API/core, `merge_group`, `release: [published]` |
+| Release Please            | `release-please.yml`          | push to `main`, `workflow_dispatch`                                    |
+| Secret Scan               | `secret-scan.yml`             | push to `main`, pull requests                                          |
 
 Blueprint-only maintenance workflows (removed on `press rebrand`): `audit-triage.yml`, `bootstrap-acceptance.yml`, `claude.yml`, `claude-code-review.yml`, `template-receipt-guard.yml`, and `update-contributors.yml`.
 
@@ -45,7 +45,7 @@ The main quality gate. Runs on pushes to `main`, pull requests targeting `main`,
 
 ### CodeQL Advanced (`codeql.yml`)
 
-Static analysis via GitHub's CodeQL (`javascript-typescript`, `security-extended` queries in `.github/codeql/codeql-config.yml`). Runs on push/PR to `main` plus a weekly schedule (`44 21 * * 4`).
+Static analysis via GitHub's CodeQL (`javascript-typescript`, `security-extended` queries in `.github/codeql/codeql-config.yml`). Runs on push/PR to `main`, `merge_group`, `public`, plus a weekly schedule (`44 21 * * 4`).
 
 ### Dependency review & Audits (`dependency-review.yml`, `dep-audit.yml`, `canary.yml`)
 

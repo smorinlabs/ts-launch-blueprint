@@ -2665,6 +2665,29 @@ describe('P13 M6 security, community docs, actionlint, logos & badges contract',
     expect(usingCiCd).toContain('just coverage');
     expect(usingCiCd).toContain('just pack-check');
 
+    const workflowRow = (filename: string): string => {
+      const row = usingCiCd.split('\n').find((line) => line.includes(`\`${filename}\``));
+      expect(row, `missing row for ${filename} in docs/tasks/using-ci-cd.md`).toBeDefined();
+      return row!;
+    };
+    const workflowOn = (filename: string): Record<string, unknown> => {
+      const parsed = parse(
+        readFileSync(join(REPO_ROOT, '.github', 'workflows', filename), 'utf8')
+      ) as { on?: Record<string, unknown> };
+      return parsed.on ?? {};
+    };
+    const apiContractOn = workflowOn('api-contract.yml');
+    expect(Object.hasOwn(apiContractOn, 'merge_group')).toBe(false);
+    expect(workflowRow('api-contract.yml')).not.toContain('merge_group');
+    expect(Object.hasOwn(workflowOn('codeql.yml'), 'merge_group')).toBe(true);
+    expect(Object.hasOwn(workflowOn('codeql.yml'), 'public')).toBe(true);
+    expect(workflowRow('codeql.yml')).toContain('merge_group');
+    expect(workflowRow('codeql.yml')).toContain('public');
+    expect(Object.hasOwn(workflowOn('large-file-guard.yml'), 'push')).toBe(true);
+    expect(Object.hasOwn(workflowOn('large-file-guard.yml'), 'merge_group')).toBe(true);
+    expect(workflowRow('large-file-guard.yml')).toContain('main');
+    expect(workflowRow('large-file-guard.yml')).toContain('merge_group');
+
     const versioning = readFileSync(join(REPO_ROOT, 'docs', 'reference', 'versioning.md'), 'utf8');
     expect(versioning).not.toContain('Uses the built-in `GITHUB_TOKEN` by default');
     expect(versioning).toContain('RELEASE_PLEASE_CLIENT_ID');
@@ -2675,6 +2698,8 @@ describe('P13 M6 security, community docs, actionlint, logos & badges contract',
     );
     expect(structure).not.toContain('implements the default `projects` command');
     expect(structure).toContain('.oss-scanner/');
+    expect(structure).toContain('projects.list');
+    expect(structure).toContain('projects.get');
   });
 
   describe.skipIf(existsSync(join(REPO_ROOT, 'press', 'press-receipt.toml')))(

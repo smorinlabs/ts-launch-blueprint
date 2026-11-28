@@ -184,7 +184,7 @@ the package as a library. `just build` bundles it, with the core, into
 
 The Hono + tRPC API (`@ts-launch-blueprint/api`, private): the second
 controller over the core. `src/router.ts` holds the tRPC router
-(`projects.list`, and the `AppRouter` type), `src/app.ts` the Hono app with
+(`projects.list`, `projects.get`, and the `AppRouter` type), `src/app.ts` the Hono app with
 `/healthz`, `/readyz` and `/trpc/*`, `src/config.ts` the environment parsing,
 and `src/server.ts` the thin process entry. It has its own `tsconfig.json`
 with `isolatedDeclarations` off (D-048). `just api` builds and starts it; see
