@@ -451,7 +451,15 @@ function valueMatchesSchema(value: unknown, schemaRaw: JsonSchemaObject): boolea
     return typeof value === 'boolean';
   }
   if (type === 'array') {
-    return Array.isArray(value);
+    if (!Array.isArray(value)) {
+      return false;
+    }
+    const minItems = numberOrUndefined(schema['minItems']);
+    const maxItems = numberOrUndefined(schema['maxItems']);
+    return !(
+      (minItems !== undefined && value.length < minItems) ||
+      (maxItems !== undefined && value.length > maxItems)
+    );
   }
   if (type === 'object') {
     if (!isRecord(value)) {

@@ -1757,4 +1757,164 @@ describe('detectBreakingContractChanges', () => {
     const diff = detectBreakingContractChanges(baseSnap, headSnap);
     expect(new Set(diff.breaking.map((b) => b.procedure))).toEqual(new Set(['enumXor', 'nullXor']));
   });
+
+  it('exercises valueMatchesSchema and schemasCanOverlap across const/enum/union/object/numeric edge cases', () => {
+    const baseSnap: ApiContractSnapshot = {
+      schemaVersion: 1,
+      version: '0.0.0',
+      procedures: {
+        disjointConsts: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              { const: null },
+              { const: true },
+              { const: [1, 2] },
+              { const: { a: 'ok' } },
+              { type: 'string', minLength: 3, maxLength: 5 },
+              { type: 'number', exclusiveMinimum: 10, exclusiveMaximum: 20 },
+              {
+                anyOf: [
+                  { type: 'string', const: 'u1' },
+                  { type: 'string', const: 'u2' },
+                ],
+              },
+              {
+                oneOf: [
+                  { type: 'number', const: 100 },
+                  { type: 'number', const: 200 },
+                ],
+              },
+            ],
+          },
+          output: null,
+        },
+        overlappingConsts: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              { const: { a: 'ok' } },
+              { const: 'hello' },
+              { type: 'number', minimum: 5 },
+              { type: ['string', 'null'] },
+            ],
+          },
+          output: null,
+        },
+        nestedAndBounds: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              { type: 'integer', maximum: 5 },
+              { type: 'string', enum: ['alpha'] },
+              { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 100, maximum: 110 }] },
+            ],
+          },
+          output: null,
+        },
+      },
+    };
+
+    const headSnap: ApiContractSnapshot = {
+      schemaVersion: 1,
+      version: '0.0.0',
+      procedures: {
+        disjointConsts: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              { const: null },
+              { const: true },
+              { const: [1, 2] },
+              { const: { a: 'ok' } },
+              { type: 'string', minLength: 3, maxLength: 5 },
+              { type: 'number', exclusiveMinimum: 10, exclusiveMaximum: 20 },
+              {
+                anyOf: [
+                  { type: 'string', const: 'u1' },
+                  { type: 'string', const: 'u2' },
+                ],
+              },
+              {
+                oneOf: [
+                  { type: 'number', const: 100 },
+                  { type: 'number', const: 200 },
+                ],
+              },
+              // All disjoint additions exercising every valueMatchesSchema rejection branch:
+              { const: 'x' }, // too short for 3..5, not in unions/objects/arrays/booleans/null
+              { const: 'too-long' }, // too long for 3..5
+              { const: 10 }, // fails exclusiveMinimum: 10
+              { const: 20 }, // fails exclusiveMaximum: 20
+              { const: 5.5 }, // non-integer and below 10
+              { type: 'integer', minimum: 1, maximum: 5 }, // disjoint from 5.5 and 10..20
+              {
+                type: 'object',
+                properties: { a: { type: 'number' }, b: { type: 'string' } },
+                required: ['a', 'b'],
+                additionalProperties: false,
+              },
+              {
+                type: 'object',
+                properties: { a: { type: 'string', const: 'nope' } },
+                required: ['a'],
+              },
+              {
+                type: 'object',
+                properties: { z: { type: 'string' } },
+                additionalProperties: false,
+              },
+              { type: 'string', enum: ['zz'] },
+              { type: 'boolean', const: false },
+              { type: 'array', minItems: 5 },
+            ],
+          },
+          output: null,
+        },
+        overlappingConsts: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              { const: { a: 'ok' } },
+              { const: 'hello' },
+              { type: 'number', minimum: 5 },
+              { type: ['string', 'null'] },
+              {
+                type: 'object',
+                properties: { a: { type: 'string' } },
+                required: ['a'],
+              }, // matches { a: 'ok' }
+              { type: 'number', minimum: 10 }, // overlaps unbounded minimum: 5
+              { type: ['boolean', 'null'] }, // overlaps nullable string|null on null
+              {}, // unconstrained matches everything
+            ],
+          },
+          output: null,
+        },
+        nestedAndBounds: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              { type: 'integer', maximum: 5 },
+              { type: 'string', enum: ['alpha'] },
+              { anyOf: [{ type: 'boolean' }, { type: 'integer', minimum: 100, maximum: 110 }] },
+              { type: 'number', exclusiveMinimum: 5, maximum: 50 }, // disjoint from <= 5 and 100..110
+              { type: 'null' }, // disjoint from all non-null branches (hits bRaw.type === 'null')
+              { type: 'string', enum: ['beta'] }, // hits b.enum path, disjoint from ['alpha']
+            ],
+          },
+          output: null,
+        },
+      },
+    };
+
+    const diff = detectBreakingContractChanges(baseSnap, headSnap);
+    expect(diff.breaking.map((b) => b.procedure)).toEqual(['overlappingConsts']);
+  });
 });
