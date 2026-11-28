@@ -50,12 +50,12 @@ file plus those.
 - [x] **P03** — [Slim PR CI and add cross-OS matrix](projects/P03-slim-pr-ci-and-add-cross-os-matrix.md) — Add merge_group, PR concurrency, change fast paths, ci-ok gate, and 3-OS matrix
 - [x] **P04** — [Secret scanning and scheduled dependency audits](projects/P04-secret-scanning-and-scheduled-dependency-audits.md) — Add gitleaks, TruffleHog CI, weekly dep-audit, canary, and CodeQL/Dependabot
 - [x] **P05** — [Hook and CI quality gate parity](projects/P05-hook-and-ci-quality-gate-parity.md) — Mirror commitlint, large-file, codespell, EditorConfig, and lockfile/TOML gates
-- [?] **P06** — [Turnkey toolchains and unified local setup](projects/P06-turnkey-toolchains-and-unified-local-setup-.md) — Add mise, flox, devcontainer, make bootstrap, just setup, and Justfile DX fixes
-- [?] **P07** — [Template-press fork guard and bootstrap skill](projects/P07-template-press-fork-guard-and-bootstrap-skill-.md) — Add guard.sh, CI bootstrap acceptance, press cleanups, and new-ts-project skill
-- [?] **P08** — [Testing resilience and web browser E2E](projects/P08-testing-resilience-and-web-browser-e2e-.md) — Add Vitest shuffle, fast-check properties, CLI snapshots, and Playwright E2E
+- [ ] **P06** — [Turnkey toolchains and unified local setup](projects/P06-turnkey-toolchains-and-unified-local-setup.md) — Add mise, flox, devcontainer, make bootstrap, just setup, and Justfile DX fixes
+- [ ] **P07** — [Template-press fork guard and bootstrap skill](projects/P07-template-press-fork-guard-and-bootstrap-skill.md) — Add guard.sh, CI bootstrap acceptance, press cleanups, and new-ts-project skill
+- [ ] **P08** — [Testing resilience and web browser E2E](projects/P08-testing-resilience-and-web-browser-e2e.md) — Add Vitest shuffle, fast-check properties, CLI snapshots, and Playwright E2E
+- [ ] **P12** — [AI-readiness simplification and review workflows](projects/P12-ai-readiness-simplification-and-review-workflows.md) — Refresh AGENTS.md hub, add CodeRabbit/Greptile/Claude workflows, and llms.txt
 - [?] **P09** — [Production API hardening and GHCR container publish](projects/P09-production-api-hardening-and-ghcr-container-publish-.md) — Add secure headers, CORS, rate limit, readyz, Dockerfile cache, and GHCR deploy
 - [?] **P10** — [Core domain depth and API contract snapshots](projects/P10-core-domain-depth-and-api-contract-snapshots-.md) — Add getProject, strict HTTP envelope, pagination, idempotency, and tRPC diff
 - [?] **P11** — [CLI v4 noun-verb and config modernization](projects/P11-cli-v4-noun-verb-and-config-modernization-.md) — Add config init/get/set, doctor bundle, completion, layered config, and pager
-- [?] **P12** — [AI-readiness simplification and review workflows](projects/P12-ai-readiness-simplification-and-review-workflows-.md) — Refresh AGENTS.md hub, add CodeRabbit/Greptile/Claude workflows, and llms.txt
 - [?] **P13** — [Release runbook and governance docs polish](projects/P13-release-runbook-and-governance-docs-polish-.md) — Add PROJECT_SETUP, full RELEASE guide, ADRs, SECURITY/OSS kit, logos and badges
 - [?] **P14** — [Audit-triage and pre-push hook hardening](projects/P14-audit-triage-and-pre-push-hook-hardening-.md) — Adapt muse audit-triage for dependency audits, partial-run resume, and multi-ref pre-push scanning
