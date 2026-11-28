@@ -45,7 +45,12 @@ scan_range() {
         # remote default branch so new commits still get a range scan.
         base=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null) || base="origin/main"
         if ! git rev-parse --verify --quiet "${base}" >/dev/null 2>&1; then
-            echo "WARN: no upstream and no '${base}' ref to diff against; skipping range scan" >&2
+            if git rev-parse --verify --quiet HEAD >/dev/null 2>&1; then
+                echo "WARN: no upstream and no '${base}' ref; falling back to full history scan" >&2
+                scan_full
+                return
+            fi
+            echo "WARN: repository has no commits; skipping range scan" >&2
             exit 0
         fi
         echo "INFO: no upstream tracking branch; scanning ${base}..HEAD instead" >&2

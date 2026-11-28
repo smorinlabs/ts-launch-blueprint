@@ -842,7 +842,8 @@ describe('P04 secret scanning, audits, canary, CodeQL & Dependabot', () => {
     expect(existsSync(gitleaksIgnorePath)).toBe(true);
     const gitleaksToml = readFileSync(gitleaksPath, 'utf8');
     expect(gitleaksToml).toContain('useDefault = true');
-    expect(gitleaksToml).toContain('pull_request_template');
+    expect(gitleaksToml).toContain('AKIAIOSFODNN7EXAMPLE');
+    expect(gitleaksToml).not.toMatch(/paths\s*=\s*\[/);
 
     const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8');
     expect(justfile).toMatch(/^@?install-gitleaks:/m);

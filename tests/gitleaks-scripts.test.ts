@@ -56,10 +56,12 @@ describe('scripts/check-gitleaks.sh & scripts/install-gitleaks.sh (POSIX)', () =
 
       const emptyBin = mkdtempSync(join(tmpdir(), 'gitleaks-empty-bin-'));
       try {
-        const missing = spawnSync('bash', [CHECK_SCRIPT, '--staged'], {
+        const bashLookup = spawnSync('which', ['bash'], { encoding: 'utf8' });
+        const bashExe = bashLookup.stdout.trim() || '/bin/bash';
+        const missing = spawnSync(bashExe, [CHECK_SCRIPT, '--staged'], {
           cwd: REPO_ROOT,
           encoding: 'utf8',
-          env: { PATH: `${emptyBin}:/usr/bin:/bin` },
+          env: { PATH: emptyBin },
         });
         expect(missing.status).toBe(127);
         expect(missing.stderr).toContain('gitleaks not on PATH');
@@ -140,7 +142,7 @@ describe('scripts/check-gitleaks.sh & scripts/install-gitleaks.sh (POSIX)', () =
         runGit(repoDir, ['add', '.gitleaks.toml']);
         runGit(repoDir, ['commit', '-q', '-m', 'init']);
 
-        // 1. No remote and no upstream -> skips cleanly with exit 0.
+        // 1. No remote and no upstream -> falls back to full history scan.
         const noRemote = spawnSync('bash', [CHECK_SCRIPT, '--range'], {
           cwd: repoDir,
           encoding: 'utf8',
@@ -151,7 +153,10 @@ describe('scripts/check-gitleaks.sh & scripts/install-gitleaks.sh (POSIX)', () =
           },
         });
         expect(noRemote.status).toBe(0);
-        expect(noRemote.stderr).toContain('skipping range scan');
+        expect(noRemote.stderr).toContain('falling back to full history scan');
+        expect(readFileSync(argsLog, 'utf8')).toContain(
+          'detect --config .gitleaks.toml --no-banner --redact'
+        );
 
         // 2. Bare remote + origin/main present, no upstream -> scans origin/main..HEAD.
         spawnSync('git', ['init', '-q', '--bare', remoteDir], { encoding: 'utf8' });

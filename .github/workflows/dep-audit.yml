@@ -79,7 +79,7 @@ jobs:
           label_args=()
           labels="$(gh label list --json name --jq '.[].name' | tr '\n' ',')"
           case ",${labels}," in *,weekly-audit,*) label_args=(--label weekly-audit) ;; esac
-          existing="$(gh issue list ${label_args[@]+"${label_args[@]}"} --state open --json number,body --jq '[.[] | select(.body != null and (.body | contains("<!-- weekly-audit-tracking -->"))) | .number][0] // empty')"
+          existing="$(gh issue list ${label_args[@]+"${label_args[@]}"} --state open --limit 500 --json number,body --jq '[.[] | select(.body != null and (.body | contains("<!-- weekly-audit-tracking -->"))) | .number][0] // empty')"
           tracking_body="${RUNNER_TEMP:-/tmp}/tracking-body.md"
           if [ -n "$existing" ]; then
             body="$(gh issue view "$existing" --json body --jq .body)"

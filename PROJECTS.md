@@ -58,3 +58,4 @@ file plus those.
 - [?] **P11** — [CLI v4 noun-verb and config modernization](projects/P11-cli-v4-noun-verb-and-config-modernization-.md) — Add config init/get/set, doctor bundle, completion, layered config, and pager
 - [?] **P12** — [AI-readiness simplification and review workflows](projects/P12-ai-readiness-simplification-and-review-workflows-.md) — Refresh AGENTS.md hub, add CodeRabbit/Greptile/Claude workflows, and llms.txt
 - [?] **P13** — [Release runbook and governance docs polish](projects/P13-release-runbook-and-governance-docs-polish-.md) — Add PROJECT_SETUP, full RELEASE guide, ADRs, SECURITY/OSS kit, logos and badges
+- [?] **P14** — [Audit-triage and pre-push hook hardening](projects/P14-audit-triage-and-pre-push-hook-hardening-.md) — Adapt muse audit-triage for dependency audits, partial-run resume, and multi-ref pre-push scanning

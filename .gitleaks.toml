@@ -5,20 +5,10 @@ title = "ts-launch-blueprint gitleaks config"
 [extend]
 useDefault = true
 
-# Global allowlist — narrow, path-scoped. Keep specific so real credentials
-# aren't hidden behind a broad pattern.
+# Global allowlist — specific placeholder regexes only (no blanket path
+# exemptions so real credentials in docs or Markdown files are still caught).
 [allowlist]
-description = "Documentation and Markdown prose"
-paths = [
-  # Documentation tree — README/CONTRIBUTING/etc. legitimately mention
-  # example tokens and shouldn't trigger global secret-pattern rules.
-  '''docs/.*''',
-  # Top-level Markdown prose — same rationale as docs/.
-  '''.*\.md$''',
-  # Issue/PR templates — example credentials in instructions are fine.
-  '''\.github/ISSUE_TEMPLATE/.*''',
-  '''\.github/pull_request_template\.md''',
-]
+description = "Canonical AWS documentation placeholder tokens"
 regexes = [
   # AWS test-fixture placeholder (canonical AWS-docs example key).
   # Used in unit tests and CONTRIBUTING examples to demo the hook itself.

@@ -139,7 +139,7 @@ jobs:
           set -euo pipefail
           run_id="${BRANCH#bot/weekly-audit-}"
           base="$(gh api "repos/$GH_REPO" --jq .default_branch)"
-          body="$(printf 'Triage of weekly-audit run %s.\n\nAutomated docs repair; verification table follows from the finish step.\nAudit run: https://github.com/%s/actions/runs/%s\n' "$run_id" "$GITHUB_REPOSITORY" "$run_id")"
+          body="$(printf 'Triage of weekly-audit run %s.\n\nAutomated docs repair; verification table follows from the finish step.\nAudit run: https://github.com/%s/actions/runs/%s\n\nNote: PRs opened by GITHUB_TOKEN require a maintainer to approve workflows to run.\n' "$run_id" "$GITHUB_REPOSITORY" "$run_id")"
           number="$(gh api --method POST "repos/$GH_REPO/pulls" \
             --raw-field head="$BRANCH" --raw-field base="$base" \
             --raw-field title="fix(docs): triage weekly-audit run ${run_id}" \

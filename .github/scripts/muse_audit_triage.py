@@ -28,8 +28,15 @@ import urllib.request
 from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
-from typing import IO, Any, NoReturn, override
+from typing import IO, Any, NoReturn
 from uuid import uuid4
+
+try:
+    from typing import override
+except ImportError:  # Python < 3.12
+
+    def override(fn):  # type: ignore[no-untyped-def]
+        return fn
 
 MODELS = {"muse-spark-1.3-contributor", "muse-spark-1.3", "muse-wonder-1.0"}
 MAX_FINDINGS_BYTES = 20_000
@@ -487,6 +494,15 @@ def validate_audited_policy(root: Path, base: str, model: str, organization: str
     raise RefusalError("Audited run predates supported triage tooling")
 
 
+def jobs_path_for_run(repo: str, run: Mapping[str, Any]) -> str:
+    """Use the attempt-specific jobs endpoint when run_attempt is present."""
+    run_id = run["id"]
+    attempt = run.get("run_attempt")
+    if isinstance(attempt, int) and not isinstance(attempt, bool) and attempt > 0:
+        return f"repos/{repo}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100"
+    return f"repos/{repo}/actions/runs/{run_id}/jobs?per_page=100"
+
+
 def prepare(environ: Mapping[str, str] = os.environ) -> None:
     root = Path(environ["GITHUB_WORKSPACE"]).resolve()
     event_name = environ.get("GITHUB_EVENT_NAME", "")
@@ -534,7 +550,7 @@ def prepare(environ: Mapping[str, str] = os.environ) -> None:
         raise RefusalError("Unable to verify existing triage branches")
     if any(item["ref"] == f"refs/heads/{branch}" for item in refs):
         raise RefusalError(f"Triage branch {branch} already exists; inspect the branch and recover or create its PR before retrying")
-    jobs = api.get(f"repos/{repo}/actions/runs/{run_id}/jobs?per_page=100")
+    jobs = api.get(jobs_path_for_run(repo, run))
     if not isinstance(jobs, dict):
         raise RefusalError("Job listing failed")
     failed = [job for job in jobs.get("jobs", []) if job.get("conclusion") == "failure"]
@@ -698,6 +714,19 @@ def validate(environ: Mapping[str, str] = os.environ) -> None:
     output(environ["GITHUB_OUTPUT"], "has_changes", "true" if paths else "false")
 
 
+def summarize_url_checks(rows: list[tuple[str, str, str]], number: str) -> str:
+    """Format verdict-separated summary counts so skipped checks stay distinct."""
+    passed = sum(1 for _, verdict, _ in rows if verdict == "pass")
+    warned = sum(1 for _, verdict, _ in rows if verdict == "warn")
+    skipped = sum(1 for _, verdict, _ in rows if verdict == "skip")
+    failed = sum(1 for _, verdict, _ in rows if verdict == "fail")
+    note = "; skipped URLs require manual verification" if skipped else ""
+    return (
+        f"Checked {len(rows)} touched URL(s): {passed} pass, {warned} warn, "
+        f"{skipped} skip, {failed} fail{note}; table posted on PR #{number}."
+    )
+
+
 def finish(environ: Mapping[str, str] = os.environ) -> None:
     root = Path(environ["GITHUB_WORKSPACE"])
     state = json.loads(Path(environ["MUSE_TRIAGE_STATE"]).read_text())
@@ -749,11 +778,7 @@ def finish(environ: Mapping[str, str] = os.environ) -> None:
         f"repos/{state['repository']}/issues/{number}/comments",
         {"body": "\n".join(table)},
     )
-    summary(
-        environ,
-        f"Verified {len(rows)} touched URL(s); {len(failed)} definitively dead; "
-        f"table posted on PR #{number}.",
-    )
+    summary(environ, summarize_url_checks(rows, number))
     if failed:
         raise RefusalError(
             f"{len(failed)} touched URL(s) are definitively dead; "

@@ -368,6 +368,15 @@ for override in ({"name": "ci"}, {"conclusion": "success"}, {"head_branch": "fea
     except mod.RefusalError:
         pass
 
+assert mod.jobs_path_for_run("o/r", {"id": 42, "run_attempt": 3}) == "repos/o/r/actions/runs/42/attempts/3/jobs?per_page=100"
+assert mod.jobs_path_for_run("o/r", {"id": 42}) == "repos/o/r/actions/runs/42/jobs?per_page=100"
+
+summary_text = mod.summarize_url_checks(
+    [("https://example.invalid/ok", "pass", "HTTP 200"), ("https://example.invalid/skip", "skip", "DNS failed")],
+    "99",
+)
+assert "1 pass" in summary_text and "1 skip" in summary_text and "manual verification" in summary_text
+
 print("OK")
 `;
       const result = runPython(pyScript);

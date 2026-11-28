@@ -5,7 +5,7 @@
 #
 # How to add a fingerprint:
 #   1. Run gitleaks on the offending range:
-#      gitleaks detect --no-banner --redact
+#      gitleaks detect --no-banner --redact --verbose
 #   2. Copy the printed `Fingerprint:` value below.
 #   3. Add a comment explaining what the finding is and why it's allowed.
 #
