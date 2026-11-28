@@ -28,8 +28,8 @@ Run coverage thresholds, Codecov OIDC, and pack-check smoke tests on every PR
 
 ### Tests & Tasks
 
-- [ ] [P02-TS01] Add/update `tests/repo-hygiene.test.ts` assertions for `vitest.config.ts` coverage reporters (`['text', 'html', 'lcov']`) and `95/95/90/95` thresholds, `.codecov.yml`, `ci.yml` `just coverage` + Node `24.x` Codecov v7 OIDC + `just pack-check`, and `publish.yml` `verify` job `just pack-check`.
-- [ ] [P02-T01] Update `vitest.config.ts` reporters to `['text', 'html', 'lcov']` and add `open-coverage-report` recipe to `Justfile`.
-- [ ] [P02-T02] Add `.codecov.yml` and wire `just coverage`, tokenless `codecov/codecov-action@v7` OIDC (Node `24.x` only, `id-token: write`), and `just pack-check` into `.github/workflows/ci.yml`.
-- [ ] [P02-T03] Wire `just pack-check` into `.github/workflows/publish.yml`'s `verify` job and align any stale coverage/Codecov docs references if needed.
-- [ ] [P02-T04] Run `just all`, `just coverage`, `just pack-check`, `just docs-check`, and `project-audit P02`; open PR, run `ci-fix --optimize` closeout on green CI, resolve review threads, mark `P02` `[x]`, and merge via `--merge`.
+- [x] [P02-TS01] Add/update `tests/repo-hygiene.test.ts` assertions for `vitest.config.ts` coverage reporters (`['text', 'html', 'lcov']`) and `95/95/90/95` thresholds, `.codecov.yml`, `ci.yml` `just coverage` + Node `24.x` Codecov v7 OIDC + `just pack-check`, and `publish.yml` `verify` job `just pack-check`.
+- [x] [P02-T01] Update `vitest.config.ts` reporters to `['text', 'html', 'lcov']` and add `open-coverage-report` recipe to `Justfile`.
+- [x] [P02-T02] Add `.codecov.yml` and wire `just coverage`, tokenless `codecov/codecov-action@v7` OIDC (Node `24.x` only, `id-token: write`), and `just pack-check` into `.github/workflows/ci.yml`.
+- [x] [P02-T03] Wire `just pack-check` into `.github/workflows/publish.yml`'s `verify` job and align any stale coverage/Codecov docs references if needed.
+- [x] [P02-T04] Run `just all`, `just coverage`, `just pack-check`, `just docs-check`, and `project-audit P02`; open PR, run `ci-fix --optimize` closeout on green CI, resolve review threads, mark `P02` `[x]`, and merge via `--merge`.

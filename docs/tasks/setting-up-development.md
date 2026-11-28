@@ -42,8 +42,9 @@ just typecheck       # or: pnpm exec tsc --noEmit
 # Run tests
 just test            # or: pnpm exec vitest run
 
-# Run tests with coverage
-just coverage        # or: pnpm run test:coverage
+# Run tests with coverage and open HTML report
+just coverage             # or: pnpm run test:coverage
+just open-coverage-report # opens coverage/index.html
 
 # Run every quality gate together
 just all

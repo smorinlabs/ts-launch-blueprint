@@ -16,6 +16,7 @@ const config: ReturnType<typeof defineConfig> = defineConfig({
     ],
     coverage: {
       provider: 'v8',
+      reporter: ['text', 'html', 'lcov'],
       include: ['packages/*/src/**/*.{ts,tsx}', 'apps/*/src/**/*.{ts,tsx}'],
       // apps/cli/src/cli.ts is a thin process entry (argv/exit only) exercised
       // by the S3 subprocess tier, not unit-coverable (claim-npm

@@ -131,27 +131,29 @@ just format       # oxfmt --write
 just lint         # oxlint
 just lint-fix     # oxlint --fix
 just typecheck    # tsc --noEmit
-just test         # vitest run
-just coverage     # vitest run --coverage (95/95/90/95 thresholds)
+just test                   # vitest run
+just coverage               # vitest run --coverage (95/95/90/95 thresholds)
+just open-coverage-report   # open coverage/index.html in browser
 ```
 
 ## Project Commands Reference
 
-| Task              | Recipe              | Underlying command                     |
-| ----------------- | ------------------- | -------------------------------------- |
-| Install deps      | `pnpm install`      | —                                      |
-| Setup git hooks   | `just setup-hooks`  | `pnpm exec lefthook install`           |
-| Format            | `just format`       | `pnpm exec oxfmt`                      |
-| Format check      | `just format-check` | `pnpm exec oxfmt --check`              |
-| Lint              | `just lint`         | `pnpm exec oxlint`                     |
-| Type check        | `just typecheck`    | `pnpm run typecheck` (`tsc --noEmit`)  |
-| Test              | `just test`         | `pnpm exec vitest run`                 |
-| Coverage          | `just coverage`     | `pnpm run test:coverage`               |
-| All quality gates | `just all`          | format-check + lint + typecheck + test |
-| Build             | `just build`        | `pnpm run build` (tsdown)              |
-| Run built CLI     | `just run [args]`   | `node apps/cli/dist/cli.js [args]`     |
-| Docs link check   | `just docs-check`   | `node scripts/check-links.mjs`         |
-| Full CI mirror    | `just ci`           | install + gates + build + hook suite   |
+| Task              | Recipe                      | Underlying command                     |
+| ----------------- | --------------------------- | -------------------------------------- |
+| Install deps      | `pnpm install`              | —                                      |
+| Setup git hooks   | `just setup-hooks`          | `pnpm exec lefthook install`           |
+| Format            | `just format`               | `pnpm exec oxfmt`                      |
+| Format check      | `just format-check`         | `pnpm exec oxfmt --check`              |
+| Lint              | `just lint`                 | `pnpm exec oxlint`                     |
+| Type check        | `just typecheck`            | `pnpm run typecheck` (`tsc --noEmit`)  |
+| Test              | `just test`                 | `pnpm exec vitest run`                 |
+| Coverage          | `just coverage`             | `pnpm run test:coverage`               |
+| Coverage report   | `just open-coverage-report` | Open `coverage/index.html` in browser  |
+| All quality gates | `just all`                  | format-check + lint + typecheck + test |
+| Build             | `just build`                | `pnpm run build` (tsdown)              |
+| Run built CLI     | `just run [args]`           | `node apps/cli/dist/cli.js [args]`     |
+| Docs link check   | `just docs-check`           | `node scripts/check-links.mjs`         |
+| Full CI mirror    | `just ci`                   | install + gates + build + hook suite   |
 
 ## Release Flow
 

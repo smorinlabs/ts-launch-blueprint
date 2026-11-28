@@ -41,8 +41,10 @@ jobs:
     name: continuous-integration
     runs-on: ubuntu-latest
     permissions:
-      # Read-only checkout of the repository; nothing here writes.
+      # Read-only checkout of the repository.
       contents: read
+      # OIDC token for tokenless Codecov upload (public repo).
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -102,14 +104,35 @@ jobs:
       - name: Type check
         run: just typecheck
 
+      - name: Test with coverage
+        if: matrix.node-version == '24.x'
+        run: just coverage
+
       - name: Test
+        if: matrix.node-version != '24.x'
         run: just test
+
+      - name: Upload coverage to Codecov
+        # Only the Node 24.x matrix cell collects/uploads coverage.
+        # use_oidc: tokenless upload (public repo). Requires `id-token: write`.
+        if: matrix.node-version == '24.x'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          files: ./coverage/lcov.info
+          flags: unittests
+          fail_ci_if_error: false
 
       - name: Docs link check
         run: just docs-check
 
       - name: Build
         run: just build
+
+      - name: Packaging validation and smoke test (just pack-check)
+        # Once per run, not per Node version: validates dist + tarball install.
+        if: matrix.node-version == '24.x'
+        run: just pack-check
 
       # Proves apps/cli can be deleted and the core + root tooling still pass
       # (D-040/D-042). Its own step, not in `just all`: it reinstalls in a
@@ -140,12 +163,6 @@ jobs:
       # Commented scaffolding — uncomment-to-enable (executable docs),
       # preserved from the source ci.yaml's disabled-but-documented intent.
       # ============================================================
-
-      # Coverage upload — enable once a Codecov token / OIDC is configured:
-      # - name: Upload coverage to Codecov
-      #   uses: codecov/codecov-action@v5
-      #   with:
-      #     files: ./coverage/coverage-final.json
 
       # Always-on SCA gate (D-022(7)): PM-native audit — no third-party action,
       # no secret. The same-repo fork guard mirrors the source's security job so

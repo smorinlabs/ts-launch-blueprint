@@ -6,12 +6,14 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
+import type { ViteUserConfig } from 'vitest/config';
 import { parse } from 'yaml';
 
 import releasePleaseManifest from '../.release-please-manifest.json' with { type: 'json' };
 import commitlintConfig from '../commitlint.config.mjs';
 import packageJson from '../package.json' with { type: 'json' };
 import releasePleaseConfig from '../release-please-config.json' with { type: 'json' };
+import vitestConfig from '../vitest.config.js';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
@@ -488,6 +490,120 @@ describe('release, versioning & packaging (S5: D-021, D-012)', () => {
       );
     expect(line).toBeDefined();
     expect(line).toMatch(/googleapis\/release-please-action@[0-9a-f]{40}\s*#\s*v\d/);
+  });
+});
+
+describe('coverage & pack-check CI contract (P02)', () => {
+  const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
+
+  it('vitest.config.ts sets text/html/lcov reporters and 95/95/90/95 thresholds', () => {
+    const coverage = (vitestConfig as ViteUserConfig).test?.coverage as
+      | { reporter?: unknown; thresholds?: unknown }
+      | undefined;
+    expect(coverage?.reporter).toEqual(['text', 'html', 'lcov']);
+    expect(coverage?.thresholds).toEqual({
+      lines: 95,
+      functions: 95,
+      branches: 90,
+      statements: 95,
+    });
+  });
+
+  it('Justfile provides open-coverage-report and keeps pack-check Linux-portable', () => {
+    const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8');
+    expect(justfile).toMatch(/^@?open-coverage-report:/m);
+    expect(justfile).toContain('coverage/index.html');
+    expect(justfile).not.toContain('/private/tmp');
+  });
+
+  it('.codecov.yml enforces CI pass, auto±1% project, 80% patch, and TS package paths', () => {
+    const codecovPath = join(REPO_ROOT, '.codecov.yml');
+    expect(existsSync(codecovPath)).toBe(true);
+    const codecov = parse(readFileSync(codecovPath, 'utf8')) as {
+      codecov?: { require_ci_to_pass?: boolean };
+      coverage?: {
+        status?: {
+          project?: { default?: { target?: string; threshold?: string } };
+          patch?: { default?: { target?: string } };
+        };
+      };
+      flags?: { unittests?: { paths?: string[] } };
+    };
+    expect(codecov.codecov?.require_ci_to_pass).toBe(true);
+    expect(codecov.coverage?.status?.project?.default).toEqual({
+      target: 'auto',
+      threshold: '1%',
+    });
+    expect(codecov.coverage?.status?.patch?.default).toEqual({
+      target: '80%',
+    });
+    expect(codecov.flags?.unittests?.paths).toEqual(['packages/', 'apps/']);
+  });
+
+  it('ci.yml wires just coverage, Node 24.x Codecov v7 OIDC upload, and just pack-check', () => {
+    const ciRaw = readFileSync(join(WORKFLOW_DIR, 'ci.yml'), 'utf8');
+    const ci = parse(ciRaw) as {
+      jobs: {
+        ci: {
+          permissions?: Record<string, string>;
+          steps: Array<{
+            name?: string;
+            if?: string;
+            run?: string;
+            uses?: string;
+            with?: Record<string, unknown>;
+          }>;
+        };
+      };
+    };
+
+    expect(ci.jobs.ci.permissions).toEqual({
+      contents: 'read',
+      'id-token': 'write',
+    });
+
+    const steps = ci.jobs.ci.steps;
+    const coverageStep = steps.find((step) => step.run?.trim() === 'just coverage');
+    expect(coverageStep).toBeDefined();
+    expect(coverageStep?.if).toContain("matrix.node-version == '24.x'");
+
+    const testFallbackStep = steps.find((step) => step.run?.trim() === 'just test');
+    expect(testFallbackStep).toBeDefined();
+    expect(testFallbackStep?.if).toContain("matrix.node-version != '24.x'");
+
+    const codecovStep = steps.find((step) => step.uses?.startsWith('codecov/codecov-action@'));
+    expect(codecovStep).toBeDefined();
+    expect(codecovStep?.if).toContain("matrix.node-version == '24.x'");
+    expect(codecovStep?.with).toEqual({
+      use_oidc: true,
+      files: './coverage/lcov.info',
+      flags: 'unittests',
+      fail_ci_if_error: false,
+    });
+
+    const codecovLine = ciRaw
+      .split('\n')
+      .find((l) => l.includes('codecov/codecov-action@') && !l.trimStart().startsWith('#'));
+    expect(codecovLine).toBeDefined();
+    expect(codecovLine).toMatch(/codecov\/codecov-action@[0-9a-f]{40}\s*#\s*v7\./);
+
+    const packCheckStep = steps.find((step) => step.run?.trim() === 'just pack-check');
+    expect(packCheckStep).toBeDefined();
+    expect(packCheckStep?.if).toContain("matrix.node-version == '24.x'");
+  });
+
+  it('publish.yml verify job runs just pack-check', () => {
+    const publish = parse(readFileSync(join(WORKFLOW_DIR, 'publish.yml'), 'utf8')) as {
+      jobs: {
+        verify: {
+          steps: Array<{ run?: string }>;
+        };
+      };
+    };
+    const packCheckStep = publish.jobs.verify.steps.find(
+      (step) => step.run?.trim() === 'just pack-check'
+    );
+    expect(packCheckStep).toBeDefined();
   });
 });
 

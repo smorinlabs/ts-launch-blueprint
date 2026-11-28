@@ -142,6 +142,7 @@ recipe below has a one-line doc comment above it in the file, and `just
 | `just test` (`t`)                           | Run tests with Vitest                                                          |
 | `just test-bun`                             | Optional/advisory: run non-e2e tiers under Bun (D-036; no-op if absent)        |
 | `just coverage`                             | Run tests with coverage thresholds enforced                                    |
+| `just open-coverage-report`                 | Open the local HTML coverage report (`coverage/index.html`)                    |
 | `just format` / `format-check` (`f` / `fc`) | Format (oxfmt) / check formatting                                              |
 | `just lint` / `lint-fix` (`l`)              | Lint (oxlint) / lint with autofixes                                            |
 | `just all` (`a`)                            | Every quality gate: format-check, lint, shell/workflow checks, typecheck, test |

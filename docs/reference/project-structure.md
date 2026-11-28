@@ -105,6 +105,7 @@ ts-launch-blueprint/
 │   └── repo-hygiene.test.ts         # Meta-tests (config drift, doc/link consistency)
 ├── scripts/
 │   └── check-links.mjs              # Dependency-free relative-link checker for docs-check
+├── .codecov.yml                     # Codecov project/patch thresholds and flags
 ├── .oxfmtrc.json                    # Oxfmt (formatter) configuration
 ├── .oxlintrc.json                   # Oxlint (linter) configuration
 ├── .release-please-manifest.json    # release-please's tracked current version
