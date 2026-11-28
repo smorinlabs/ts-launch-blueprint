@@ -30,7 +30,7 @@ Replace temporary template-press git SHA pin with PyPI v5.0.0 once released
 
 ### Tests & Tasks
 
-- [ ] [P01-TS01] Update `tests/press-acceptance.test.ts` to use `template-press==5.0.0` and verify `tests/press-config.test.ts` asserts `"smorinlabs/template-press"` remains in `keep_names` with no stale `04769b24b7b5665d8932cac3a6c1ac876b8a98bb` references in the repository.
-- [ ] [P01-T01] Replace SHA `04769b24b7b5665d8932cac3a6c1ac876b8a98bb` with `template-press==5.0.0` in `.github/workflows/press-verify.yml` and `Justfile`.
-- [ ] [P01-T02] Replace SHA `04769b24b7b5665d8932cac3a6c1ac876b8a98bb` with `template-press==5.0.0` in `README.md` and `docs/tasks/setting-up-development.md`.
-- [ ] [P01-T03] Run `just all`, `just docs-check`, `just press-verify`, and `project-audit P01`; open PR, pass CI with lightweight closeout check, resolve review threads, mark `P01` `[x]`, and merge via `--merge`.
+- [x] [P01-TS01] Update `tests/press-acceptance.test.ts` to use `template-press==5.0.0` and verify `tests/press-config.test.ts` asserts `"smorinlabs/template-press"` remains in `keep_names` with no stale `04769b24b7b5665d8932cac3a6c1ac876b8a98bb` references in the repository.
+- [x] [P01-T01] Replace SHA `04769b24b7b5665d8932cac3a6c1ac876b8a98bb` with `template-press==5.0.0` in `.github/workflows/press-verify.yml` and `Justfile`.
+- [x] [P01-T02] Replace SHA `04769b24b7b5665d8932cac3a6c1ac876b8a98bb` with `template-press==5.0.0` in `README.md` and `docs/tasks/setting-up-development.md`.
+- [x] [P01-T03] Run `just all`, `just docs-check`, `just press-verify`, and `project-audit P01`; open PR, pass CI with lightweight closeout check, resolve review threads, mark `P01` `[x]`, and merge via `--merge`.

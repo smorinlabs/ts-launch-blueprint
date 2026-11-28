@@ -63,12 +63,9 @@ cp press/press-answers.example.toml ../press-answers.toml
 # cli_name, display_name, owner, author, and email.
 
 # 2. Preview and apply the rebrand with template-press (requires uv)
-uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
-  press check-tools --target .
-uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
-  press rebrand --target . --config ../press-answers.toml --dry-run
-uvx --from "git+https://github.com/smorinlabs/template-press@04769b24b7b5665d8932cac3a6c1ac876b8a98bb" \
-  press rebrand --target . --config ../press-answers.toml
+uvx --from template-press==5.0.0 press check-tools --target .
+uvx --from template-press==5.0.0 press rebrand --target . --config ../press-answers.toml --dry-run
+uvx --from template-press==5.0.0 press rebrand --target . --config ../press-answers.toml
 
 # 3. Install dependencies, hooks, and verify every quality gate
 make check      # verify the foundational tools (just, node) are installed

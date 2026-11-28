@@ -24,7 +24,7 @@ import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const RUN_ACCEPTANCE = process.env['PRESS_ACCEPTANCE'] === '1';
-const TEMPLATE_PRESS_COMMIT = '04769b24b7b5665d8932cac3a6c1ac876b8a98bb';
+const TEMPLATE_PRESS_SPEC = 'template-press==5.0.0';
 
 const DEST_IDENTITY = {
   package_name: 'harbor_sample',
@@ -58,14 +58,7 @@ function pressCommand(): [string, string[]] {
   if (localProject) {
     return ['uv', ['run', '--project', localProject, 'press']];
   }
-  return [
-    'uvx',
-    [
-      '--from',
-      `git+https://github.com/smorinlabs/template-press@${TEMPLATE_PRESS_COMMIT}`,
-      'press',
-    ],
-  ];
+  return ['uvx', ['--from', TEMPLATE_PRESS_SPEC, 'press']];
 }
 
 function collectFiles(dir: string, relBase = ''): string[] {
@@ -166,7 +159,7 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
       // 4. press-verify.yml ships intact; template-only files are removed.
       expect(
         readFileSync(join(target, '.github', 'workflows', 'press-verify.yml'), 'utf8')
-      ).toContain('smorinlabs/template-press');
+      ).toContain(TEMPLATE_PRESS_SPEC);
 
       for (const removed of [
         '.github/workflows/template-receipt-guard.yml',
