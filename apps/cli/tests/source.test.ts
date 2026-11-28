@@ -66,7 +66,7 @@ function makeHarness(overrides: Partial<CliDeps> = {}): Harness {
 
 const MEMORY_ENV = { [SOURCE_ENV_VAR]: 'memory' };
 const ENGINEERING: Project[] = DEFAULT_IN_MEMORY_SEED.projects.filter(
-  (project) => project.workspace.name === 'Engineering'
+  (project) => project.workspace?.name === 'Engineering'
 );
 
 /** Parse the JSON document the command writes to stdout. */

@@ -83,10 +83,36 @@ describe('successful requests (test_successful_request parity)', () => {
     expect(projects[0]!.name).toBe('Project 1');
   });
 
-  it('tolerates a missing data key (source .get("data", []) parity)', async () => {
+  it('rejects a missing data key with ApiError (strict envelope)', async () => {
     const { fetchImpl } = makeFetch([jsonResponse({})]);
-    const projects = await createApiClient({ token: 't', fetchImpl }).getProjects();
-    expect(projects).toEqual([]);
+    await expect(createApiClient({ token: 't', fetchImpl }).getProjects()).rejects.toThrow(
+      /unexpected \/projects response shape/
+    );
+  });
+});
+
+describe('getProject (P10-TS02)', () => {
+  it('returns the project when found', async () => {
+    const { fetchImpl, calls } = makeFetch([
+      jsonResponse({ data: { gid: '1', name: 'Project 1', workspace: { name: 'Workspace 1' } } }),
+    ]);
+    const project = await createApiClient({ token: 't', fetchImpl }).getProject('1');
+    expect(project).toEqual(PROJECT);
+    expect(calls[0]!.url.pathname.endsWith('/projects/1')).toBe(true);
+  });
+
+  it('throws NotFoundError on HTTP 404', async () => {
+    const { fetchImpl } = makeFetch([jsonResponse({ errors: [{ message: 'Not found' }] }, 404)]);
+    await expect(createApiClient({ token: 't', fetchImpl }).getProject('missing')).rejects.toThrow(
+      NotFoundError
+    );
+  });
+
+  it('throws ApiError on malformed 200 payload', async () => {
+    const { fetchImpl } = makeFetch([jsonResponse({ data: { gid: '1' } })]);
+    await expect(createApiClient({ token: 't', fetchImpl }).getProject('1')).rejects.toThrow(
+      ApiError
+    );
   });
 });
 
@@ -186,6 +212,12 @@ describe('get_projects parameters (test_get_projects parity)', () => {
     await createApiClient({ token: 't', fetchImpl }).getProjects();
     expect(DEFAULT_LIMIT).toBe(200);
     expect(calls[0]!.url.searchParams.get('limit')).toBe('200');
+  });
+
+  it('keeps CLI client uncapped for limit > 100 (Q7.A)', async () => {
+    const { fetchImpl, calls } = makeFetch([jsonResponse({ data: [] })]);
+    await createApiClient({ token: 't', fetchImpl }).getProjects({ limit: 500 });
+    expect(calls[0]!.url.searchParams.get('limit')).toBe('500');
   });
 });
 

@@ -39,8 +39,9 @@ describe('routeLabel', () => {
 
 describe('procedureLabel', () => {
   it('keeps a known procedure name', () => {
-    expect(KNOWN_PROCEDURES).toEqual(new Set(['projects.list']));
+    expect(KNOWN_PROCEDURES).toEqual(new Set(['projects.list', 'projects.get']));
     expect(procedureLabel('projects.list')).toBe('projects.list');
+    expect(procedureLabel('projects.get')).toBe('projects.get');
   });
 
   it.each([['doesNotExist'], [''], [undefined]])('maps %j to unknown', (name) => {

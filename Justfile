@@ -218,6 +218,12 @@ check-removable +apps:
 @lint-fix:
     pnpm exec oxlint --fix
 
+# Export the Zod/tRPC API contract snapshot to docs/api/contract.snapshot.json (D-043)
+[group('dev')]
+@export-contract:
+    pnpm exec tsx scripts/export-contract.mjs
+    pnpm exec oxfmt docs/api/contract.snapshot.json
+
 # Run type checker: the root tsc --noEmit plus each app with its own
 # tsconfig (scripts/typecheck.sh, D-048)
 [group('dev')]

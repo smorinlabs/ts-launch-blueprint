@@ -44,14 +44,14 @@ function mockApi(): Mock<typeof fetch> {
     const raw = new URL(String(input), 'http://localhost').searchParams.get('input') ?? '{}';
     const workspace = (JSON.parse(raw) as { 0?: { workspaceName?: string } })[0]?.workspaceName;
     if (workspace === undefined) {
-      return envelope({ result: { data: { projects: DEMO } } });
+      return envelope({ result: { data: { projects: DEMO, nextCursor: null } } });
     }
     const projects = DEMO.filter(
-      (project) => project.workspace.name.toLowerCase() === workspace.toLowerCase()
+      (project) => project.workspace?.name.toLowerCase() === workspace.toLowerCase()
     );
     return projects.length === 0
       ? errorEnvelope(`Workspace not found: ${workspace}`, 'NOT_FOUND', 404)
-      : envelope({ result: { data: { projects } } });
+      : envelope({ result: { data: { projects, nextCursor: null } } });
   });
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
@@ -152,9 +152,26 @@ describe('projects screen', () => {
     expect(window.location.search).toBe('');
   });
 
+  it('renders an em dash when a project has null workspace', async () => {
+    mockResponses(() =>
+      envelope({
+        result: {
+          data: {
+            projects: [{ id: 'p-5', name: 'Solo', workspace: null }],
+            nextCursor: null,
+          },
+        },
+      })
+    );
+    renderApp();
+    expect(await screen.findByText('1 project')).toBeDefined();
+    const cells = within(screen.getByRole('table', { name: 'Projects' })).getAllByRole('cell');
+    expect(cells.map((cell) => cell.textContent)).toEqual(['Solo', '—']);
+  });
+
   it('empty: "No projects found." (with the workspace when filtered)', async () => {
     window.history.replaceState(null, '', '/?workspace=ops');
-    mockResponses(() => envelope({ result: { data: { projects: [] } } }));
+    mockResponses(() => envelope({ result: { data: { projects: [], nextCursor: null } } }));
     renderApp();
     expect(await screen.findByText('No projects found in workspace "ops".')).toBeDefined();
     expect(screen.getByRole('status')).toBeDefined();
@@ -162,7 +179,7 @@ describe('projects screen', () => {
   });
 
   it('empty with no filter: just "No projects found."', async () => {
-    mockResponses(() => envelope({ result: { data: { projects: [] } } }));
+    mockResponses(() => envelope({ result: { data: { projects: [], nextCursor: null } } }));
     renderApp();
     expect(await screen.findByText('No projects found.')).toBeDefined();
   });
@@ -195,7 +212,7 @@ describe('projects screen', () => {
 
   it('502: 3 requests (1 + 2 retries), then Try again refetches and shows the table', async () => {
     const fetchMock = mockResponses(failure, failure, failure, () =>
-      envelope({ result: { data: { projects: DEMO } } })
+      envelope({ result: { data: { projects: DEMO, nextCursor: null } } })
     );
     renderApp();
     const alert = await screen.findByRole('alert');

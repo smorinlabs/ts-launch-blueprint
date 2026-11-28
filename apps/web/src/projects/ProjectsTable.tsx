@@ -26,7 +26,7 @@ export function ProjectsTable(props: { projects: ProjectsListOutput['projects'] 
           {props.projects.map((project) => (
             <tr key={project.id}>
               <td>{project.name}</td>
-              <td>{project.workspace.name}</td>
+              <td>{project.workspace?.name ?? '—'}</td>
             </tr>
           ))}
         </tbody>

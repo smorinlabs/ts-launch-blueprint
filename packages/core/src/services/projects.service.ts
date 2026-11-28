@@ -1,13 +1,13 @@
 // Projects service (service layer): the business rules every controller
-// calls (the CLI now, the API in Phase 2). It reaches data only through a
+// calls (the CLI and the API). It reaches data only through a
 // ProjectsRepository, so it runs the same over HTTP or in-memory data.
 import type { ProjectsRepository } from '../repositories/projects.repository.js';
 import { NotFoundError } from '../schemas/errors.js';
 import type { Project } from '../schemas/project.schema.js';
+import type { ListProjectsOutput } from '../schemas/projects.contract.js';
 
-/** Source default page size/limit (projects.py:217,322). The source has
- * no client-side pagination: `limit` is forwarded as a single request
- * parameter and the API returns at most that many projects. */
+/** Source default page size/limit (projects.py:217,322). Core and CLI stay
+ * uncapped; apps/api enforces MAX_API_LIMIT (Q7.A). */
 export const DEFAULT_LIMIT = 200;
 
 /** Input for listProjects. */
@@ -17,11 +17,14 @@ export interface ListProjectsInput {
   workspaceName?: string | undefined;
   /** Maximum number of projects (default DEFAULT_LIMIT). */
   limit?: number | undefined;
+  /** Opaque pagination cursor from a previous `nextCursor`. */
+  cursor?: string | undefined;
 }
 
 /** Project use cases. */
 export interface ProjectsService {
-  listProjects(input?: ListProjectsInput): Promise<Project[]>;
+  listProjects(input?: ListProjectsInput): Promise<ListProjectsOutput>;
+  getProject(id: string): Promise<Project>;
 }
 
 /** Create the projects service over a repository. */
@@ -29,9 +32,7 @@ export function createProjectsService(deps: { repository: ProjectsRepository }):
   const { repository } = deps;
 
   return {
-    // get_projects parity (projects.py:216-247): optional case-insensitive
-    // workspace-name -> gid filter; an empty name means no filter.
-    async listProjects(input?: ListProjectsInput): Promise<Project[]> {
+    async listProjects(input?: ListProjectsInput): Promise<ListProjectsOutput> {
       let workspaceGid: string | undefined;
       const workspaceName = input?.workspaceName;
       if (workspaceName !== undefined && workspaceName !== '') {
@@ -40,12 +41,23 @@ export function createProjectsService(deps: { repository: ProjectsRepository }):
           (candidate) => candidate.name.toLowerCase() === workspaceName.toLowerCase()
         );
         if (workspace === undefined) {
-          // Exit 3 (not-found) — same code as the source, by design.
           throw new NotFoundError(`Workspace not found: ${workspaceName}`);
         }
         workspaceGid = workspace.gid;
       }
-      return repository.listProjects({ workspaceGid, limit: input?.limit ?? DEFAULT_LIMIT });
+      return repository.listProjects({
+        workspaceGid,
+        limit: input?.limit ?? DEFAULT_LIMIT,
+        ...(input?.cursor !== undefined ? { cursor: input.cursor } : {}),
+      });
+    },
+
+    async getProject(id: string): Promise<Project> {
+      const project = await repository.getProject(id);
+      if (project === null) {
+        throw new NotFoundError(`Project not found: ${id}`);
+      }
+      return project;
     },
   };
 }

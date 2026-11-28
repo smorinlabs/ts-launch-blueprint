@@ -13,11 +13,12 @@
 // are business rules (the projects service).
 import { ApiError, AuthError } from '../schemas/errors.js';
 import {
-  type ConvertResult,
-  convertProject,
-  convertWorkspace,
+  convertProjectDetailed,
+  convertWorkspaceDetailed,
+  type DetailedConvertResult,
 } from '../schemas/project.converter.js';
 import type { Project, Workspace } from '../schemas/project.schema.js';
+import type { ListProjectsOutput } from '../schemas/projects.contract.js';
 import type { ListProjectsQuery, ProjectsRepository } from './projects.repository.js';
 
 /** Placeholder API root, mirroring the source's fictional service
@@ -65,35 +66,95 @@ async function errorMessage(response: Response): Promise<string> {
   return fallback;
 }
 
-// The source trusted response shapes (KeyError/implicit any); a typed
-// port needs an explicit guard. Shape violations -> ApiError (clean
-// exit 1) instead of the source's accidental crash path.
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// Strict boundary validation (Py P04 parity): missing `data` is schema drift
+// (ApiError), never an empty list. Collects all item issues across the array
+// so errors locate `data.<index>.<field>` + `(+N more)` without echoing values.
 function unwrapList<T>(
   body: unknown,
   endpoint: string,
-  convert: (raw: unknown) => ConvertResult<T>
+  convert: (raw: unknown) => DetailedConvertResult<T>
 ): T[] {
-  if (typeof body !== 'object' || body === null) {
+  if (!isPlainObject(body)) {
     throw new ApiError(`API request failed: unexpected ${endpoint} response shape`);
   }
-  const data = (body as { data?: unknown }).data;
-  if (data === undefined) {
-    // get_projects parity: response_data.get("data", []) tolerates a
-    // missing key (projects.py:247).
-    return [];
-  }
+  const data = body['data'];
   if (!Array.isArray(data)) {
     throw new ApiError(`API request failed: unexpected ${endpoint} response shape`);
   }
-  return data.map((item: unknown, index) => {
-    const result = convert(item);
-    if (!result.ok) {
-      throw new ApiError(
-        `API request failed: unexpected ${endpoint} item at index ${index}: ${result.problem}`
-      );
+
+  const values: T[] = [];
+  let firstFailure: { index: number; firstProblem: string; firstPath: string } | undefined;
+  let totalIssues = 0;
+
+  for (let index = 0; index < data.length; index += 1) {
+    const result = convert(data[index]);
+    if (result.ok) {
+      values.push(result.value);
+    } else {
+      totalIssues += result.issueCount;
+      if (firstFailure === undefined) {
+        firstFailure = {
+          index,
+          firstProblem: result.firstProblem,
+          firstPath: result.firstPath,
+        };
+      }
     }
-    return result.value;
-  });
+  }
+
+  if (firstFailure !== undefined) {
+    const dataPath =
+      firstFailure.firstPath === ''
+        ? `data.${firstFailure.index}`
+        : `data.${firstFailure.index}.${firstFailure.firstPath}`;
+    const remainder = totalIssues > 1 ? ` (+${totalIssues - 1} more)` : '';
+    throw new ApiError(
+      `API request failed: unexpected ${endpoint} item at index ${firstFailure.index}: ${firstFailure.firstProblem} (${dataPath})${remainder}`
+    );
+  }
+
+  return values;
+}
+
+function unwrapItem<T>(
+  body: unknown,
+  endpoint: string,
+  convert: (raw: unknown) => DetailedConvertResult<T>
+): T {
+  if (!isPlainObject(body)) {
+    throw new ApiError(`API request failed: unexpected ${endpoint} response shape`);
+  }
+  const data = body['data'];
+  if (!isPlainObject(data)) {
+    throw new ApiError(`API request failed: unexpected ${endpoint} response shape`);
+  }
+  const result = convert(data);
+  if (!result.ok) {
+    throw new ApiError(`API request failed: unexpected ${endpoint} item: ${result.problem}`);
+  }
+  return result.value;
+}
+
+function extractNextCursor(body: unknown): string | null {
+  if (!isPlainObject(body) || body['next_page'] === undefined || body['next_page'] === null) {
+    return null;
+  }
+  const nextPage = body['next_page'];
+  if (!isPlainObject(nextPage)) {
+    throw new ApiError('API request failed: unexpected /projects next_page shape');
+  }
+  const offset = nextPage['offset'];
+  if (offset === undefined || offset === null) {
+    return null;
+  }
+  if (typeof offset !== 'string' || offset.length === 0) {
+    throw new ApiError('API request failed: unexpected /projects next_page shape');
+  }
+  return offset;
 }
 
 /** Strip trailing slashes without a regex: `/\/+$/` backtracks
@@ -118,9 +179,11 @@ export function createHttpProjectsRepository(
     Accept: 'application/json',
   };
 
-  // _request parity (projects.py:171-205): one wrapper owning URL
-  // construction, headers, and failure translation.
-  async function request(path: string, params?: Record<string, string>): Promise<unknown> {
+  async function request(
+    path: string,
+    params?: Record<string, string>,
+    requestOptions?: { allowNotFound?: boolean }
+  ): Promise<unknown> {
     const url = new URL(`${baseUrl}/${path.replace(/^\/+/, '')}`);
     for (const [key, value] of Object.entries(params ?? {})) {
       url.searchParams.set(key, value);
@@ -139,6 +202,10 @@ export function createHttpProjectsRepository(
       throw new ApiError(`API request failed: ${err instanceof Error ? err.message : String(err)}`);
     }
     if (!response.ok) {
+      if (requestOptions?.allowNotFound === true && response.status === 404) {
+        await response.body?.cancel();
+        return undefined;
+      }
       const message = await errorMessage(response);
       if (response.status === 401 || response.status === 403) {
         // Invalid/rejected token -> auth, exit 4 (D-016(2)).
@@ -154,14 +221,11 @@ export function createHttpProjectsRepository(
   }
 
   return {
-    // get_workspaces parity (projects.py:207-214).
     async listWorkspaces(): Promise<Workspace[]> {
-      return unwrapList(await request('/workspaces'), '/workspaces', convertWorkspace);
+      return unwrapList(await request('/workspaces'), '/workspaces', convertWorkspaceDetailed);
     },
 
-    // get_projects parity (projects.py:216-247): limit + opt_fields
-    // params, plus the workspace gid filter when one is given.
-    async listProjects(query: ListProjectsQuery): Promise<Project[]> {
+    async listProjects(query: ListProjectsQuery): Promise<ListProjectsOutput> {
       const params: Record<string, string> = {
         limit: String(query.limit),
         opt_fields: 'name,workspace.name',
@@ -169,7 +233,28 @@ export function createHttpProjectsRepository(
       if (query.workspaceGid !== undefined) {
         params['workspace'] = query.workspaceGid;
       }
-      return unwrapList(await request('/projects', params), '/projects', convertProject);
+      if (query.cursor !== undefined) {
+        params['offset'] = query.cursor;
+      }
+      const body = await request('/projects', params);
+      const projects = unwrapList(body, '/projects', convertProjectDetailed);
+      const nextCursor = extractNextCursor(body);
+      return { projects, nextCursor };
+    },
+
+    async getProject(id: string): Promise<Project | null> {
+      if (id === '.' || id === '..') {
+        throw new ApiError("Invalid project ID: '.' and '..' are not allowed");
+      }
+      const body = await request(
+        `/projects/${encodeURIComponent(id)}`,
+        { opt_fields: 'name,workspace.name' },
+        { allowNotFound: true }
+      );
+      if (body === undefined) {
+        return null;
+      }
+      return unwrapItem(body, '/projects/:id', convertProjectDetailed);
     },
   };
 }

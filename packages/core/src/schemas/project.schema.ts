@@ -14,15 +14,15 @@ export const WorkspaceSchema: z.ZodObject<{ gid: z.ZodString; name: z.ZodString 
 export const ProjectSchema: z.ZodObject<{
   id: z.ZodString;
   name: z.ZodString;
-  workspace: z.ZodObject<{ name: z.ZodString }>;
+  workspace: z.ZodNullable<z.ZodObject<{ name: z.ZodString }>>;
 }> = z.object({
   id: z.string(),
   name: z.string(),
-  workspace: z.object({ name: z.string() }),
+  workspace: z.object({ name: z.string() }).nullable(),
 });
 
 /** A workspace the projects service knows about. */
 export type Workspace = z.infer<typeof WorkspaceSchema>;
 
-/** A project, with the name of the workspace it belongs to. */
+/** A project, with the optional workspace it belongs to. */
 export type Project = z.infer<typeof ProjectSchema>;

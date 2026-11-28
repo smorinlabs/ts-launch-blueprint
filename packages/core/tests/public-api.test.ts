@@ -7,6 +7,8 @@ import * as core from '../src/index.js';
 import type {
   Core,
   CoreConfig,
+  GetProjectInput,
+  GetProjectOutput,
   HttpProjectsRepositoryOptions,
   InMemoryProjectsSeed,
   ListProjectsInput,
@@ -33,6 +35,8 @@ describe('core public API surface', () => {
       'DEFAULT_LIMIT',
       'DEFAULT_TIMEOUT_MS',
       'DomainError',
+      'GetProjectInputSchema',
+      'GetProjectOutputSchema',
       'ListProjectsInputSchema',
       'ListProjectsOutputSchema',
       'NotFoundError',
@@ -49,6 +53,8 @@ describe('core public API surface', () => {
     type _Surface = [
       Core,
       CoreConfig,
+      GetProjectInput,
+      GetProjectOutput,
       HttpProjectsRepositoryOptions,
       InMemoryProjectsSeed,
       ListProjectsInput,
