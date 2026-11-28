@@ -64,7 +64,7 @@ Every workflow declares an explicit top-level `permissions:` block:
 
 ## Best Practices
 
-- **Keep Heavy Gates Scoped**: `changes` skips heavy code/web jobs on docs-only and verified `release-please` PRs while keeping `lint` (including `just docs-check`) always-on, and `dep-audit.yml` + `just audit` run `pnpm audit --audit-level=high` and OSV-Scanner without slowing every PR.
+- **Keep Heavy Gates Scoped**: `changes` skips heavy code/web jobs on docs-only and verified `release-please` PRs while keeping `lint` (including `just docs-check`) always-on; `just audit` runs `pnpm audit --audit-level=high` locally, while `dep-audit.yml` pairs `pnpm audit --audit-level=high` with `osv-scanner` on a weekly schedule without slowing every PR.
 - **Use the 4-Cell Cross-OS Matrix**: test across `ubuntu`, `macos`, and `windows` on Node `24.x`, plus `ubuntu` on Node `26.x`.
 - **Cache Dependencies**: `pnpm/action-setup` (pinned before `actions/setup-node`) with `actions/setup-node`'s `cache: 'pnpm'`, keyed to the committed `pnpm-lock.yaml`, needs no separate `actions/cache` step.
 - **Fail Fast, But Not Across the Matrix**: `fail-fast: false` so a failure on one OS or Node version doesn't hide results from the others.

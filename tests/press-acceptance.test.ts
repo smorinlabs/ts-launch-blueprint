@@ -43,11 +43,14 @@ const DEST_IDENTITY = {
 } as const;
 
 function runOrThrow(cmd: string, args: string[], cwd: string): string {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  delete env['pnpm_config_verify_deps_before_run'];
+  delete env['npm_config_verify_deps_before_run'];
   const result = spawnSync(cmd, args, {
     cwd,
     encoding: 'utf8',
     timeout: 240_000,
-    env: process.env,
+    env,
   });
   if (result.status !== 0) {
     throw new Error(

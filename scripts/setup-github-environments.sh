@@ -60,6 +60,7 @@ if [[ $# -eq 1 ]]; then
 fi
 
 command -v gh >/dev/null 2>&1 || die "gh CLI not found. Install: https://cli.github.com/"
+command -v node >/dev/null 2>&1 || die "node is required to build environment payloads"
 gh auth status >/dev/null 2>&1 || die "gh is not authenticated. Run: gh auth login"
 
 if [[ $# -eq 0 ]]; then
@@ -77,26 +78,95 @@ echo "  npm allowed tag patterns: ${NPM_ALLOWED_TAGS[*]}"
 echo "  security-review allowed branch patterns: ${SECURITY_ALLOWED_BRANCHES[*]}"
 echo
 
+build_env_payload() {
+    local existing_json="${1:-}"
+    ENV_JSON="$existing_json" node -e '
+const raw = process.env.ENV_JSON || "";
+let waitTimer = 0;
+let preventSelfReview = false;
+let reviewers = [];
+
+if (raw.trim() !== "") {
+  const env = JSON.parse(raw);
+  const rules = Array.isArray(env.protection_rules) ? env.protection_rules : [];
+  const waitRule = rules.find((r) => r && r.type === "wait_timer");
+  const revRule = rules.find((r) => r && r.type === "required_reviewers");
+
+  if (waitRule && typeof waitRule.wait_timer === "number") {
+    waitTimer = waitRule.wait_timer;
+  } else if (typeof env.wait_timer === "number") {
+    waitTimer = env.wait_timer;
+  }
+
+  if (revRule && typeof revRule.prevent_self_review === "boolean") {
+    preventSelfReview = revRule.prevent_self_review;
+  } else if (typeof env.prevent_self_review === "boolean") {
+    preventSelfReview = env.prevent_self_review;
+  }
+
+  const rawReviewers = Array.isArray(revRule && revRule.reviewers)
+    ? revRule.reviewers
+    : (Array.isArray(env.reviewers) ? env.reviewers : []);
+  reviewers = rawReviewers
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const type = entry.type;
+      const id = entry.reviewer && typeof entry.reviewer.id === "number"
+        ? entry.reviewer.id
+        : entry.id;
+      if ((type === "User" || type === "Team") && typeof id === "number") {
+        return { type, id };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
+process.stdout.write(JSON.stringify({
+  wait_timer: waitTimer,
+  prevent_self_review: preventSelfReview,
+  reviewers,
+  deployment_branch_policy: {
+    protected_branches: false,
+    custom_branch_policies: true,
+  },
+}));
+'
+}
+
 upsert_environment() {
     local env="$1"
+    local get_out="" get_status=0 put_payload=""
     echo "==> $env: upsert environment"
-    # PUT is idempotent. custom_branch_policies=true means allowed tag/branch
-    # rules are managed via the deployment-branch-policies subresource below.
-    gh api --method PUT "repos/$repo/environments/$env" \
-        -F "wait_timer=0" \
-        -F "prevent_self_review=false" \
-        -F "reviewers[]" \
-        -F "deployment_branch_policy[protected_branches]=false" \
-        -F "deployment_branch_policy[custom_branch_policies]=true" \
+    # Preserve existing protection rules (wait_timer, prevent_self_review,
+    # reviewers) when the environment already exists (HTTP 200); only send
+    # creation defaults on HTTP 404. custom_branch_policies=true means allowed
+    # tag/branch rules are managed via the deployment-branch-policies subresource below.
+    if get_out="$(gh api "repos/$repo/environments/$env" 2>&1)"; then
+        put_payload="$(build_env_payload "$get_out")" \
+            || die "failed to parse existing environment '$env' response"
+    else
+        get_status=$?
+        if [[ "$get_out" == *"HTTP 404"* || "$get_out" == *'"status": "404"'* || "$get_out" == *'"status":"404"'* ]]; then
+            put_payload="$(build_env_payload "")"
+        else
+            die "failed to inspect environment '$env' (exit $get_status): $get_out"
+        fi
+    fi
+
+    printf '%s' "$put_payload" | gh api --method PUT "repos/$repo/environments/$env" \
+        --input - \
         >/dev/null
 }
 
 reconcile_policies() {
     local env="$1"
     local existing_ids
-    existing_ids="$(gh api \
+    if ! existing_ids="$(gh api --paginate \
         "repos/$repo/environments/$env/deployment-branch-policies" \
-        -q '.branch_policies[].id' 2>/dev/null || true)"
+        -q '.branch_policies[].id')"; then
+        die "failed to list deployment branch policies for '$env'"
+    fi
 
     if [[ -n "$existing_ids" ]]; then
         echo "    clearing existing deployment policies"

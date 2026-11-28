@@ -70,7 +70,7 @@ With `just setup-hooks` wired:
 - **pre-commit** runs oxfmt (auto-fixing staged files), oxlint, boundary
   checks (`depcruise`), `shellcheck`, `actionlint`, `editorconfig-checker`,
   `cspell`, `pnpm-lock-check`, `check-large-files`, `gitleaks`, and a
-  full-program `tsc --noEmit` — in parallel.
+  full-program `tsc --noEmit` — sequentially.
 - **commit-msg** runs commitlint against your commit message
   ([Conventional Commits](https://www.conventionalcommits.org/), 100/200/200
   header/body/footer line-length limits).

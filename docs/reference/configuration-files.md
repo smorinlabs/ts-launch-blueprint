@@ -163,7 +163,7 @@ which cross-reference each other by line number. See
 Configures lefthook, the git-hooks runner (installed via the
 package.json `prepare` script). Runs `shellcheck` + `actionlint` +
 `editorconfig-checker` + `cspell` + `pnpm-lock-check` + `format` +
-`check-large-files` + `lint` + `boundaries` + `typecheck` in parallel on
+`check-large-files` + `lint` + `boundaries` + `typecheck` sequentially on
 `pre-commit`, `commitlint` on `commit-msg`, and `press-verify` + an
 opt-in test run on `pre-push` (`TS_PROJECTS_PREPUSH_TESTS=1`). See
 [lefthook.yml](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/lefthook.yml)

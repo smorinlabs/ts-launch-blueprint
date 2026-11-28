@@ -133,7 +133,7 @@ If a generated project prefers manual version tags instead of PR-driven
 
 ```bash
 # Disable release-please:
-mv .github/workflows/release-please.yml .github/workflows/release-please.yml.disabled
+git mv .github/workflows/release-please.yml .github/workflows/release-please.yml.disabled
 
 # Bump versions consistently before tagging:
 $EDITOR package.json
@@ -183,7 +183,7 @@ Publisher before merging a Release PR. For an existing repository adopting
 `release-please`, seed `.release-please-manifest.json` with the current version
 and set `bootstrap-sha` in `release-please-config.json` only if older commits
 should be excluded. See the
-[release-please bootstrap reference](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md#bootstrapping).
+[release-please bootstrap reference](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md).
 
 ---
 
@@ -209,8 +209,9 @@ Common failure modes:
   environment allows **`v*` tags** (`type=tag`), not branch-only policies. Run
   `scripts/setup-github-environments.sh <owner>/<repo>`.
 - **`npm publish` fails auth**: verify the Trusted Publisher on `npmjs.com`
-  matches owner, repository, `publish.yml`, and environment `npm` (`node >= 24`
-  with bundled `npm >= 11.5.1`).
+  matches owner, repository, `publish.yml`, and environment `npm` (and that the
+  runner uses `node >= 24` with `npm >= 11.5.1` — Node `24.0.0` bundled npm
+  `11.3.0`, so upgrade `npm` if a runner ships an older `24.x` release).
 - **`bin` strip-guard fails**: fix `apps/cli/package.json` `"bin"` path/key
   rather than relying on npm auto-correction.
 - **`verify` version or ancestry mismatch**: ensure the tag descends from

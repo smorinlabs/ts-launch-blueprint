@@ -14,12 +14,19 @@ and plaintext exposure when sharing configuration files or diagnostic bundles.
 
 ## Decision
 
-We will **never read or write secrets (including `token`) in any TOML config
-file**:
+We will **never read or write secrets in the supported CLI configuration schema**
+(`resolveConfig` never reads TOML tokens, and `config init` / `config set`
+refuse to persist `token`):
 
 - Authentication tokens are resolved exclusively from `--token` (highest
   precedence) or `TS_PROJECTS_TOKEN` (environment variable).
-- `config init` and `config set token ...` reject persisting `token` to disk.
+- `config init` and `config set token ...` reject persisting `token` to disk,
+  and `serializeToml` strips any `token` key from the root table, `[output]`,
+  and `[logging]` before writing.
+- Arbitrary legacy or custom tables (such as `[auth]`) in a pre-existing TOML
+  file are preserved untouched by `config set` rewrites and are ignored at
+  runtime; inspect existing files for custom secret sections before sharing or
+  committing them.
 - `config get token` reports a masked summary (`****XXXX`) of the resolved
   runtime token without writing it.
 - User config files written on POSIX still use `0o600` mode as defense-in-depth.

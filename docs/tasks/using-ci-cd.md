@@ -50,7 +50,7 @@ Static analysis via GitHub's CodeQL (`javascript-typescript`, `security-extended
 
 ### Dependency review & Audits (`dependency-review.yml`, `dep-audit.yml`, `canary.yml`)
 
-- `dependency-review.yml` runs on every pull request targeting `main`, scanning `pnpm-lock.yaml` with `actions/dependency-review-action` (SHA-pinned, see [pinning policy](../tools/github-actions.md#action-pinning-policy)).
+- `dependency-review.yml` runs on pull requests targeting `main` when the repository is public (`github.event.repository.visibility == 'public'`), scanning `pnpm-lock.yaml` with `actions/dependency-review-action` (SHA-pinned, see [pinning policy](../tools/github-actions.md#action-pinning-policy)). On private repositories without GitHub Code Security enabled, it skips automatically — rely on `dep-audit.yml`, `manual-pr-security-scan.yml`, and local `just audit` instead.
 - `dep-audit.yml` runs weekly (`0 5 * * 1`, plus `workflow_dispatch`) to execute `pnpm audit --audit-level=high` and `google/osv-scanner-action` across the workspace, filing/updating a tracking issue on scheduled failure.
 - `canary.yml` runs weekly (`0 6 * * 2`) across Node `24.x` and `26.x` with `pnpm update --recursive` to catch upstream breaking dependency changes early.
 
@@ -91,11 +91,13 @@ just press-verify      # template-press verification
 pnpm exec lefthook run pre-commit --all-files
 ```
 
-Or run the composite CI mirror:
+Or run the core local CI loop (`install`, `all`, `docs-check`, `build`, and `lefthook run pre-commit --all-files`):
 
 ```bash
 just ci
 ```
+
+Run `just coverage` and `just pack-check` separately when verifying full CI coverage thresholds and npm packaging.
 
 ## Customization
 

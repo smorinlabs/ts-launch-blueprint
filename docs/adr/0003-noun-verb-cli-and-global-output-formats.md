@@ -22,7 +22,9 @@ controls**:
 - Noun-verb groups: `projects list|get`, `config init|path|get|set`,
   `doctor [--bundle]`, and `completion {bash,zsh,fish}`.
 - Global flags `-o, --output {text,json,csv,markdown}`, `--json`, and
-  `--output-file <path>` apply uniformly across all subcommands.
+  `--output-file <path>` apply uniformly across data-emitting subcommands
+  (`projects`, `config`, `doctor`); `completion` emits raw shell scripts
+  regardless of `-o`/`--json` while still honoring `--output-file <path>`.
 - Machine-mode errors emit a single structured JSON object on stderr while
   keeping stdout pure for requested output; progress/spinners write only to
   stderr when TTY-safe.
@@ -30,8 +32,9 @@ controls**:
 
 ## Consequences
 
-- Every subcommand shares identical formatting, file-output, and JSON error
-  contracts, pinned by 80-column `--help` snapshots.
+- Every data-emitting subcommand shares identical formatting, file-output, and
+  JSON error contracts (and `completion` emits raw shell completions with
+  `--output-file` support), pinned by 80-column `--help` snapshots.
 - Legacy bare-root invocation (`ts-projects --limit 5`) is removed cleanly
   before `1.0.0`.
 

@@ -31,9 +31,11 @@ whole system in one pass. Each entry uses the same compact shape:
 
 **What** — `engines.node = ">=24"` in `package.json`, pinned in `.nvmrc` (`24`)
 and `devEngines.runtime`.
-**Why** — Node 24 is Active LTS, bundles `npm >= 11.5.1` (required for npm OIDC
-Trusted Publishing), and provides modern built-ins (`AbortSignal.timeout`, JSON
-import attributes) without Corepack or EOL Node 20 baggage.
+**Why** — Node 24 is Active LTS (modern built-ins such as
+`AbortSignal.timeout` and JSON import attributes, without Corepack or EOL Node 20
+baggage). npm OIDC Trusted Publishing separately requires `npm >= 11.5.1`
+(included in current `24.x` releases, whereas Node `24.0.0` bundled npm
+`11.3.0`, so older `24.x` images need an `npm` upgrade before publishing).
 **Value** — every published CLI build and API container runs on a supported,
 predictable runtime.
 **Refs** — `.nvmrc`, `package.json`, [ADR 0001](../adr/0001-pnpm-monorepo-and-cli-only-publishing.md).
@@ -301,10 +303,12 @@ Dependabot PRs. `.github/dependabot.yml` groups weekly `github-actions`,
 
 **What** — stock `googleapis/release-please-action` maintains Release PRs
 updating `package.json`, `apps/cli/package.json`,
-`.release-please-manifest.json`, and `CHANGELOG.md`. Merging cuts a `v*` tag,
-triggering `publish.yml` (`verify` → protected `npm` environment → `npm publish`
-via OIDC with `bin` strip-guard) and `publish-container.yml` (immutable
-`:X.Y.Z` + serialized `:latest` GHCR images).
+`.release-please-manifest.json`, and `CHANGELOG.md`. Merging cuts a `v*` tag
+and creates a GitHub Release: the `v*` tag push triggers `publish.yml`
+(`verify` → protected `npm` environment → `npm publish` via OIDC with `bin`
+strip-guard), while publishing the GitHub Release (`release: types: [published]`)
+triggers `publish-container.yml` (immutable `:X.Y.Z` + serialized `:latest` GHCR
+images).
 **Why** — zero long-lived `NPM_TOKEN` or registry passwords, automatic npm
 provenance, and atomic version consistency.
 **Value** — auditable, human-approved releases with one-click environment gates.

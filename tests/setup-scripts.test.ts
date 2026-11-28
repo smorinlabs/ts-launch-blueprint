@@ -47,7 +47,12 @@ function createFakeGhBin(dir: string, extraCases = ''): { binDir: string; logFil
 
   const ghShim = `#!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' "$*" >> "${logFile}"
+if [[ " $* " == *" --input - "* ]]; then
+  stdin_payload="$(cat)"
+  printf '%s | stdin=%s\n' "$*" "$stdin_payload" >> "${logFile}"
+else
+  printf '%s\n' "$*" >> "${logFile}"
+fi
 ${extraCases}
 case "$*" in
   "auth status")
@@ -57,8 +62,13 @@ case "$*" in
     echo "auto-org/auto-cli"
     exit 0
     ;;
-  api\\ repos/*/*/environments/*/deployment-branch-policies\\ -q*)
+  api\\ --paginate\\ repos/*/*/environments/*/deployment-branch-policies\\ -q*)
     exit 0
+    ;;
+  api\\ repos/*/*/environments/*)
+    echo '{"message":"Not Found","status":"404"}'
+    echo 'gh: Not Found (HTTP 404)' >&2
+    exit 1
     ;;
   api\\ --method\\ DELETE*)
     exit 0
@@ -154,12 +164,12 @@ describe.skipIf(process.platform === 'win32')('scripts/setup-github-environments
     }
   );
 
-  it('upserts npm with v* tag policy and security-review with main + release/* branch policies', () => {
+  it('creates missing environments (404 -> defaults), paginates policies, and creates v* + main/release/* rules', () => {
     const scratch = mkdtempSync(join(tmpdir(), 'setup-env-ok-'));
     try {
       const { binDir, logFile } = createFakeGhBin(
         scratch,
-        `if [[ "$*" == *"deployment-branch-policies -q"* ]]; then
+        `if [[ "$*" == *"--paginate"*"deployment-branch-policies -q"* ]]; then
   echo "101"
   echo "102"
   exit 0
@@ -173,10 +183,37 @@ fi`
       expect(res.stdout).toContain('Target repo: example-org/example-cli');
 
       const calls = readFileSync(logFile, 'utf8').split('\n').filter(Boolean);
-      expect(calls.join('\n')).not.toContain('reviewers=[]');
+      expect(calls).toContain('api repos/example-org/example-cli/environments/npm');
+      expect(calls).toContain('api repos/example-org/example-cli/environments/security-review');
       expect(calls).toContain(
-        'api --method PUT repos/example-org/example-cli/environments/npm -F wait_timer=0 -F prevent_self_review=false -F reviewers[] -F deployment_branch_policy[protected_branches]=false -F deployment_branch_policy[custom_branch_policies]=true'
+        'api --paginate repos/example-org/example-cli/environments/npm/deployment-branch-policies -q .branch_policies[].id'
       );
+
+      const defaultPayload = {
+        wait_timer: 0,
+        prevent_self_review: false,
+        reviewers: [],
+        deployment_branch_policy: {
+          protected_branches: false,
+          custom_branch_policies: true,
+        },
+      };
+      const npmPutLine = calls.find((line) =>
+        line.startsWith(
+          'api --method PUT repos/example-org/example-cli/environments/npm --input - | stdin='
+        )
+      );
+      expect(npmPutLine).toBeDefined();
+      expect(JSON.parse(npmPutLine!.split('| stdin=')[1]!)).toEqual(defaultPayload);
+
+      const secPutLine = calls.find((line) =>
+        line.startsWith(
+          'api --method PUT repos/example-org/example-cli/environments/security-review --input - | stdin='
+        )
+      );
+      expect(secPutLine).toBeDefined();
+      expect(JSON.parse(secPutLine!.split('| stdin=')[1]!)).toEqual(defaultPayload);
+
       expect(calls).toContain(
         'api --method DELETE repos/example-org/example-cli/environments/npm/deployment-branch-policies/101'
       );
@@ -192,14 +229,137 @@ fi`
       ).toBe(false);
 
       expect(calls).toContain(
-        'api --method PUT repos/example-org/example-cli/environments/security-review -F wait_timer=0 -F prevent_self_review=false -F reviewers[] -F deployment_branch_policy[protected_branches]=false -F deployment_branch_policy[custom_branch_policies]=true'
-      );
-      expect(calls).toContain(
         'api --method POST repos/example-org/example-cli/environments/security-review/deployment-branch-policies -f name=main -f type=branch'
       );
       expect(calls).toContain(
         'api --method POST repos/example-org/example-cli/environments/security-review/deployment-branch-policies -f name=release/* -f type=branch'
       );
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves existing wait_timer, prevent_self_review, and reviewers when updating existing environments (200)', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'setup-env-preserve-'));
+    try {
+      const existingNpm = JSON.stringify({
+        name: 'npm',
+        protection_rules: [
+          { id: 1, type: 'wait_timer', wait_timer: 15 },
+          {
+            id: 2,
+            type: 'required_reviewers',
+            prevent_self_review: true,
+            reviewers: [
+              { type: 'User', reviewer: { id: 12345, login: 'alice' } },
+              { type: 'Team', reviewer: { id: 67890, slug: 'maintainers' } },
+            ],
+          },
+        ],
+      });
+      const existingSecurity = JSON.stringify({
+        name: 'security-review',
+        protection_rules: [],
+      });
+      const { binDir, logFile } = createFakeGhBin(
+        scratch,
+        `case "$*" in
+  "api repos/example-org/example-cli/environments/npm")
+    printf '%s\\n' '${existingNpm}'
+    exit 0
+    ;;
+  "api repos/example-org/example-cli/environments/security-review")
+    printf '%s\\n' '${existingSecurity}'
+    exit 0
+    ;;
+esac`
+      );
+      const res = runScript(ENV_SCRIPT, ['example-org/example-cli'], {
+        env: { ...process.env, PATH: `${binDir}:${process.env['PATH'] ?? ''}` },
+      });
+      expect(res.stderr).toBe('');
+      expect(res.status).toBe(0);
+
+      const calls = readFileSync(logFile, 'utf8').split('\n').filter(Boolean);
+      const npmPutLine = calls.find((line) =>
+        line.startsWith(
+          'api --method PUT repos/example-org/example-cli/environments/npm --input - | stdin='
+        )
+      );
+      expect(npmPutLine).toBeDefined();
+      expect(JSON.parse(npmPutLine!.split('| stdin=')[1]!)).toEqual({
+        wait_timer: 15,
+        prevent_self_review: true,
+        reviewers: [
+          { type: 'User', id: 12345 },
+          { type: 'Team', id: 67890 },
+        ],
+        deployment_branch_policy: {
+          protected_branches: false,
+          custom_branch_policies: true,
+        },
+      });
+
+      const secPutLine = calls.find((line) =>
+        line.startsWith(
+          'api --method PUT repos/example-org/example-cli/environments/security-review --input - | stdin='
+        )
+      );
+      expect(secPutLine).toBeDefined();
+      expect(JSON.parse(secPutLine!.split('| stdin=')[1]!)).toEqual({
+        wait_timer: 0,
+        prevent_self_review: false,
+        reviewers: [],
+        deployment_branch_policy: {
+          protected_branches: false,
+          custom_branch_policies: true,
+        },
+      });
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when inspecting an environment returns an unexpected error', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'setup-env-get-err-'));
+    try {
+      const { binDir, logFile } = createFakeGhBin(
+        scratch,
+        `if [[ "$*" == "api repos/example-org/example-cli/environments/npm" ]]; then
+  echo 'gh: Forbidden (HTTP 403)' >&2
+  exit 1
+fi`
+      );
+      const res = runScript(ENV_SCRIPT, ['example-org/example-cli'], {
+        env: { ...process.env, PATH: `${binDir}:${process.env['PATH'] ?? ''}` },
+      });
+      expect(res.status).not.toBe(0);
+      expect(res.stderr).toContain("failed to inspect environment 'npm'");
+      const calls = readFileSync(logFile, 'utf8');
+      expect(calls).not.toContain('--method PUT');
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when listing deployment-branch-policies fails', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'setup-env-list-err-'));
+    try {
+      const { binDir, logFile } = createFakeGhBin(
+        scratch,
+        `if [[ "$*" == *"deployment-branch-policies -q"* ]]; then
+  echo 'gh: Internal Server Error (HTTP 500)' >&2
+  exit 1
+fi`
+      );
+      const res = runScript(ENV_SCRIPT, ['example-org/example-cli'], {
+        env: { ...process.env, PATH: `${binDir}:${process.env['PATH'] ?? ''}` },
+      });
+      expect(res.status).not.toBe(0);
+      expect(res.stderr).toContain("failed to list deployment branch policies for 'npm'");
+      const calls = readFileSync(logFile, 'utf8');
+      expect(calls).not.toContain('--method POST');
+      expect(calls).not.toContain('--method DELETE');
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
@@ -278,13 +438,28 @@ describe.skipIf(process.platform === 'win32')('scripts/setup-npm-publishing.sh',
       copyFileSync(NPM_SCRIPT, copiedScript);
       chmodSync(copiedScript, 0o755);
 
-      const missing = runScript(copiedScript, [], { cwd: scratch });
+      const fakeBinDir = join(scratch, 'fake-bin');
+      mkdirSync(fakeBinDir, { recursive: true });
+      const failingGh = join(fakeBinDir, 'gh');
+      writeFileSync(failingGh, '#!/usr/bin/env bash\nexit 1\n', 'utf8');
+      chmodSync(failingGh, 0o755);
+
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        PATH: `${fakeBinDir}:${join(process.execPath, '..')}:/usr/bin:/bin`,
+        GH_CONFIG_DIR: join(scratch, 'empty-gh'),
+      };
+      delete env['GH_REPO'];
+      delete env['GH_TOKEN'];
+      delete env['GITHUB_TOKEN'];
+
+      const missing = runScript(copiedScript, [], { cwd: scratch, env });
       expect(missing.status).not.toBe(0);
       expect(missing.stderr).toContain('apps/cli/package.json not found');
 
       mkdirSync(join(scratch, 'apps', 'cli'), { recursive: true });
       writeFileSync(join(scratch, 'apps', 'cli', 'package.json'), '{bad json', 'utf8');
-      const malformed = runScript(copiedScript, [], { cwd: scratch });
+      const malformed = runScript(copiedScript, [], { cwd: scratch, env });
       expect(malformed.status).not.toBe(0);
       expect(malformed.stderr).toContain('could not read package name');
 
@@ -293,10 +468,7 @@ describe.skipIf(process.platform === 'win32')('scripts/setup-npm-publishing.sh',
         JSON.stringify({ name: '@fallback-org/sample-cli', version: '0.1.0' }),
         'utf8'
       );
-      const noWorkflow = runScript(copiedScript, [], {
-        cwd: scratch,
-        env: { ...process.env, PATH: `${join(process.execPath, '..')}:/usr/bin:/bin` },
-      });
+      const noWorkflow = runScript(copiedScript, [], { cwd: scratch, env });
       expect(noWorkflow.status).toBe(0);
       expect(noWorkflow.stdout).toContain('@fallback-org/sample-cli');
       expect(noWorkflow.stdout).toContain('fallback-org');
@@ -324,11 +496,18 @@ describe.skipIf(process.platform === 'win32')('scripts/setup-npm-publishing.sh',
         'utf8'
       );
 
+      const fakeBinDir = join(scratch, 'fake-bin');
+      mkdirSync(fakeBinDir, { recursive: true });
+      const failingGh = join(fakeBinDir, 'gh');
+      writeFileSync(failingGh, '#!/usr/bin/env bash\nexit 1\n', 'utf8');
+      chmodSync(failingGh, 0o755);
+
       const env: NodeJS.ProcessEnv = {
         ...process.env,
-        PATH: `${join(process.execPath, '..')}:/usr/bin:/bin`,
+        PATH: `${fakeBinDir}:${join(process.execPath, '..')}:/usr/bin:/bin`,
         GH_CONFIG_DIR: join(scratch, 'empty-gh'),
       };
+      delete env['GH_REPO'];
       delete env['GH_TOKEN'];
       delete env['GITHUB_TOKEN'];
 

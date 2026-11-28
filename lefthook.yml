@@ -7,7 +7,7 @@
 # intent without a Python runtime.
 
 pre-commit:
-  parallel: true
+  parallel: false
   jobs:
     - name: shellcheck
       glob: '*.{sh,bash}'
@@ -23,6 +23,9 @@ pre-commit:
         command -v editorconfig-checker >/dev/null 2>&1 || { echo "FAIL: editorconfig-checker missing — run just install-editorconfig-checker" >&2; exit 1; }
         editorconfig-checker -config .editorconfig-checker.json {staged_files}
     - name: cspell
+      env:
+        pnpm_config_verify_deps_before_run: ''
+        npm_config_verify_deps_before_run: ''
       run: pnpm exec cspell lint --no-progress --no-must-find-files --files {staged_files}
     - name: pnpm-lock-check
       glob: '{package.json,**/package.json,pnpm-workspace.yaml,pnpm-lock.yaml}'
@@ -47,6 +50,9 @@ pre-commit:
         - 'docs/port/typescript_port_process_prompt.md'
         - '.claude/settings.local.json'
         - 'CHANGELOG.md'
+      env:
+        pnpm_config_verify_deps_before_run: ''
+        npm_config_verify_deps_before_run: ''
       run: pnpm exec oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
     # Reject staged files larger than 1MB outside docs/assets/ (mirrors
@@ -73,15 +79,24 @@ pre-commit:
       exclude:
         - '**/dist/**'
         - 'coverage/**'
+      env:
+        pnpm_config_verify_deps_before_run: ''
+        npm_config_verify_deps_before_run: ''
       run: pnpm exec oxlint {staged_files}
     # Architecture boundaries (D-042) over the WHOLE import graph, not only
     # staged files: a staged change can break a rule elsewhere in the graph.
     - name: boundaries
       glob: '*.{ts,tsx}'
+      env:
+        pnpm_config_verify_deps_before_run: ''
+        npm_config_verify_deps_before_run: ''
       run: just check-boundaries
     # Type check runs on the FULL program, not per-file — tsc semantics need
     # the whole graph (mirrors the source's repo-wide mypy hook).
     - name: typecheck
+      env:
+        pnpm_config_verify_deps_before_run: ''
+        npm_config_verify_deps_before_run: ''
       run: sh scripts/typecheck.sh
     # Secret scan over staged diff (skipped in CI where secret-scan.yml runs
     # TruffleHog over PR diffs / push history).

@@ -24,8 +24,8 @@ body:
           required: true
         - label: I searched existing issues for duplicates.
           required: true
-        - label: I ran `make hook-check` and the relevant `just` command (e.g. `just all` / `just debug-info`) and pasted the output below.
-          required: true
+        - label: If working from a repository checkout, I ran `make hook-check` and the relevant `just` command (e.g. `just all` / `just debug-info`) and pasted the output below (optional for `npm` package users).
+          required: false
 
   - type: dropdown
     id: severity

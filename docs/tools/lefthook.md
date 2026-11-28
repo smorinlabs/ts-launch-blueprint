@@ -18,7 +18,7 @@ just setup-hooks
 
 ## What runs, and when
 
-### `pre-commit` (parallel jobs, staged files only)
+### `pre-commit` (sequential jobs, staged files only)
 
 - **`format`** — runs `oxfmt` on staged `*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,toml,md}`
   files and re-stages any fixes it makes (`stage_fixed: true`). This one job
