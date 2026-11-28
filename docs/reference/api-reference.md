@@ -23,7 +23,7 @@ For readable output locally, pipe it: `just api | pnpm exec pino-pretty`.
 See [Observability](./observability.md) for the log fields.
 
 A configuration error (a bad `HOST`, `PORT`, `TS_PROJECTS_SOURCE`, `LOG_LEVEL`,
-`CORS_ORIGINS`, `RATE_LIMIT`, `SHUTDOWN_TIMEOUT_MS`, or the `http` source without
+`CORS_ORIGINS`, `RATE_LIMIT`, `TRUST_PROXY`, `SHUTDOWN_TIMEOUT_MS`, or the `http` source without
 a token) stops it at startup, with a plain message on stderr and a non-zero
 exit. A port that is already in use exits 1 with one `CRITICAL` log line.
 
@@ -143,23 +143,24 @@ the server generates a UUID. The same ID is on the request's log lines.
 
 ## Environment Variables
 
-| Variable                             | Effect                                                                               |
-| ------------------------------------ | ------------------------------------------------------------------------------------ |
-| `HOST`                               | Bind address (default `127.0.0.1`; `0.0.0.0` in `apps/api/Dockerfile`)               |
-| `PORT`                               | Port to listen on (default `8080`, Cloud Run's default); an integer from 1 to 65535  |
-| `CORS_ORIGINS`                       | Optional opt-in CORS origins (`*`, comma-separated, or JSON array); off when unset   |
-| `RATE_LIMIT`                         | Optional opt-in rate limit (`<count>/<second\|minute\|hour\|day>`); off when unset   |
-| `SHUTDOWN_TIMEOUT_MS`                | Graceful shutdown timeout in ms (default `10000`, integer `1` to `2147483647`)       |
-| `TS_PROJECTS_SOURCE`                 | `memory` (**default for the API**: demo data, no token) or `http` (the projects API) |
-| `TS_PROJECTS_TOKEN`                  | Required with `TS_PROJECTS_SOURCE=http`; checked at startup                          |
-| `TS_PROJECTS_API_URL`                | Optional API root override for the `http` source                                     |
-| `LOG_LEVEL`                          | `debug`, `info` (default), `warn`, `error` or `silent`                               |
-| `METRICS_ENABLED`                    | `true` (default) or `false`; `false` turns `/metrics` off (404)                      |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`        | Optional; turns tracing on, exporting to `<endpoint>/v1/traces` (OTLP HTTP/JSON)     |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Optional full traces URL; wins over the base endpoint                                |
-| `OTEL_SERVICE_NAME`                  | The traces' `service.name` (default `ts-launch-blueprint-api`)                       |
-| `OTEL_TRACES_SAMPLER_ARG`            | Sampling ratio for new traces, `0` to `1` (default `1`)                              |
-| `GCP_PROJECT_ID`                     | Optional; when set, trace fields use Cloud Logging's full trace name                 |
+| Variable                             | Effect                                                                                    |
+| ------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `HOST`                               | Bind address (default `127.0.0.1`; `0.0.0.0` in `apps/api/Dockerfile`)                    |
+| `PORT`                               | Port to listen on (default `8080`, Cloud Run's default); an integer from 1 to 65535       |
+| `CORS_ORIGINS`                       | Optional opt-in CORS origins (`*`, comma-separated, or JSON array); off when unset        |
+| `RATE_LIMIT`                         | Optional opt-in rate limit (`<count>/<second\|minute\|hour\|day>`); off when unset        |
+| `TRUST_PROXY`                        | Trusted proxy policy for rate-limit IP extraction (`false` default, `true`, or IPs/CIDRs) |
+| `SHUTDOWN_TIMEOUT_MS`                | Graceful shutdown timeout in ms (default `10000`, integer `1` to `2147483647`)            |
+| `TS_PROJECTS_SOURCE`                 | `memory` (**default for the API**: demo data, no token) or `http` (the projects API)      |
+| `TS_PROJECTS_TOKEN`                  | Required with `TS_PROJECTS_SOURCE=http`; checked at startup                               |
+| `TS_PROJECTS_API_URL`                | Optional API root override for the `http` source                                          |
+| `LOG_LEVEL`                          | `debug`, `info` (default), `warn`, `error` or `silent`                                    |
+| `METRICS_ENABLED`                    | `true` (default) or `false`; `false` turns `/metrics` off (404)                           |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`        | Optional; turns tracing on, exporting to `<endpoint>/v1/traces` (OTLP HTTP/JSON)          |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Optional full traces URL; wins over the base endpoint                                     |
+| `OTEL_SERVICE_NAME`                  | The traces' `service.name` (default `ts-launch-blueprint-api`)                            |
+| `OTEL_TRACES_SAMPLER_ARG`            | Sampling ratio for new traces, `0` to `1` (default `1`)                                   |
+| `GCP_PROJECT_ID`                     | Optional; when set, trace fields use Cloud Logging's full trace name                      |
 
 The CLI reads the same `TS_PROJECTS_SOURCE`, but its default is `http`; see
 the [CLI Reference](./cli-reference.md).

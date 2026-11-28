@@ -2,6 +2,8 @@
 // server.ts turns a ConfigError into a non-zero exit at startup. The source
 // parser duplicates the CLI's on purpose: one app never imports another
 // ([app-no-cross-app-import]); if both copies grow, move it into the core.
+import { isIP } from 'node:net';
+
 import { ConfigError } from '@ts-launch-blueprint/core';
 import { z } from 'zod';
 
@@ -21,6 +23,8 @@ export const DEFAULT_PORT = 8080;
 export const CORS_ORIGINS_ENV_VAR = 'CORS_ORIGINS';
 /** Opt-in fixed-window rate limit (`<count>/<second|minute|hour|day>`). */
 export const RATE_LIMIT_ENV_VAR = 'RATE_LIMIT';
+/** Opt-in trusted reverse-proxy policy (`false` default, `true`, or IP/CIDR list). */
+export const TRUST_PROXY_ENV_VAR = 'TRUST_PROXY';
 /** Graceful shutdown timeout in milliseconds. */
 export const SHUTDOWN_TIMEOUT_ENV_VAR = 'SHUTDOWN_TIMEOUT_MS';
 /** Default graceful shutdown timeout in milliseconds. */
@@ -57,6 +61,9 @@ export interface RateLimitConfig {
   unit: 'second' | 'minute' | 'hour' | 'day';
 }
 
+/** Trusted reverse-proxy policy: false (default), true (trust any), or IP/CIDR list. */
+export type TrustProxyConfig = boolean | string[];
+
 /** Tracing settings; `tracesUrl` undefined means tracing is off. */
 export interface TracingConfig {
   tracesUrl: string | undefined;
@@ -74,6 +81,7 @@ interface BaseConfig {
   tracing: TracingConfig;
   corsOrigins: string[];
   rateLimit: RateLimitConfig | undefined;
+  trustProxy: TrustProxyConfig;
   shutdownTimeoutMs: number;
 }
 
@@ -165,6 +173,65 @@ function parseCorsOrigins(value: string | undefined): string[] {
   }
   for (const origin of parsed.data) {
     if (!isValidHttpOrigin(origin)) {
+      throw new ConfigError(invalidMessage);
+    }
+  }
+  return parsed.data;
+}
+
+function isValidIpOrCidr(entry: string): boolean {
+  const parts = entry.split('/');
+  if (parts.length > 2) {
+    return false;
+  }
+  const [address, prefixStr] = parts;
+  const family = isIP(address ?? '');
+  if (family === 0) {
+    return false;
+  }
+  if (prefixStr === undefined) {
+    return true;
+  }
+  if (!/^\d+$/.test(prefixStr)) {
+    return false;
+  }
+  const prefix = Number(prefixStr);
+  const maxPrefix = family === 4 ? 32 : 128;
+  return Number.isInteger(prefix) && prefix >= 0 && prefix <= maxPrefix;
+}
+
+/** Parse `TRUST_PROXY` (`false` default, `true`, or comma/JSON list of IPs/CIDRs). */
+export function parseTrustProxy(value: string | undefined): TrustProxyConfig {
+  if (value === undefined || value.trim() === '') {
+    return false;
+  }
+  const trimmed = value.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === 'false' || lower === '0') {
+    return false;
+  }
+  if (lower === 'true' || lower === '1') {
+    return true;
+  }
+  const invalidMessage = `Invalid ${TRUST_PROXY_ENV_VAR} "${value}": expected "true", "false", or a list of IP/CIDR entries`;
+
+  let rawEntries: unknown;
+  if (trimmed.startsWith('[')) {
+    try {
+      rawEntries = JSON.parse(trimmed);
+    } catch {
+      throw new ConfigError(invalidMessage);
+    }
+  } else {
+    rawEntries = trimmed.split(',').map((item) => item.trim());
+  }
+
+  const parsed = z.array(z.string().trim().min(1)).min(1).safeParse(rawEntries);
+  if (!parsed.success) {
+    throw new ConfigError(invalidMessage);
+  }
+  for (const entry of parsed.data) {
+    if (!isValidIpOrCidr(entry)) {
       throw new ConfigError(invalidMessage);
     }
   }
@@ -277,6 +344,18 @@ const rateLimitSchema = emptyOrString.transform((value, ctx) => {
   }
 });
 
+const trustProxySchema = emptyOrString.transform((value, ctx) => {
+  try {
+    return parseTrustProxy(value);
+  } catch (err) {
+    ctx.addIssue({
+      code: 'custom',
+      message: (err as Error).message,
+    });
+    return z.NEVER;
+  }
+});
+
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
 const shutdownTimeoutMsSchema = emptyOrString.transform((value, ctx) => {
@@ -325,6 +404,7 @@ const ApiEnvSchema = z
     [SAMPLER_ARG_ENV_VAR]: sampleRatioSchema,
     [CORS_ORIGINS_ENV_VAR]: corsOriginsSchema,
     [RATE_LIMIT_ENV_VAR]: rateLimitSchema,
+    [TRUST_PROXY_ENV_VAR]: trustProxySchema,
     [SHUTDOWN_TIMEOUT_ENV_VAR]: shutdownTimeoutMsSchema,
     [SOURCE_ENV_VAR]: sourceSchema,
     [TOKEN_ENV_VAR]: emptyOrString.transform((v) =>
@@ -370,6 +450,7 @@ const ApiEnvSchema = z
       },
       corsOrigins: parsed[CORS_ORIGINS_ENV_VAR],
       rateLimit: parsed[RATE_LIMIT_ENV_VAR],
+      trustProxy: parsed[TRUST_PROXY_ENV_VAR],
       shutdownTimeoutMs: parsed[SHUTDOWN_TIMEOUT_ENV_VAR],
     };
 

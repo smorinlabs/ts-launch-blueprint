@@ -146,15 +146,20 @@ function unwrapNullableSchema(schema: JsonSchemaObject): JsonSchemaObject {
   return schema;
 }
 
-function unionBranchesOf(schema: JsonSchemaObject): JsonSchemaObject[] | null {
-  for (const unionKey of ['anyOf', 'oneOf'] as const) {
+interface UnionInfo {
+  kind: 'anyOf' | 'oneOf';
+  branches: JsonSchemaObject[];
+}
+
+function unionInfoOf(schema: JsonSchemaObject): UnionInfo | null {
+  for (const unionKey of ['oneOf', 'anyOf'] as const) {
     const branches = schema[unionKey];
     if (Array.isArray(branches)) {
       const nonNull = branches.filter(
         (b): b is JsonSchemaObject => isRecord(b) && b['type'] !== 'null'
       );
       if (nonNull.length > 0) {
-        return nonNull;
+        return { kind: unionKey, branches: nonNull };
       }
     }
   }
@@ -163,10 +168,14 @@ function unionBranchesOf(schema: JsonSchemaObject): JsonSchemaObject[] | null {
       (t): t is string => typeof t === 'string' && t !== 'null'
     );
     if (nonNull.length > 1) {
-      return nonNull.map((t) => ({ type: t }));
+      return { kind: 'anyOf', branches: nonNull.map((t) => ({ type: t })) };
     }
   }
   return null;
+}
+
+function unionBranchesOf(schema: JsonSchemaObject): JsonSchemaObject[] | null {
+  return unionInfoOf(schema)?.branches ?? null;
 }
 
 function stringList(value: unknown): string[] {
@@ -353,6 +362,248 @@ function isDivisibleMultiple(dividend: number, divisor: number): boolean {
   return scaledA % scaledB === 0n;
 }
 
+function numericRangesOverlap(
+  aLow: EffectiveBound | undefined,
+  aHigh: EffectiveBound | undefined,
+  bLow: EffectiveBound | undefined,
+  bHigh: EffectiveBound | undefined
+): boolean {
+  const low = isLowerStricter(bLow, aLow) ? bLow : aLow;
+  const high = isUpperStricter(bHigh, aHigh) ? bHigh : aHigh;
+  if (low === undefined || high === undefined) {
+    return true;
+  }
+  if (low.value > high.value) {
+    return false;
+  }
+  return low.value < high.value || (low.inclusive && high.inclusive);
+}
+
+function lengthRangesOverlap(
+  a: JsonSchemaObject,
+  b: JsonSchemaObject,
+  minKey: 'minLength' | 'minItems',
+  maxKey: 'maxLength' | 'maxItems'
+): boolean {
+  const aMin = numberOrUndefined(a[minKey]);
+  const aMax = numberOrUndefined(a[maxKey]);
+  const bMin = numberOrUndefined(b[minKey]);
+  const bMax = numberOrUndefined(b[maxKey]);
+  if (aMin !== undefined && bMax !== undefined && aMin > bMax) {
+    return false;
+  }
+  if (bMin !== undefined && aMax !== undefined && bMin > aMax) {
+    return false;
+  }
+  return true;
+}
+
+function valueMatchesSchema(value: unknown, schemaRaw: JsonSchemaObject): boolean {
+  if (value === null) {
+    return isNullableSchema(schemaRaw);
+  }
+  const schema = unwrapNullableSchema(schemaRaw);
+  const union = unionInfoOf(schema);
+  if (union !== null) {
+    const matches = union.branches.filter((b) => valueMatchesSchema(value, b)).length;
+    return union.kind === 'oneOf' ? matches === 1 : matches >= 1;
+  }
+  if (Object.hasOwn(schema, 'const')) {
+    return deepEqual(value, schema['const']);
+  }
+  if (Array.isArray(schema['enum'])) {
+    return schema['enum'].some((v) => deepEqual(value, v));
+  }
+  const type = schema['type'];
+  if (type === 'string') {
+    if (typeof value !== 'string') {
+      return false;
+    }
+    const minLen = numberOrUndefined(schema['minLength']);
+    const maxLen = numberOrUndefined(schema['maxLength']);
+    if (
+      (minLen !== undefined && value.length < minLen) ||
+      (maxLen !== undefined && value.length > maxLen)
+    ) {
+      return false;
+    }
+    if (typeof schema['pattern'] === 'string') {
+      return new RegExp(schema['pattern']).test(value);
+    }
+    return true;
+  }
+  if (type === 'number' || type === 'integer') {
+    if (typeof value !== 'number' || (type === 'integer' && !Number.isInteger(value))) {
+      return false;
+    }
+    const low = lowerNumericBound(schema, type === 'integer');
+    const high = upperNumericBound(schema, type === 'integer');
+    if (low !== undefined && (value < low.value || (!low.inclusive && value === low.value))) {
+      return false;
+    }
+    if (high !== undefined && (value > high.value || (!high.inclusive && value === high.value))) {
+      return false;
+    }
+    const multiple = positiveMultipleOf(schema);
+    return multiple === undefined || isDivisibleMultiple(value, multiple);
+  }
+  if (type === 'boolean') {
+    return typeof value === 'boolean';
+  }
+  if (type === 'array') {
+    if (!Array.isArray(value)) {
+      return false;
+    }
+    const minItems = numberOrUndefined(schema['minItems']);
+    const maxItems = numberOrUndefined(schema['maxItems']);
+    return !(
+      (minItems !== undefined && value.length < minItems) ||
+      (maxItems !== undefined && value.length > maxItems)
+    );
+  }
+  if (type === 'object') {
+    if (!isRecord(value)) {
+      return false;
+    }
+    const props = propertiesOf(schema);
+    for (const req of stringList(schema['required'])) {
+      if (!Object.hasOwn(value, req)) {
+        return false;
+      }
+    }
+    for (const [key, propVal] of Object.entries(value)) {
+      const propSchema = props[key];
+      if (propSchema !== undefined) {
+        if (!valueMatchesSchema(propVal, propSchema)) {
+          return false;
+        }
+      } else if (schema['additionalProperties'] === false) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return true;
+}
+
+function requiredPropertiesCompatible(
+  reqNames: string[],
+  reqProps: Record<string, JsonSchemaObject>,
+  other: JsonSchemaObject,
+  otherProps: Record<string, JsonSchemaObject>
+): boolean {
+  for (const req of reqNames) {
+    const reqSchema = reqProps[req];
+    const otherSchema = otherProps[req];
+    if (otherSchema !== undefined) {
+      if (reqSchema !== undefined && !schemasCanOverlap(reqSchema, otherSchema)) {
+        return false;
+      }
+    } else if (other['additionalProperties'] === false) {
+      return false;
+    } else if (
+      isRecord(other['additionalProperties']) &&
+      reqSchema !== undefined &&
+      !schemasCanOverlap(reqSchema, other['additionalProperties'])
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Conservative overlap test for two JSON Schemas: returns `false` only when
+ * the two schemas are provably disjoint (no value can match both), and `true`
+ * otherwise. Used to detect breaking overlapping branches in `oneOf` unions.
+ */
+function schemasCanOverlap(aRaw: JsonSchemaObject, bRaw: JsonSchemaObject): boolean {
+  if (aRaw['type'] === 'null') {
+    return isNullableSchema(bRaw);
+  }
+  if (bRaw['type'] === 'null') {
+    return isNullableSchema(aRaw);
+  }
+  if (isNullableSchema(aRaw) && isNullableSchema(bRaw)) {
+    return true;
+  }
+  const a = unwrapNullableSchema(aRaw);
+  const b = unwrapNullableSchema(bRaw);
+
+  const aBranches = unionBranchesOf(a);
+  const bBranches = unionBranchesOf(b);
+  if (aBranches !== null || bBranches !== null) {
+    const aList = aBranches ?? [a];
+    const bList = bBranches ?? [b];
+    return aList.some((ab) => bList.some((bb) => schemasCanOverlap(ab, bb)));
+  }
+
+  if (Object.hasOwn(a, 'const')) {
+    return valueMatchesSchema(a['const'], b);
+  }
+  if (Object.hasOwn(b, 'const')) {
+    return valueMatchesSchema(b['const'], a);
+  }
+  if (Array.isArray(a['enum'])) {
+    return a['enum'].some((v) => valueMatchesSchema(v, b));
+  }
+  if (Array.isArray(b['enum'])) {
+    return b['enum'].some((v) => valueMatchesSchema(v, a));
+  }
+
+  const aType = typeof a['type'] === 'string' ? a['type'] : undefined;
+  const bType = typeof b['type'] === 'string' ? b['type'] : undefined;
+  if (aType !== undefined && bType !== undefined && aType !== bType) {
+    const bothNumeric =
+      (aType === 'integer' && bType === 'number') || (aType === 'number' && bType === 'integer');
+    if (!bothNumeric) {
+      return false;
+    }
+  }
+
+  if ((aType === 'number' || aType === 'integer') && (bType === 'number' || bType === 'integer')) {
+    const normalizeInt = aType === 'integer' || bType === 'integer';
+    return numericRangesOverlap(
+      lowerNumericBound(a, normalizeInt),
+      upperNumericBound(a, normalizeInt),
+      lowerNumericBound(b, normalizeInt),
+      upperNumericBound(b, normalizeInt)
+    );
+  }
+
+  if (aType === 'string' && bType === 'string') {
+    return lengthRangesOverlap(a, b, 'minLength', 'maxLength');
+  }
+
+  if (aType === 'array' && bType === 'array') {
+    if (!lengthRangesOverlap(a, b, 'minItems', 'maxItems')) {
+      return false;
+    }
+    const aPrefix = Array.isArray(a['prefixItems']) ? a['prefixItems'].filter(isRecord) : null;
+    const bPrefix = Array.isArray(b['prefixItems']) ? b['prefixItems'].filter(isRecord) : null;
+    if (aPrefix !== null && bPrefix !== null) {
+      const shared = Math.min(aPrefix.length, bPrefix.length);
+      for (let i = 0; i < shared; i += 1) {
+        if (!schemasCanOverlap(aPrefix[i]!, bPrefix[i]!)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  if (aType === 'object' && bType === 'object') {
+    const aProps = propertiesOf(a);
+    const bProps = propertiesOf(b);
+    return (
+      requiredPropertiesCompatible(stringList(a['required']), aProps, b, bProps) &&
+      requiredPropertiesCompatible(stringList(b['required']), bProps, a, aProps)
+    );
+  }
+
+  return true;
+}
+
 function compareInputSchema(
   procedure: string,
   path: string,
@@ -361,6 +612,9 @@ function compareInputSchema(
   breaking: BreakingChange[],
   nonBreaking: string[]
 ): void {
+  if (deepEqual(baseRaw, headRaw)) {
+    return;
+  }
   if (baseRaw['type'] === 'null') {
     if (isNullableSchema(headRaw)) {
       if (headRaw['type'] !== 'null') {
@@ -381,24 +635,52 @@ function compareInputSchema(
   const base = unwrapNullableSchema(baseRaw);
   const head = unwrapNullableSchema(headRaw);
 
-  const baseBranches = unionBranchesOf(base);
-  const headBranches = unionBranchesOf(head);
-  if (baseBranches !== null || headBranches !== null) {
-    const bList = baseBranches ?? [base];
-    const hList = headBranches ?? [head];
-    const allBaseAccepted = bList.every((bBranch) =>
-      hList.some((hBranch) => {
-        const probeBreaking: BreakingChange[] = [];
-        compareInputSchema(procedure, path, bBranch, hBranch, probeBreaking, []);
-        return probeBreaking.length === 0;
-      })
+  const baseUnion = unionInfoOf(base);
+  const headUnion = unionInfoOf(head);
+  if (baseUnion !== null || headUnion !== null) {
+    const bList = baseUnion?.branches ?? [base];
+    const hList = headUnion?.branches ?? [head];
+    const isSubSchema = (sub: JsonSchemaObject, sup: JsonSchemaObject): boolean => {
+      const probeBreaking: BreakingChange[] = [];
+      compareInputSchema(procedure, path, sub, sup, probeBreaking, []);
+      return probeBreaking.length === 0;
+    };
+    const matchedHeadIndices = bList.map((bBranch) =>
+      hList.findIndex((hBranch) => isSubSchema(bBranch, hBranch))
     );
+    const allBaseAccepted = matchedHeadIndices.every((idx) => idx !== -1);
     if (!allBaseAccepted) {
       breaking.push({
         procedure,
         path,
         reason: 'Input union narrowed or branch became incompatible',
       });
+    } else if (headUnion?.kind === 'oneOf') {
+      const hasNewOverlap = bList.some((bBranch, bIdx) => {
+        const matchIdx = matchedHeadIndices[bIdx]!;
+        return hList.some((hOther, hIdx) => {
+          if (hIdx === matchIdx || !schemasCanOverlap(bBranch, hOther)) {
+            return false;
+          }
+          if (
+            baseUnion?.kind === 'oneOf' &&
+            bList.some((bOther, bOtherIdx) => bOtherIdx !== bIdx && isSubSchema(hOther, bOther))
+          ) {
+            return false;
+          }
+          return true;
+        });
+      });
+      if (hasNewOverlap) {
+        breaking.push({
+          procedure,
+          path,
+          reason:
+            'Input oneOf union has overlapping branch that rejects previously accepted values',
+        });
+      } else if (hList.length > bList.length) {
+        nonBreaking.push(`${procedure} ${path}: input union widened`);
+      }
     } else if (hList.length > bList.length) {
       nonBreaking.push(`${procedure} ${path}: input union widened`);
     }

@@ -16,7 +16,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 
-import type { RateLimitConfig } from './config.js';
+import type { RateLimitConfig, TrustProxyConfig } from './config.js';
 import { INTERNAL_ERROR_MESSAGE } from './errors.js';
 import { idempotency, type IdempotencyOptions } from './idempotency.js';
 import type { Logger } from './logger.js';
@@ -44,6 +44,7 @@ export function createApp(deps: {
   tracing?: Tracing | undefined;
   corsOrigins?: readonly string[] | undefined;
   rateLimit?: RateLimitConfig | undefined;
+  trustProxy?: TrustProxyConfig | undefined;
   checkReadiness?: (() => Promise<ReadinessCheck[]> | ReadinessCheck[]) | undefined;
   version?: string | undefined;
   idempotency?: IdempotencyOptions | undefined;
@@ -91,7 +92,7 @@ export function createApp(deps: {
 
   // 6. Opt-in rate limiting (only mounted when RATE_LIMIT is configured).
   if (deps.rateLimit !== undefined) {
-    app.use('*', rateLimit(deps.rateLimit));
+    app.use('*', rateLimit({ ...deps.rateLimit, trustProxy: deps.trustProxy }));
   }
 
   // Scrape endpoint registered after global CORS/rate-limit middleware.
