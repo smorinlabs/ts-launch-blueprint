@@ -1,15 +1,18 @@
-// Ports tests/test_config.py intent (D-019(5)): hermetic via injected
-// env + fs.mkdtemp temp dirs — no process.env mutation, no real HOME.
-// Source cases mapped:
-//   test_config_from_env       -> 'env-only token works'
-//   test_config_from_env_file  -> 'file-only token works'
-//   test_config_precedence     -> precedence block (env>file, flag>env)
-//   test_invalid_config_file   -> 'missing everywhere -> AuthError...'
-// New behaviors per D-017: TOML/zod message quality, --config exists
-// check, 0600 write mode, loose-permission warning, XDG resolution.
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+// Tests for env/flag-only tokens (ADR 0002), 3-layer TOML config discovery & degradation (ADR 0004),
+// atomic temp+fsync+rename writes, corrupt-file write refusal, and typed M3 config helpers (P11-TS03).
+// cspell:ignore gettable bcde
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, win32 } from 'node:path';
 
 import {
   AuthError,
@@ -22,12 +25,26 @@ import {
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  allowedConfigValues,
+  coerceConfigValue,
   CONFIG_FILE_NAME,
+  CONFIG_PATH_ENV_VAR,
+  type ConfigFs,
   defaultConfigPath,
+  getConfigFileValue,
+  gettableKeys,
+  initConfigValues,
+  maskToken,
+  missingTokenMessage,
+  parseConfigKey,
+  readConfigForWrite,
   redactToken,
   requireToken,
   resolveConfig,
+  setConfigValue,
   TOKEN_ENV_VAR,
+  writableKeys,
+  writeConfigData,
   writeUserConfig,
 } from '../src/cli/config.js';
 import { CliError, EXIT_CODES, exitCodeFor, UsageError } from '../src/cli/exit-codes.js';
@@ -47,7 +64,7 @@ afterEach(() => {
   }
 });
 
-/** Write a config file under <home>/.config/ts-projects and return home. */
+/** Write a user config file under <home>/.config/ts-projects and return home + path. */
 function makeHomeWithConfig(contents: string, mode = 0o600): { home: string; path: string } {
   const home = makeTempDir();
   const dir = join(home, '.config', 'ts-projects');
@@ -58,34 +75,22 @@ function makeHomeWithConfig(contents: string, mode = 0o600): { home: string; pat
   return { home, path };
 }
 
-function baseOptions(home: string, env: Record<string, string | undefined> = {}) {
-  return { env, homedir: () => home };
+function baseOptions(
+  home: string,
+  env: Record<string, string | undefined> = {},
+  cwd?: () => string
+) {
+  return {
+    env,
+    homedir: () => home,
+    cwd: cwd ?? (() => join(home, 'no-project-here')),
+    platform: 'linux' as const,
+  };
 }
 
-describe('resolveConfig precedence (test_config_precedence port)', () => {
-  it('env-only token works (test_config_from_env port)', () => {
+describe('token resolution — env/flag only (ADR 0002)', () => {
+  it('CFG-01: flag --token beats TS_PROJECTS_TOKEN env', () => {
     const home = makeTempDir();
-    const config = resolveConfig(baseOptions(home, { [TOKEN_ENV_VAR]: 'env_token' }));
-    expect(config.token).toBe('env_token');
-    expect(config.tokenSource).toBe('env');
-  });
-
-  it('file-only token works (test_config_from_env_file port)', () => {
-    const { home } = makeHomeWithConfig('token = "file_token"\n');
-    const config = resolveConfig(baseOptions(home));
-    expect(config.token).toBe('file_token');
-    expect(config.tokenSource).toBe('file');
-  });
-
-  it('env beats file', () => {
-    const { home } = makeHomeWithConfig('token = "file_token"\n');
-    const config = resolveConfig(baseOptions(home, { [TOKEN_ENV_VAR]: 'env_token' }));
-    expect(config.token).toBe('env_token');
-    expect(config.tokenSource).toBe('env');
-  });
-
-  it('flag beats env and file', () => {
-    const { home } = makeHomeWithConfig('token = "file_token"\n');
     const config = resolveConfig({
       ...baseOptions(home, { [TOKEN_ENV_VAR]: 'env_token' }),
       flagToken: 'flag_token',
@@ -94,41 +99,55 @@ describe('resolveConfig precedence (test_config_precedence port)', () => {
     expect(config.tokenSource).toBe('flag');
   });
 
-  it('flag alone works (fixes the documented source quirk)', () => {
-    // In the Python source, --token alone failed because Config.from_env
-    // raised before main() applied the flag; the port validates after
-    // all layers merge (INDEX-mandated documented behavior).
+  it('CFG-02: env TS_PROJECTS_TOKEN works and empty string flag/env is treated as unset', () => {
+    const home = makeTempDir();
+    const envOnly = resolveConfig(baseOptions(home, { [TOKEN_ENV_VAR]: 'env_token' }));
+    expect(envOnly.token).toBe('env_token');
+    expect(envOnly.tokenSource).toBe('env');
+
+    const emptyFlag = resolveConfig({
+      ...baseOptions(home, { [TOKEN_ENV_VAR]: 'env_token' }),
+      flagToken: '',
+    });
+    expect(emptyFlag.token).toBe('env_token');
+    expect(emptyFlag.tokenSource).toBe('env');
+
+    const emptyEnv = resolveConfig(baseOptions(home, { [TOKEN_ENV_VAR]: '' }));
+    expect(emptyEnv.token).toBeUndefined();
+    expect(emptyEnv.tokenSource).toBe('none');
+  });
+
+  it('CFG-03: TOML token is silently ignored in discovered and explicit config (no loose-perm warning)', () => {
+    const { home } = makeHomeWithConfig('token = "file_token"\n', 0o644);
+    const warnings: string[] = [];
+    const discovered = resolveConfig({
+      ...baseOptions(home),
+      warn: (message) => warnings.push(message),
+    });
+    expect(discovered.token).toBeUndefined();
+    expect(discovered.tokenSource).toBe('none');
+    expect(warnings).toEqual([]);
+    expect(discovered.warnings).toEqual([]);
+
+    const explicit = join(makeTempDir(), 'explicit.toml');
+    writeFileSync(explicit, 'token = "explicit_token"\n', { mode: 0o644 });
+    const explicitConfig = resolveConfig({
+      ...baseOptions(home),
+      configPathFlag: explicit,
+      warn: (message) => warnings.push(message),
+    });
+    expect(explicitConfig.token).toBeUndefined();
+    expect(explicitConfig.tokenSource).toBe('none');
+    expect(warnings).toEqual([]);
+  });
+
+  it('flag alone works via requireToken', () => {
     const home = makeTempDir();
     const config = resolveConfig({ ...baseOptions(home), flagToken: 'flag_token' });
     expect(requireToken(config, {}, () => home)).toBe('flag_token');
   });
 
-  it('empty-string env token is treated as unset (Python falsy parity)', () => {
-    const { home } = makeHomeWithConfig('token = "file_token"\n');
-    const config = resolveConfig(baseOptions(home, { [TOKEN_ENV_VAR]: '' }));
-    expect(config.token).toBe('file_token');
-    expect(config.tokenSource).toBe('file');
-  });
-
-  it('reads workspace and limit from the file', () => {
-    const { home, path } = makeHomeWithConfig('token = "t"\nworkspace = "Acme"\nlimit = 50\n');
-    const config = resolveConfig(baseOptions(home));
-    expect(config.workspace).toBe('Acme');
-    expect(config.limit).toBe(50);
-    expect(config.configPath).toBe(path);
-  });
-
-  it('resolves token source none when nothing is set', () => {
-    const home = makeTempDir();
-    const config = resolveConfig(baseOptions(home));
-    expect(config.token).toBeUndefined();
-    expect(config.tokenSource).toBe('none');
-    expect(config.configPath).toBeUndefined();
-  });
-});
-
-describe('missing token (test_invalid_config_file port)', () => {
-  it('missing everywhere -> AuthError with the three-remedy message', () => {
+  it('CFG-04: missing token -> AuthError with 2 remedies and ts-projects doctor hint', () => {
     const home = makeTempDir();
     const config = resolveConfig(baseOptions(home));
     let caught: unknown;
@@ -138,210 +157,708 @@ describe('missing token (test_invalid_config_file port)', () => {
       caught = err;
     }
     expect(caught).toBeInstanceOf(AuthError);
-    const message = (caught as AuthError).message;
-    // Source parity: "No PY_TOKEN found" -> "No TS_PROJECTS_TOKEN found".
-    expect(message).toMatch(/No TS_PROJECTS_TOKEN found/);
-    expect(message).toContain('three options');
-    expect(message).toContain('--token');
-    expect(message).toContain(`export ${TOKEN_ENV_VAR}=`);
-    expect(message).toContain(CONFIG_FILE_NAME);
-    expect(message).toContain('chmod 600');
-    expect(message).toContain('Windows note');
-    // Exit 4 (auth) per D-016(2); the source exited 1.
+    const authErr = caught as AuthError;
+    expect(authErr.code).toBe(ERROR_CODES.auth);
+    expect(authErr.message).toContain('never stored in the config file');
+    expect(authErr.message).toContain('--token');
+    expect(authErr.message).toContain(`export ${TOKEN_ENV_VAR}=`);
+    expect(authErr.message).toContain('ts-projects doctor');
+    expect(authErr.message).not.toContain('three options');
+    expect(authErr.message).not.toContain(CONFIG_FILE_NAME);
+    expect(authErr.message).not.toContain('chmod 600');
+    expect(authErr.hint).toContain('--token');
+    expect(authErr.hint).toContain(TOKEN_ENV_VAR);
+    expect(authErr.hint).toContain('ts-projects doctor');
     expect(exitCodeFor(caught)).toBe(4);
+    expect(missingTokenMessage({}, () => home)).toBe(authErr.message);
+  });
+
+  it('CFG-05: maskToken and redactToken mask <=4 chars as **** and >4 chars as ****XXXX', () => {
+    expect(maskToken('')).toBe('****');
+    expect(maskToken('t')).toBe('****');
+    expect(maskToken('abcd')).toBe('****');
+    expect(maskToken('abcde')).toBe('****bcde');
+    expect(maskToken('supersecret1234')).toBe('****1234');
+    expect(redactToken('short')).toBe('****hort');
+    expect(redactToken('abcd')).toBe('****');
   });
 });
 
-describe('--config handling (click.Path(exists=True) parity)', () => {
-  it('nonexistent --config path -> UsageError (exit 2)', () => {
+describe('schema, 3-layer discovery & warning degradation (ADR 0004)', () => {
+  it('CFG-06: defaults when no config file exists', () => {
     const home = makeTempDir();
-    let caught: unknown;
-    try {
-      resolveConfig({ ...baseOptions(home), configPathFlag: join(home, 'missing.toml') });
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(UsageError);
-    expect((caught as UsageError).message).toContain('missing.toml');
-    expect(exitCodeFor(caught)).toBe(2);
+    const config = resolveConfig(baseOptions(home));
+    expect(config.settings).toEqual({
+      output: { format: 'text', color: 'auto' },
+      logging: { level: 'warning', file: '', file_level: 'debug', format: 'text' },
+    });
+    expect(config.setFields.size).toBe(0);
+    expect(config.loadedPaths).toEqual([]);
+    expect(config.configPath).toBeUndefined();
+    expect(config.targetPath).toBe(defaultConfigPath({}, () => home, 'linux'));
+    expect(config.warnings).toEqual([]);
   });
 
-  it('--config replaces discovery (cli-standards R5.4)', () => {
-    const { home } = makeHomeWithConfig('token = "discovered"\nworkspace = "Home"\n');
-    const explicit = join(makeTempDir(), 'other.toml');
-    writeFileSync(explicit, 'token = "explicit"\n', { mode: 0o600 });
-    const config = resolveConfig({ ...baseOptions(home), configPathFlag: explicit });
-    expect(config.token).toBe('explicit');
-    // Discovered values must NOT merge in (replace, not merge).
-    expect(config.workspace).toBeUndefined();
-    expect(config.configPath).toBe(explicit);
-  });
-});
-
-describe('config file quality errors', () => {
-  it('malformed TOML -> ConfigError naming the file and parse problem', () => {
-    const { home, path } = makeHomeWithConfig('token = not-valid-toml\n');
-    let caught: unknown;
-    try {
-      resolveConfig(baseOptions(home));
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(ConfigError);
-    expect(caught).toBeInstanceOf(DomainError);
-    expect(caught).not.toHaveProperty('exitCode');
-    expect((caught as ConfigError).code).toBe(ERROR_CODES.config);
-    const message = (caught as ConfigError).message;
-    expect(message).toContain('Invalid TOML');
-    expect(message).toContain(path);
-    expect(exitCodeFor(caught)).toBe(1);
-  });
-
-  it('zod rejection -> ConfigError naming the offending key', () => {
-    const { home, path } = makeHomeWithConfig('token = "t"\nlimit = "not-a-number"\n');
-    let caught: unknown;
-    try {
-      resolveConfig(baseOptions(home));
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(ConfigError);
-    expect(caught).toBeInstanceOf(DomainError);
-    expect(caught).not.toHaveProperty('exitCode');
-    expect((caught as ConfigError).code).toBe(ERROR_CODES.config);
-    const message = (caught as ConfigError).message;
-    expect(message).toContain(path);
-    expect(message).toContain('limit');
-    expect(exitCodeFor(caught)).toBe(1);
+  it('CFG-07: parses [output], [logging], and compat workspace/limit with setFields tracking', () => {
+    const { home, path } = makeHomeWithConfig(
+      [
+        'workspace = "Acme"',
+        'limit = 50',
+        '',
+        '[output]',
+        'format = "markdown"',
+        'color = "always"',
+        '',
+        '[logging]',
+        'level = "info"',
+        'file = "/tmp/app.log"',
+        'file_level = "error"',
+        'format = "json"',
+        '',
+      ].join('\n')
+    );
+    const config = resolveConfig(baseOptions(home));
+    expect(config.workspace).toBe('Acme');
+    expect(config.limit).toBe(50);
+    expect(config.configPath).toBe(path);
+    expect(config.loadedPaths).toEqual([path]);
+    expect(config.settings).toEqual({
+      output: { format: 'markdown', color: 'always' },
+      logging: { level: 'info', file: '/tmp/app.log', file_level: 'error', format: 'json' },
+    });
+    const setFieldsList = [...config.setFields];
+    setFieldsList.sort();
+    expect(setFieldsList).toEqual([
+      'logging.file',
+      'logging.file_level',
+      'logging.format',
+      'logging.level',
+      'output.color',
+      'output.format',
+    ]);
   });
 
-  it('unreadable config file -> ConfigError (not a crash)', () => {
-    const { home, path } = makeHomeWithConfig('token = "t"\n');
-    const fakeFs = {
-      existsSync: () => true,
-      readFileSync: (): string => {
+  it('CFG-08: unknown sections/keys and non-object sections are ignored without warnings', () => {
+    const { home } = makeHomeWithConfig(
+      ['output = "not-a-table"', 'unknown_top = 123', '', '[extra]', 'foo = "bar"', ''].join('\n')
+    );
+    const warnings: string[] = [];
+    const config = resolveConfig({
+      ...baseOptions(home),
+      warn: (msg) => warnings.push(msg),
+    });
+    expect(config.settings).toEqual({
+      output: { format: 'text', color: 'auto' },
+      logging: { level: 'warning', file: '', file_level: 'debug', format: 'text' },
+    });
+    expect(warnings).toEqual([]);
+    expect(config.warnings).toEqual([]);
+  });
+
+  it('CFG-09: 3-layer precedence system (reversed XDG_CONFIG_DIRS) -> user -> project (dotfile wins)', () => {
+    const root = makeTempDir();
+    const sys1 = join(root, 'sys1');
+    const sys2 = join(root, 'sys2');
+    const home = join(root, 'home');
+    const project = join(root, 'project');
+    mkdirSync(join(sys1, 'ts-projects'), { recursive: true });
+    mkdirSync(join(sys2, 'ts-projects'), { recursive: true });
+    mkdirSync(join(home, '.config', 'ts-projects'), { recursive: true });
+    mkdirSync(project, { recursive: true });
+
+    const sys2Path = join(sys2, 'ts-projects', CONFIG_FILE_NAME);
+    const sys1Path = join(sys1, 'ts-projects', CONFIG_FILE_NAME);
+    const userPath = join(home, '.config', 'ts-projects', CONFIG_FILE_NAME);
+    const nonDotProject = join(project, CONFIG_FILE_NAME);
+    const dotProject = join(project, `.${CONFIG_FILE_NAME}`);
+
+    // sys2 (lowest) sets format, color, level, file_level
+    writeFileSync(
+      sys2Path,
+      '[output]\nformat = "csv"\ncolor = "never"\n[logging]\nlevel = "error"\nfile_level = "critical"\n'
+    );
+    // sys1 (higher system) overrides output.format and logging.level
+    writeFileSync(sys1Path, '[output]\nformat = "json"\n[logging]\nlevel = "info"\n');
+    // user overrides output.color
+    writeFileSync(userPath, '[output]\ncolor = "always"\n');
+    // both project files exist -> dotfile wins and overrides logging.level
+    writeFileSync(nonDotProject, '[logging]\nlevel = "debug"\n');
+    writeFileSync(dotProject, '[logging]\nlevel = "warning"\n');
+
+    const config = resolveConfig({
+      env: { XDG_CONFIG_DIRS: `${sys1}:${sys2}` },
+      homedir: () => home,
+      cwd: () => project,
+      platform: 'linux',
+    });
+
+    expect(config.loadedPaths).toEqual([sys2Path, sys1Path, userPath, dotProject]);
+    expect(config.configPath).toBe(dotProject);
+    expect(config.targetPath).toBe(userPath);
+    expect(config.settings.output).toEqual({ format: 'json', color: 'always' });
+    expect(config.settings.logging).toEqual({
+      level: 'warning',
+      file: '',
+      file_level: 'critical',
+      format: 'text',
+    });
+  });
+
+  it('CFG-10: invalid setting value drops only offending key, preserves siblings, and warns', () => {
+    const { home } = makeHomeWithConfig(
+      [
+        '[output]',
+        'color = "yes"',
+        'format = "json"',
+        '',
+        '[logging]',
+        'file = 123',
+        'level = "debug"',
+        '',
+      ].join('\n')
+    );
+    const warnings: string[] = [];
+    const config = resolveConfig({
+      ...baseOptions(home),
+      warn: (msg) => warnings.push(msg),
+    });
+
+    expect(config.settings.output).toEqual({ format: 'json', color: 'auto' });
+    expect(config.settings.logging).toEqual({
+      level: 'debug',
+      file: '',
+      file_level: 'debug',
+      format: 'text',
+    });
+    expect(config.setFields.has('output.format')).toBe(true);
+    expect(config.setFields.has('logging.level')).toBe(true);
+    expect(config.setFields.has('output.color')).toBe(false);
+    expect(config.setFields.has('logging.file')).toBe(false);
+
+    expect(warnings).toHaveLength(2);
+    expect(config.warnings).toEqual(warnings);
+    expect(warnings[0]).toContain('ignoring invalid config value output.color = "yes"');
+    expect(warnings[0]).toContain('allowed: auto, always, never');
+    expect(warnings[1]).toBe('ignoring invalid config value logging.file = 123');
+  });
+
+  it('CFG-11: corrupt or unreadable discovered layer degrades to warning while valid layers survive', () => {
+    const root = makeTempDir();
+    const sysDir = join(root, 'sys');
+    const home = join(root, 'home');
+    const project = join(root, 'project');
+    mkdirSync(join(sysDir, 'ts-projects'), { recursive: true });
+    mkdirSync(join(home, '.config', 'ts-projects'), { recursive: true });
+    mkdirSync(project, { recursive: true });
+
+    const sysPath = join(sysDir, 'ts-projects', CONFIG_FILE_NAME);
+    const userPath = join(home, '.config', 'ts-projects', CONFIG_FILE_NAME);
+    const projPath = join(project, CONFIG_FILE_NAME);
+
+    writeFileSync(sysPath, '[output]\nformat = "csv"\n');
+    writeFileSync(userPath, '[output\nbroken = toml\n');
+    writeFileSync(projPath, '[logging]\nformat = "json"\n');
+
+    const warnings: string[] = [];
+    const config = resolveConfig({
+      env: { XDG_CONFIG_DIRS: sysDir },
+      homedir: () => home,
+      cwd: () => project,
+      platform: 'linux',
+      warn: (msg) => warnings.push(msg),
+    });
+
+    expect(config.settings.output.format).toBe('csv');
+    expect(config.settings.logging.format).toBe('json');
+    expect(config.loadedPaths).toEqual([sysPath, userPath, projPath]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(`ignoring unreadable config file ${userPath}`);
+
+    // Unreadable discovered file via fs.readFileSync error also degrades
+    const fakeFs: ConfigFs = {
+      existsSync: (p) => p === userPath,
+      readFileSync: () => {
         throw new Error('EACCES: permission denied');
       },
       statSync,
       mkdirSync: () => undefined,
       writeFileSync: () => undefined,
       chmodSync: () => undefined,
+      openSync: () => 1,
+      writeSync: () => 0,
+      fsyncSync: () => undefined,
+      closeSync: () => undefined,
+      renameSync: () => undefined,
+      unlinkSync: () => undefined,
     };
-    let caught: unknown;
+    const unreadable = resolveConfig({
+      ...baseOptions(home),
+      fs: fakeFs,
+    });
+    expect(unreadable.warnings).toHaveLength(1);
+    expect(unreadable.warnings[0]).toContain(`ignoring unreadable config file ${userPath}`);
+    expect(unreadable.warnings[0]).toContain('EACCES');
+  });
+});
+
+describe('explicit --config / TS_PROJECTS_CONFIG override (ADR 0004)', () => {
+  it('CFG-12: missing explicit --config is tolerated with empty warnings and loadedPaths', () => {
+    const { home } = makeHomeWithConfig('[output]\nformat = "json"\n');
+    const explicit = join(home, 'missing.toml');
+    const config = resolveConfig({
+      ...baseOptions(home),
+      configPathFlag: explicit,
+    });
+    expect(config.targetPath).toBe(explicit);
+    expect(config.loadedPaths).toEqual([]);
+    expect(config.configPath).toBeUndefined();
+    expect(config.warnings).toEqual([]);
+    // Discovery did NOT run:
+    expect(config.settings.output.format).toBe('text');
+  });
+
+  it('TS_PROJECTS_CONFIG env replaces discovery; empty string falls back to discovery', () => {
+    const { home, path: userPath } = makeHomeWithConfig('[output]\nformat = "json"\n');
+    const explicit = join(makeTempDir(), 'env-override.toml');
+    writeFileSync(explicit, '[output]\nformat = "csv"\n');
+
+    const overridden = resolveConfig(baseOptions(home, { [CONFIG_PATH_ENV_VAR]: explicit }));
+    expect(overridden.targetPath).toBe(explicit);
+    expect(overridden.loadedPaths).toEqual([explicit]);
+    expect(overridden.settings.output.format).toBe('csv');
+
+    const emptyEnv = resolveConfig(baseOptions(home, { [CONFIG_PATH_ENV_VAR]: '' }));
+    expect(emptyEnv.targetPath).toBe(userPath);
+    expect(emptyEnv.settings.output.format).toBe('json');
+  });
+
+  it('CFG-13: invalid TOML or unreadable explicit --config throws ConfigError (TS001)', () => {
+    const home = makeTempDir();
+    const explicit = join(home, 'bad.toml');
+    writeFileSync(explicit, 'output = [broken\n');
+
+    let caughtInvalid: unknown;
     try {
-      resolveConfig({ ...baseOptions(home), fs: fakeFs });
+      resolveConfig({ ...baseOptions(home), configPathFlag: explicit });
     } catch (err) {
-      caught = err;
+      caughtInvalid = err;
     }
-    expect(caught).toBeInstanceOf(ConfigError);
-    expect((caught as ConfigError).message).toContain('Could not read config file');
-    expect((caught as ConfigError).message).toContain(path);
+    expect(caughtInvalid).toBeInstanceOf(ConfigError);
+    expect(caughtInvalid).toBeInstanceOf(DomainError);
+    expect((caughtInvalid as ConfigError).code).toBe(ERROR_CODES.config);
+    expect((caughtInvalid as ConfigError).message).toContain('invalid TOML in config file');
+    expect((caughtInvalid as ConfigError).message).toContain(explicit);
+    expect(exitCodeFor(caughtInvalid)).toBe(1);
+
+    const fakeFs: ConfigFs = {
+      existsSync: (p) => p === explicit,
+      readFileSync: () => {
+        throw new Error('EACCES: permission denied');
+      },
+      statSync,
+      mkdirSync: () => undefined,
+      writeFileSync: () => undefined,
+      chmodSync: () => undefined,
+      openSync: () => 1,
+      writeSync: () => 0,
+      fsyncSync: () => undefined,
+      closeSync: () => undefined,
+      renameSync: () => undefined,
+      unlinkSync: () => undefined,
+    };
+
+    let caughtUnreadable: unknown;
+    try {
+      resolveConfig({ ...baseOptions(home), configPathFlag: explicit, fs: fakeFs });
+    } catch (err) {
+      caughtUnreadable = err;
+    }
+    expect(caughtUnreadable).toBeInstanceOf(ConfigError);
+    expect((caughtUnreadable as ConfigError).message).toContain('cannot read config file');
+    expect((caughtUnreadable as ConfigError).message).toContain(explicit);
   });
 });
 
-describe.skipIf(process.platform === 'win32')('POSIX permissions (D-017(6))', () => {
-  it('writeUserConfig creates the file with mode 0600', () => {
-    const home = makeTempDir();
-    const path = writeUserConfig({ token: 'secret' }, baseOptions(home));
-    expect(path).toBe(defaultConfigPath({}, () => home));
-    expect(statSync(path).mode & 0o777).toBe(0o600);
-    const config = resolveConfig(baseOptions(home));
-    expect(config.token).toBe('secret');
+describe('typed config key/value helpers and atomic writes', () => {
+  it('CFG-14: writableKeys, gettableKeys, parseConfigKey, coerceConfigValue, allowedConfigValues', () => {
+    expect(writableKeys()).toEqual([
+      'logging.file',
+      'logging.file_level',
+      'logging.format',
+      'logging.level',
+      'output.color',
+      'output.format',
+    ]);
+    expect(gettableKeys()).toEqual([
+      'logging.file',
+      'logging.file_level',
+      'logging.format',
+      'logging.level',
+      'output.color',
+      'output.format',
+      'token',
+    ]);
+
+    expect(parseConfigKey('output.color')).toEqual({ section: 'output', key: 'color' });
+    expect(() => parseConfigKey('token')).toThrow(ConfigError);
+    expect(() => parseConfigKey('token')).toThrow(/unknown config key 'token'/);
+    expect(() => parseConfigKey('logging.nope')).toThrow(ConfigError);
+    expect(() => parseConfigKey('a.b.c')).toThrow(ConfigError);
+
+    expect(allowedConfigValues('output', 'format')).toEqual(['text', 'json', 'csv', 'markdown']);
+    expect(allowedConfigValues('output', 'color')).toEqual(['auto', 'always', 'never']);
+    expect(allowedConfigValues('logging', 'level')).toEqual([
+      'debug',
+      'info',
+      'warning',
+      'error',
+      'critical',
+    ]);
+    expect(allowedConfigValues('logging', 'format')).toEqual(['text', 'json']);
+    expect(allowedConfigValues('logging', 'file')).toBeUndefined();
+
+    expect(coerceConfigValue('output', 'color', 'always')).toBe('always');
+    expect(coerceConfigValue('logging', 'file', '')).toBe('');
+    expect(coerceConfigValue('logging', 'file', '123')).toBe('123');
+    // Case-sensitive and no trimming
+    expect(() => coerceConfigValue('output', 'color', 'ALWAYS')).toThrow(ConfigError);
+    expect(() => coerceConfigValue('output', 'color', ' always ')).toThrow(ConfigError);
+    expect(() => coerceConfigValue('output', 'color', 'rainbow')).toThrow(
+      /invalid value for output\.color: 'rainbow' \(allowed: auto, always, never\)/
+    );
   });
 
-  it('rewriting an existing config restores mode 0600', () => {
-    const home = makeTempDir();
-    const path = writeUserConfig({ token: 'one' }, baseOptions(home));
-    chmodSync(path, 0o644);
-    writeUserConfig({ token: 'two' }, baseOptions(home));
-    expect(statSync(path).mode & 0o777).toBe(0o600);
-  });
+  it('CFG-15: setConfigValue writes nested tables, preserves siblings, and getConfigFileValue reads back', () => {
+    const dir = makeTempDir();
+    const target = join(dir, 'nested', CONFIG_FILE_NAME);
 
-  it('loose permissions on a token-bearing config -> non-fatal warning', () => {
-    const { home, path } = makeHomeWithConfig('token = "t"\n', 0o644);
-    const warnings: string[] = [];
-    const config = resolveConfig({
-      ...baseOptions(home),
-      warn: (message) => warnings.push(message),
+    expect(setConfigValue(target, 'output.format', 'csv')).toBe('csv');
+    expect(setConfigValue(target, 'output.color', 'never')).toBe('never');
+    expect(setConfigValue(target, 'logging.level', 'info')).toBe('info');
+    expect(setConfigValue(target, 'logging.level', 'error', { dryRun: true })).toBe('error');
+
+    expect(getConfigFileValue(target, 'output.format')).toBe('csv');
+    expect(getConfigFileValue(target, 'output.color')).toBe('never');
+    // dryRun did not modify disk
+    expect(getConfigFileValue(target, 'logging.level')).toBe('info');
+    expect(getConfigFileValue(join(dir, 'missing.toml'), 'output.format')).toBeUndefined();
+
+    const loaded = resolveConfig({
+      env: {},
+      homedir: () => dir,
+      configPathFlag: target,
     });
-    expect(config.token).toBe('t');
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain(`chmod 600 ${path}`);
+    expect(loaded.settings.output).toEqual({ format: 'csv', color: 'never' });
+    expect(loaded.settings.logging.level).toBe('info');
   });
 
-  it('mode 0600 config produces no warning', () => {
-    const { home } = makeHomeWithConfig('token = "t"\n', 0o600);
-    const warnings: string[] = [];
-    resolveConfig({ ...baseOptions(home), warn: (message) => warnings.push(message) });
-    expect(warnings).toHaveLength(0);
+  it('CFG-16: corrupt target refusal on readConfigForWrite, setConfigValue, initConfigValues, and writeUserConfig', () => {
+    const dir = makeTempDir();
+    const target = join(dir, CONFIG_FILE_NAME);
+    const corrupt = '[output\ncolor = "always"\n';
+    writeFileSync(target, corrupt, { mode: 0o600 });
+
+    expect(() => readConfigForWrite(target)).toThrow(ConfigError);
+    expect(() => readConfigForWrite(target)).toThrow(/refusing to modify/);
+    expect(() => setConfigValue(target, 'output.color', 'never')).toThrow(ConfigError);
+    expect(() => initConfigValues(target, { output: { format: 'json', color: 'always' } })).toThrow(
+      ConfigError
+    );
+
+    expect(readFileSync(target, 'utf8')).toBe(corrupt);
+    expect(readdirSync(dir)).toEqual([CONFIG_FILE_NAME]);
   });
 
-  it('tokenless loose-permission config produces no warning', () => {
-    const { home } = makeHomeWithConfig('workspace = "Acme"\n', 0o644);
-    const warnings: string[] = [];
-    resolveConfig({ ...baseOptions(home), warn: (message) => warnings.push(message) });
-    expect(warnings).toHaveLength(0);
-  });
-});
+  it('initConfigValues supports dryRun without writing and writes valid TOML otherwise', () => {
+    const dir = makeTempDir();
+    const target = join(dir, CONFIG_FILE_NAME);
 
-describe('Windows behavior (platform injected)', () => {
-  it('skips the permissions warning on win32', () => {
-    const { home } = makeHomeWithConfig('token = "t"\n', 0o644);
-    const warnings: string[] = [];
-    const config = resolveConfig({
-      ...baseOptions(home),
-      warn: (message) => warnings.push(message),
-      platform: 'win32',
+    const preview = initConfigValues(
+      target,
+      { output: { format: 'markdown', color: 'always' }, logging: { level: 'info' } },
+      { dryRun: true }
+    );
+    expect(preview).toContain('format = "markdown"');
+    expect(readdirSync(dir)).toEqual([]);
+
+    const written = initConfigValues(target, {
+      output: { format: 'markdown', color: 'always' },
+      logging: { level: 'info' },
     });
-    expect(config.token).toBe('t');
-    expect(warnings).toHaveLength(0);
+    expect(readFileSync(target, 'utf8')).toBe(written);
+    expect(getConfigFileValue(target, 'output.format')).toBe('markdown');
   });
 
-  it('writes without a POSIX mode on win32', () => {
-    const home = makeTempDir();
-    const calls: Array<{ mode?: number }> = [];
-    const fakeFs = {
-      existsSync: () => false,
-      readFileSync: () => '',
+  it.skipIf(process.platform === 'win32')(
+    'CFG-17a: writeUserConfig and writeConfigData write 0o600 atomically with zero temp files',
+    () => {
+      const home = makeTempDir();
+      const target = writeUserConfig(
+        { workspace: 'Acme', limit: 25, output: { format: 'json' } },
+        baseOptions(home)
+      );
+      expect(target).toBe(defaultConfigPath({}, () => home, 'linux'));
+      expect(statSync(target).mode & 0o777).toBe(0o600);
+
+      chmodSync(target, 0o644);
+      writeUserConfig({ workspace: 'Beta', output: { color: 'never' } }, baseOptions(home));
+      expect(statSync(target).mode & 0o777).toBe(0o600);
+      expect(readdirSync(configDir({}, () => home, 'linux'))).toEqual([CONFIG_FILE_NAME]);
+
+      const resolved = resolveConfig(baseOptions(home));
+      expect(resolved.workspace).toBe('Beta');
+      expect(resolved.settings.output.color).toBe('never');
+    }
+  );
+
+  it('CFG-17b: atomic write failure cleans up temp file and leaves original target intact', () => {
+    const dir = makeTempDir();
+    const target = join(dir, CONFIG_FILE_NAME);
+    const original = '[output]\nformat = "text"\n';
+    writeFileSync(target, original, { mode: 0o600 });
+
+    let closeCount = 0;
+    let openCount = 0;
+    const failingFs: ConfigFs = {
+      existsSync: (p) => p === target,
+      readFileSync: (p) => (p === target ? original : ''),
+      statSync,
+      mkdirSync,
+      writeFileSync,
+      chmodSync,
+      openSync: (p, flags, mode) => {
+        openCount += 1;
+        writeFileSync(p, '', mode !== undefined ? { mode } : {});
+        return openCount;
+      },
+      writeSync: () => 0,
+      fsyncSync: () => {
+        throw new Error('EIO: disk failure');
+      },
+      closeSync: () => {
+        closeCount += 1;
+      },
+      renameSync: () => undefined,
+      unlinkSync: (p) => {
+        rmSync(p, { force: true });
+      },
+    };
+
+    expect(() =>
+      writeConfigData(target, { output: { format: 'json' } }, { fs: failingFs, platform: 'linux' })
+    ).toThrow('EIO: disk failure');
+    expect(closeCount).toBe(1);
+    expect(readFileSync(target, 'utf8')).toBe(original);
+    expect(readdirSync(dir)).toEqual([CONFIG_FILE_NAME]);
+  });
+
+  it('CFG-17c: Windows atomic write skips POSIX chmod/mode and uses APPDATA path', () => {
+    const home = 'C:\\Users\\alice';
+    const openModes: Array<number | undefined> = [];
+    const writtenFiles = new Map<string, string>();
+    const fakeFs: ConfigFs = {
+      existsSync: (p) => writtenFiles.has(p),
+      readFileSync: (p) => writtenFiles.get(p) ?? '',
       statSync: () => ({ mode: 0o600 }),
       mkdirSync: () => undefined,
-      writeFileSync: (_path: string, _data: string, options: { mode?: number }) => {
-        calls.push(options);
-      },
+      writeFileSync: () => undefined,
       chmodSync: () => {
         throw new Error('chmod must not be called on win32');
       },
+      openSync: (p, _flags, mode) => {
+        openModes.push(mode);
+        writtenFiles.set(p, '');
+        return 7;
+      },
+      writeSync: () => 0,
+      fsyncSync: () => undefined,
+      closeSync: () => undefined,
+      renameSync: (oldPath, newPath) => {
+        writtenFiles.set(newPath, writtenFiles.get(oldPath) ?? '');
+        writtenFiles.delete(oldPath);
+      },
+      unlinkSync: (p) => {
+        writtenFiles.delete(p);
+      },
     };
-    writeUserConfig({ token: 't' }, { ...baseOptions(home), fs: fakeFs, platform: 'win32' });
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.mode).toBeUndefined();
+
+    const writtenPath = writeUserConfig(
+      { output: { color: 'never' } },
+      {
+        env: { APPDATA: 'C:\\Users\\alice\\AppData\\Roaming' },
+        homedir: () => home,
+        fs: fakeFs,
+        platform: 'win32',
+      }
+    );
+    expect(writtenPath).toBe(
+      win32.join('C:\\Users\\alice\\AppData\\Roaming', 'ts-projects', CONFIG_FILE_NAME)
+    );
+    expect(openModes).toEqual([undefined]);
   });
 });
 
-describe('XDG path resolution (D-017(3))', () => {
-  it('uses $XDG_CONFIG_HOME when set', () => {
-    const xdg = makeTempDir();
-    expect(configDir({ XDG_CONFIG_HOME: xdg }, () => '/unused')).toBe(join(xdg, 'ts-projects'));
+describe('prototype safety, class-based ConfigFs, and nested token stripping', () => {
+  it('PROTO-ADV-01: [__proto__] and [section.__proto__] tables do not pollute resolveConfig', () => {
+    const { home } = makeHomeWithConfig(
+      [
+        '[__proto__]',
+        'workspace = "pwned_via_proto"',
+        'limit = 999',
+        '',
+        '[output.__proto__]',
+        'format = "json"',
+        '',
+        '[logging.__proto__]',
+        'level = "debug"',
+        '',
+      ].join('\n')
+    );
+
+    const resolved = resolveConfig(baseOptions(home));
+    expect(resolved.workspace).toBeUndefined();
+    expect(resolved.limit).toBeUndefined();
+    expect(resolved.settings.output).toEqual({ format: 'text', color: 'auto' });
+    expect(resolved.settings.logging).toEqual({
+      level: 'warning',
+      file: '',
+      file_level: 'debug',
+      format: 'text',
+    });
+    expect(resolved.setFields.size).toBe(0);
   });
 
-  it('falls back to ~/.config when XDG_CONFIG_HOME is empty or unset', () => {
-    const home = makeTempDir();
-    const expected = join(home, '.config', 'ts-projects');
-    expect(configDir({}, () => home)).toBe(expected);
-    expect(configDir({ XDG_CONFIG_HOME: '' }, () => home)).toBe(expected);
+  it('PROTO-ADV-02: getConfigFileValue ignores Object.prototype properties and __proto__ lookups', () => {
+    const dir = makeTempDir();
+    const target = join(dir, CONFIG_FILE_NAME);
+    writeFileSync(target, '[output]\nformat = "json"\n', { mode: 0o600 });
+
+    expect(getConfigFileValue(target, 'output.format')).toBe('json');
+    expect(getConfigFileValue(target, 'output.toString')).toBeUndefined();
+    expect(getConfigFileValue(target, 'output.constructor')).toBeUndefined();
+    expect(getConfigFileValue(target, 'output.hasOwnProperty')).toBeUndefined();
+    expect(getConfigFileValue(target, '__proto__.workspace')).toBeUndefined();
   });
 
-  it('resolveConfig honors XDG_CONFIG_HOME for discovery', () => {
-    const xdg = makeTempDir();
-    mkdirSync(join(xdg, 'ts-projects'), { recursive: true });
-    writeFileSync(join(xdg, 'ts-projects', CONFIG_FILE_NAME), 'token = "xdg_token"\n', {
-      mode: 0o600,
+  it('FS-ADV-01: class-based ConfigFs relying on this works in resolveConfig, writeConfigData, and setConfigValue', () => {
+    class MemoryConfigFs implements ConfigFs {
+      readonly files: Map<string, string> = new Map();
+      readonly dirs: Set<string> = new Set();
+      private nextFd = 10;
+      private readonly openBuffers: Map<number, { path: string; chunks: string[] }> = new Map();
+
+      existsSync(path: string): boolean {
+        return this.files.has(path);
+      }
+
+      readFileSync(path: string, _encoding: 'utf8'): string {
+        const content = this.files.get(path);
+        if (content === undefined) {
+          throw new Error(`ENOENT: ${path}`);
+        }
+        return content;
+      }
+
+      statSync(_path: string): { mode: number } {
+        return { mode: 0o600 };
+      }
+
+      mkdirSync(path: string, _options: { recursive: true; mode?: number | undefined }): unknown {
+        this.dirs.add(path);
+        return undefined;
+      }
+
+      writeFileSync(path: string, data: string, _options: { mode?: number }): void {
+        this.files.set(path, data);
+      }
+
+      chmodSync(_path: string, _mode: number): void {
+        // no-op
+      }
+
+      openSync(path: string, _flags: string, _mode?: number): number {
+        const fd = this.nextFd;
+        this.nextFd += 1;
+        this.openBuffers.set(fd, { path, chunks: [] });
+        return fd;
+      }
+
+      writeSync(fd: number, data: string): number {
+        const entry = this.openBuffers.get(fd);
+        if (entry === undefined) {
+          throw new Error(`EBADF: ${fd}`);
+        }
+        entry.chunks.push(data);
+        return data.length;
+      }
+
+      fsyncSync(_fd: number): void {
+        // no-op
+      }
+
+      closeSync(fd: number): void {
+        const entry = this.openBuffers.get(fd);
+        if (entry !== undefined) {
+          this.files.set(entry.path, entry.chunks.join(''));
+          this.openBuffers.delete(fd);
+        }
+      }
+
+      renameSync(oldPath: string, newPath: string): void {
+        const content = this.files.get(oldPath);
+        if (content === undefined) {
+          throw new Error(`ENOENT: ${oldPath}`);
+        }
+        this.files.set(newPath, content);
+        this.files.delete(oldPath);
+      }
+
+      unlinkSync(path: string): void {
+        this.files.delete(path);
+      }
+    }
+
+    const memFs = new MemoryConfigFs();
+    const home = '/virtual/home';
+    const project = '/virtual/project';
+    const dotProject = `${project}/.${CONFIG_FILE_NAME}`;
+    memFs.files.set(dotProject, '[output]\nformat = "json"\n');
+
+    const resolved = resolveConfig({
+      env: {},
+      homedir: () => home,
+      cwd: () => project,
+      fs: memFs,
+      platform: 'linux',
     });
-    const config = resolveConfig({
-      env: { XDG_CONFIG_HOME: xdg },
-      homedir: () => '/unused',
+    expect(resolved.configPath).toBe(dotProject);
+    expect(resolved.settings.output.format).toBe('json');
+
+    const target = `${home}/.config/ts-projects/${CONFIG_FILE_NAME}`;
+    writeConfigData(target, { output: { format: 'csv' } }, { fs: memFs, platform: 'linux' });
+    expect(memFs.dirs.has(`${home}/.config/ts-projects`)).toBe(true);
+    expect(getConfigFileValue(target, 'output.format', memFs)).toBe('csv');
+
+    setConfigValue(target, 'output.color', 'never', { fs: memFs, platform: 'linux' });
+    expect(getConfigFileValue(target, 'output.color', memFs)).toBe('never');
+  });
+
+  it('TOK-ADV-05: writeConfigData strips nested token keys inside [output] and [logging]', () => {
+    const dir = makeTempDir();
+    const target = join(dir, CONFIG_FILE_NAME);
+    writeConfigData(target, {
+      token: 'TOP_SECRET',
+      output: { format: 'json', token: 'NESTED_OUTPUT_SECRET' },
+      logging: { level: 'info', token: 'NESTED_LOGGING_SECRET' },
     });
-    expect(config.token).toBe('xdg_token');
+
+    const raw = readFileSync(target, 'utf8');
+    expect(raw).not.toContain('TOP_SECRET');
+    expect(raw).not.toContain('NESTED_OUTPUT_SECRET');
+    expect(raw).not.toContain('NESTED_LOGGING_SECRET');
+    expect(raw).not.toContain('token');
+    expect(getConfigFileValue(target, 'output.format')).toBe('json');
+    expect(getConfigFileValue(target, 'logging.level')).toBe('info');
   });
 });
 
@@ -356,23 +873,5 @@ describe('error taxonomy (D-016(2), cli-standards R6.1)', () => {
     expect(exitCodeFor(new CliError('x', EXIT_CODES.conflict))).toBe(5);
     expect(exitCodeFor(new Error('unexpected'))).toBe(1);
     expect(exitCodeFor('not-an-error')).toBe(1);
-  });
-
-  it('AuthError is a DomainError with no exit code, mapped to exit 4', () => {
-    const err = new AuthError('x');
-    expect(err).toBeInstanceOf(DomainError);
-    expect(err).not.toHaveProperty('exitCode');
-    expect(exitCodeFor(err)).toBe(EXIT_CODES.auth);
-    expect(err.name).toBe('AuthError');
-  });
-});
-
-describe('redactToken (cli-standards R5.6)', () => {
-  it('masks all but the last four characters of long tokens', () => {
-    expect(redactToken('supersecret1234')).toBe('***1234');
-  });
-
-  it('fully masks short tokens', () => {
-    expect(redactToken('short')).toBe('***');
   });
 });

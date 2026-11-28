@@ -15,6 +15,8 @@ export interface CliDeps {
   stderr: (text: string) => void;
   env: Record<string, string | undefined>;
   homedir: () => string;
+  cwd?: (() => string) | undefined;
+  platform?: string | undefined;
   stdoutIsTTY: boolean;
   stderrIsTTY: boolean;
   /** TTY-ness of stdin — gates the interactive multi-select. */

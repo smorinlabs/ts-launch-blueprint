@@ -33,6 +33,8 @@ export function realDeps(): CliDeps {
     },
     env: process.env,
     homedir: osHomedir,
+    cwd: () => process.cwd(),
+    platform: process.platform,
     stdoutIsTTY: process.stdout.isTTY ?? false,
     stderrIsTTY: process.stderr.isTTY ?? false,
     stdinIsTTY: process.stdin.isTTY ?? false,
@@ -109,7 +111,9 @@ function buildProgram(deps: CliDeps): Command {
       configPathFlag: globals.config,
       env: deps.env,
       homedir: deps.homedir,
+      cwd: deps.cwd,
       fs: deps.fs,
+      platform: deps.platform,
       warn: (message) => logger.warn(message),
     });
     const token = source === 'memory' ? undefined : requireToken(resolved, deps.env, deps.homedir);

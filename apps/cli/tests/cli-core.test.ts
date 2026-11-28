@@ -1,6 +1,6 @@
 // In-process CLI core tests (D-016(1), D-019(4) tier 1): runCli(argv,
 // deps) with injected writers/env — no subprocess, no process.exit.
-// cspell:ignore verbos projcts envtokenvalue flagtokenvalue filetoken
+// cspell:ignore verbos projcts envtoken envtokenvalue flagtokenvalue filetoken
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -134,7 +134,7 @@ describe('config --show (token resolution surface)', () => {
     const h = makeHarness({ env: { [TOKEN_ENV_VAR]: 'supersecret1234' } });
     const code = await runCli(['config', '--show'], h.deps);
     expect(code).toBe(0);
-    expect(h.stdout()).toContain('token = "***1234" (source: env)');
+    expect(h.stdout()).toContain('token = "****1234" (source: env)');
     expect(h.stdout()).not.toContain('supersecret1234');
     expect(h.stderr()).not.toContain('supersecret1234');
   });
@@ -143,10 +143,10 @@ describe('config --show (token resolution surface)', () => {
     const h = makeHarness({ env: { [TOKEN_ENV_VAR]: 'envtokenvalue1' } });
     const code = await runCli(['--token', 'flagtokenvalue2', 'config', '--show'], h.deps);
     expect(code).toBe(0);
-    expect(h.stdout()).toContain('token = "***lue2" (source: flag)');
+    expect(h.stdout()).toContain('token = "****lue2" (source: flag)');
   });
 
-  it('file token surfaces workspace/limit and the file path', async () => {
+  it('ignores TOML token while surfacing workspace/limit and the file path', async () => {
     const home = makeTempDir();
     const dir = join(home, '.config', 'ts-projects');
     mkdirSync(dir, { recursive: true });
@@ -155,46 +155,62 @@ describe('config --show (token resolution surface)', () => {
       'token = "filetoken5678"\nworkspace = "Acme"\nlimit = 50\n',
       { mode: 0o600 }
     );
-    const h = makeHarness({ homedir: () => home });
-    const code = await runCli(['config', '--show'], h.deps);
+    const noEnv = makeHarness({ homedir: () => home });
+    expect(await runCli(['config', '--show'], noEnv.deps)).toBe(4);
+
+    const withEnv = makeHarness({ homedir: () => home, env: { [TOKEN_ENV_VAR]: 'envtoken5678' } });
+    const code = await runCli(['config', '--show'], withEnv.deps);
     expect(code).toBe(0);
-    const output = h.stdout();
-    expect(output).toContain('token = "***5678" (source: file)');
+    const output = withEnv.stdout();
+    expect(output).toContain('token = "****5678" (source: env)');
     expect(output).toContain('workspace = "Acme"');
     expect(output).toContain('limit = 50');
     expect(output).toContain(join(dir, CONFIG_FILE_NAME));
   });
 
-  it('missing token everywhere -> exit 4 with the three remedies on stderr', async () => {
+  it('missing token everywhere -> exit 4 with the two remedies and doctor hint on stderr', async () => {
     const h = makeHarness();
     const code = await runCli(['config', '--show'], h.deps);
     expect(code).toBe(4);
     expect(h.stdout()).toBe('');
     const err = h.stderr();
     expect(err).toContain('No TS_PROJECTS_TOKEN found');
-    expect(err).toContain('three options');
+    expect(err).toContain('two options');
     expect(err).toContain('--token');
     expect(err).toContain(`export ${TOKEN_ENV_VAR}=`);
-    expect(err).toContain(CONFIG_FILE_NAME);
+    expect(err).toContain('ts-projects doctor');
+    expect(err).not.toContain(CONFIG_FILE_NAME);
   });
 
-  it('nonexistent --config -> exit 2 usage error', async () => {
+  it('nonexistent explicit --config is tolerated (ADR 0004)', async () => {
     const home = makeTempDir();
-    const h = makeHarness({ homedir: () => home });
+    const h = makeHarness({ homedir: () => home, env: { [TOKEN_ENV_VAR]: 'envtoken1234' } });
     const code = await runCli(['--config', join(home, 'nope.toml'), 'config', '--show'], h.deps);
-    expect(code).toBe(2);
-    expect(h.stderr()).toContain('Config file does not exist');
+    expect(code).toBe(0);
+    expect(h.stdout()).toContain('config_file = (none)');
   });
 
-  it('malformed TOML -> exit 1 config error', async () => {
+  it('malformed TOML in explicit --config -> exit 1 config error; discovered layer -> warning', async () => {
     const home = makeTempDir();
     const dir = join(home, '.config', 'ts-projects');
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, CONFIG_FILE_NAME), 'token = broken\n', { mode: 0o600 });
-    const h = makeHarness({ homedir: () => home });
-    const code = await runCli(['config', '--show'], h.deps);
+    const discovered = join(dir, CONFIG_FILE_NAME);
+    writeFileSync(discovered, 'output = broken\n', { mode: 0o600 });
+
+    const hDiscovered = makeHarness({
+      homedir: () => home,
+      env: { [TOKEN_ENV_VAR]: 'envtoken1234' },
+    });
+    expect(await runCli(['config', '--show'], hDiscovered.deps)).toBe(0);
+    expect(hDiscovered.stderr()).toContain('ignoring unreadable config file');
+
+    const hExplicit = makeHarness({
+      homedir: () => home,
+      env: { [TOKEN_ENV_VAR]: 'envtoken1234' },
+    });
+    const code = await runCli(['--config', discovered, 'config', '--show'], hExplicit.deps);
     expect(code).toBe(1);
-    expect(h.stderr()).toContain('Invalid TOML');
+    expect(hExplicit.stderr()).toContain('invalid TOML in config file');
   });
 
   it('config without --show prints the subcommand help', async () => {
@@ -249,21 +265,18 @@ describe('verbosity ladder (D-018(3), cli-standards R4.4)', () => {
     expect(h.stderr()).toContain('token source: env');
   });
 
-  it.skipIf(process.platform === 'win32')(
-    '-q still shows warnings (loose permissions)',
-    async () => {
-      const home = makeTempDir();
-      const dir = join(home, '.config', 'ts-projects');
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, CONFIG_FILE_NAME), 'token = "filetoken5678"\n', {
-        mode: 0o644,
-      });
-      const h = makeHarness({ homedir: () => home });
-      const code = await runCli(['-q', 'config', '--show'], h.deps);
-      expect(code).toBe(0);
-      expect(h.stderr()).toContain('chmod 600');
-    }
-  );
+  it('-q still shows config degradation warnings', async () => {
+    const home = makeTempDir();
+    const dir = join(home, '.config', 'ts-projects');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, CONFIG_FILE_NAME), '[output]\ncolor = "yes"\n', {
+      mode: 0o600,
+    });
+    const h = makeHarness({ homedir: () => home, env: { [TOKEN_ENV_VAR]: 'envtoken1234' } });
+    const code = await runCli(['-q', 'config', '--show'], h.deps);
+    expect(code).toBe(0);
+    expect(h.stderr()).toContain('ignoring invalid config value output.color');
+  });
 });
 
 describe('stack traces (source --verbose traceback intent)', () => {

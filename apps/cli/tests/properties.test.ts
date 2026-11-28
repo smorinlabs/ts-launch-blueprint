@@ -7,7 +7,17 @@ import type { Project } from '@ts-launch-blueprint/core';
 import * as fc from 'fast-check';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { type ConfigFileValues, resolveConfig, writeUserConfig } from '../src/cli/config.js';
+import {
+  CONFIG_COLOR_MODES,
+  CONFIG_LOG_FORMATS,
+  CONFIG_LOG_LEVELS,
+  CONFIG_OUTPUT_FORMATS,
+  type ConfigFileValues,
+  readConfigForWrite,
+  resolveConfig,
+  writeConfigData,
+  writeUserConfig,
+} from '../src/cli/config.js';
 import { formatOutput } from '../src/cli/format.js';
 
 const tempDirs: string[] = [];
@@ -123,39 +133,85 @@ describe('CLI formatting and config properties', () => {
     );
   });
 
-  it('writeUserConfig and resolveConfig round-trip TOML values losslessly', () => {
+  it('writeUserConfig and resolveConfig round-trip TOML values losslessly (never token)', () => {
     const home = makeTempDir();
     const env: Record<string, string | undefined> = { XDG_CONFIG_HOME: join(home, '.config') };
     const configArb: fc.Arbitrary<ConfigFileValues> = fc.record(
       {
-        token: configStringArb.filter((token) => token.length >= 1),
         workspace: configStringArb,
         limit: fc.integer({ min: 1, max: 1_000_000 }),
+        output: fc.record(
+          {
+            format: fc.constantFrom(...CONFIG_OUTPUT_FORMATS),
+            color: fc.constantFrom(...CONFIG_COLOR_MODES),
+          },
+          { requiredKeys: [] }
+        ),
+        logging: fc.record(
+          {
+            level: fc.constantFrom(...CONFIG_LOG_LEVELS),
+            file: configStringArb,
+            file_level: fc.constantFrom(...CONFIG_LOG_LEVELS),
+            format: fc.constantFrom(...CONFIG_LOG_FORMATS),
+          },
+          { requiredKeys: [] }
+        ),
       },
       { requiredKeys: [] }
     );
 
     fc.assert(
       fc.property(configArb, (values) => {
-        const writtenPath = writeUserConfig(values, { env, homedir: () => home });
-        const resolved = resolveConfig({ env, homedir: () => home });
+        const writtenPath = writeUserConfig(values, {
+          env,
+          homedir: () => home,
+          platform: 'linux',
+        });
+        const resolved = resolveConfig({
+          env,
+          homedir: () => home,
+          cwd: () => home,
+          platform: 'linux',
+        });
 
         expect(resolved.configPath).toBe(writtenPath);
-        expect(resolved.token).toBe(values.token);
+        expect(resolved.token).toBeUndefined();
+        expect(resolved.tokenSource).toBe('none');
         expect(resolved.workspace).toBe(values.workspace);
         expect(resolved.limit).toBe(values.limit);
-        expect(resolved.tokenSource).toBe(values.token === undefined ? 'none' : 'file');
+        expect(resolved.settings.output).toEqual({
+          format: values.output?.format ?? 'text',
+          color: values.output?.color ?? 'auto',
+        });
+        expect(resolved.settings.logging).toEqual({
+          level: values.logging?.level ?? 'warning',
+          file: values.logging?.file ?? '',
+          file_level: values.logging?.file_level ?? 'debug',
+          format: values.logging?.format ?? 'text',
+        });
       }),
       { numRuns: 50 }
     );
   });
 
-  it('writeUserConfig with empty token resolves as tokenSource none', () => {
-    const home = makeTempDir();
-    const env: Record<string, string | undefined> = { XDG_CONFIG_HOME: join(home, '.config') };
-    writeUserConfig({ token: '' }, { env, homedir: () => home });
-    const resolved = resolveConfig({ env, homedir: () => home });
-    expect(resolved.token).toBeUndefined();
-    expect(resolved.tokenSource).toBe('none');
+  it('CFG-18: writeConfigData and readConfigForWrite round-trip arbitrary TOML section tables', () => {
+    const dir = makeTempDir();
+    const target = join(dir, 'roundtrip.toml');
+    const safeKeyArb = fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9_]{0,12}$/);
+    const scalarArb = fc.oneof(
+      fc.boolean(),
+      fc.integer({ min: Number.MIN_SAFE_INTEGER, max: Number.MAX_SAFE_INTEGER }),
+      configStringArb
+    );
+    const sectionTableArb = fc.dictionary(safeKeyArb, scalarArb, { minKeys: 1, maxKeys: 5 });
+    const docArb = fc.dictionary(safeKeyArb, sectionTableArb, { maxKeys: 4 });
+
+    fc.assert(
+      fc.property(docArb, (doc) => {
+        writeConfigData(target, doc);
+        expect(readConfigForWrite(target)).toEqual(doc);
+      }),
+      { numRuns: 50 }
+    );
   });
 });

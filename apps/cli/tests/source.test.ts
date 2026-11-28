@@ -220,6 +220,6 @@ describe('config --show and the data source', () => {
     const code = await runCli(['config', '--show'], h.deps);
     expect(code).toBe(0);
     expect(h.stdout()).toContain('source = http (source: default)');
-    expect(h.stdout()).toContain('token = "***1234" (source: env)');
+    expect(h.stdout()).toContain('token = "****1234" (source: env)');
   });
 });

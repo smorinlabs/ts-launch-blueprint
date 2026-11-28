@@ -110,7 +110,9 @@ async function runProjects(
     configPathFlag: opts.config,
     env: deps.env,
     homedir: deps.homedir,
+    cwd: deps.cwd,
     fs: deps.fs,
+    platform: deps.platform,
     warn: (message) => logger.warn(message),
   });
 

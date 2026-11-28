@@ -249,18 +249,22 @@ describe('limit and workspace forwarding (test_cli_workspace_filter parity)', ()
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, 'ts-projects_config.toml'),
-      'token = "file-token-999"\nworkspace = "Acme"\nlimit = 25\n',
+      'token = "ignored-file-token"\nworkspace = "Acme"\nlimit = 25\n',
       { mode: 0o600 }
     );
+    // ADR 0002: TOML token alone is ignored and exits 4 without env/flag token.
+    const noToken = makeHarness({ env: {}, homedir: () => home });
+    expect(await runCli(['projects', '--no-input'], noToken.deps)).toBe(4);
+
     const first = makeApiFetch();
-    const h = makeHarness({ env: {}, homedir: () => home, fetchImpl: first.fetchImpl });
+    const h = makeHarness({ homedir: () => home, fetchImpl: first.fetchImpl });
     expect(await runCli(['projects', '--no-input'], h.deps)).toBe(0);
     expect(first.urls[0]!.pathname.endsWith('/workspaces')).toBe(true);
     expect(first.urls[1]!.searchParams.get('limit')).toBe('25');
     expect(first.urls[1]!.searchParams.get('workspace')).toBe('ws1');
 
     const second = makeApiFetch();
-    const h2 = makeHarness({ env: {}, homedir: () => home, fetchImpl: second.fetchImpl });
+    const h2 = makeHarness({ homedir: () => home, fetchImpl: second.fetchImpl });
     await runCli(['projects', '--no-input', '--limit', '7'], h2.deps);
     expect(second.urls[1]!.searchParams.get('limit')).toBe('7');
   });
@@ -443,7 +447,7 @@ describe('machine-mode error envelope (D-018(4)/D-033, R7.8)', () => {
     // Concise single-line message: the multi-remedy tutorial stays
     // human-mode only.
     expect(envelope.error.message).toBe(
-      'No TS_PROJECTS_TOKEN found in environment or config file.'
+      'No TS_PROJECTS_TOKEN found (never stored in the config file).'
     );
   });
 
