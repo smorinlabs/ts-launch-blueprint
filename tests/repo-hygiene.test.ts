@@ -2359,10 +2359,10 @@ describe('fork guard & bootstrap acceptance workflow (P07)', () => {
   const BOOTSTRAP_ACCEPTANCE_PATH = join(WORKFLOW_DIR, 'bootstrap-acceptance.yml');
 
   it('[P07-TS01] .gitignore ignores .blueprint-contributor and Justfile wires _blueprint_notice + _guard on artifact recipes only', () => {
-    const gitignore = readFileSync(join(REPO_ROOT, '.gitignore'), 'utf8');
+    const gitignore = readFileSync(join(REPO_ROOT, '.gitignore'), 'utf8').replaceAll('\r\n', '\n');
     expect(gitignore).toMatch(/^\.blueprint-contributor$/m);
 
-    const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8');
+    const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8').replaceAll('\r\n', '\n');
     expect(justfile).toContain("_blueprint_notice := shell('bash scripts/guard.sh warn')");
     expect(justfile).toMatch(/^\[private\]\n@_guard:\n\s+bash scripts\/guard\.sh block$/m);
 
