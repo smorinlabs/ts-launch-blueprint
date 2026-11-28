@@ -24,7 +24,8 @@ The repository ships the following workflows under `.github/workflows/`:
 | Release Please            | `release-please.yml`          | push to `main`, `workflow_dispatch`                                    |
 | Secret Scan               | `secret-scan.yml`             | push to `main`, pull requests                                          |
 
-Blueprint-only maintenance workflows (removed on `press rebrand`): `audit-triage.yml`, `bootstrap-acceptance.yml`, `claude.yml`, `claude-code-review.yml`, `template-receipt-guard.yml`, and `update-contributors.yml`.
+- **Optional / env-or-secret-gated org workflows** (shipped in stamped child repositories, inert unless configured; see [Project Setup](../PROJECT_SETUP.md) and [ADR 0015](../adr/0015-security-scanning-and-optional-org-automation.md)): `audit-triage.yml` (weekly Muse triage; requires `vars.MUSE_CI_ENABLED == 'true'` and `META_MUSE_CI_API_KEY`), `claude.yml` (`@claude` mentions; auto-skips when `CLAUDE_CODE_OAUTH_TOKEN` is unset), and `claude-code-review.yml` (automated PR review; auto-skips when `CLAUDE_CODE_OAUTH_TOKEN` is unset).
+- **Blueprint-only maintenance workflows** (removed on `press rebrand` via `press/press-rules.toml`): `bootstrap-acceptance.yml`, `template-receipt-guard.yml`, and `update-contributors.yml`.
 
 ### CI (`ci.yml`)
 

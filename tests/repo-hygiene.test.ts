@@ -2700,6 +2700,59 @@ describe('P13 M6 security, community docs, actionlint, logos & badges contract',
     expect(structure).toContain('.oss-scanner/');
     expect(structure).toContain('projects.list');
     expect(structure).toContain('projects.get');
+
+    const rulesToml = readFileSync(join(REPO_ROOT, 'press', 'press-rules.toml'), 'utf8');
+    const removeBlocks = rulesToml.split(/^\[\[remove\]\]/m).slice(1);
+    const removedWorkflows = removeBlocks
+      .map((block) => block.split(/^\[/m)[0] ?? block)
+      .map((block) => block.match(/^\s*file\s*=\s*"\.github\/workflows\/([^"]+)"/m)?.[1])
+      .filter((name): name is string => name !== undefined);
+    expect(removedWorkflows).toHaveLength(3);
+    expect(new Set(removedWorkflows)).toEqual(
+      new Set(['bootstrap-acceptance.yml', 'template-receipt-guard.yml', 'update-contributors.yml'])
+    );
+
+    const optionalOrgWorkflows = ['audit-triage.yml', 'claude.yml', 'claude-code-review.yml'];
+    const blueprintOnlyLines = usingCiCd
+      .split('\n')
+      .filter((line) => /blueprint-only|removed on `press rebrand`/i.test(line));
+    expect(blueprintOnlyLines.length).toBeGreaterThanOrEqual(2);
+    for (const line of blueprintOnlyLines) {
+      for (const wf of removedWorkflows) {
+        expect(line).toContain(`\`${wf}\``);
+      }
+      for (const wf of optionalOrgWorkflows) {
+        expect(line).not.toContain(wf);
+      }
+    }
+
+    const optionalLine = usingCiCd
+      .split('\n')
+      .find((line) => line.includes('Optional / env-or-secret-gated org workflows'));
+    expect(optionalLine).toBeDefined();
+    expect(optionalLine).toContain('shipped in stamped child repositories');
+    for (const wf of optionalOrgWorkflows) {
+      expect(optionalLine).toContain(`\`${wf}\``);
+    }
+
+    const ghActionsBlueprintClause = ghActions.match(
+      /blueprint-only maintenance workflows removed on `press rebrand` \([^)]*\)/
+    )?.[0];
+    expect(ghActionsBlueprintClause).toBeDefined();
+    for (const wf of removedWorkflows) {
+      expect(ghActionsBlueprintClause).toContain(`\`${wf}\``);
+    }
+    for (const wf of optionalOrgWorkflows) {
+      expect(ghActionsBlueprintClause).not.toContain(wf);
+    }
+
+    const ghActionsOptionalClause = ghActions.match(
+      /optional env\/secret-gated org workflows shipped in child repos \([^)]*\)/
+    )?.[0];
+    expect(ghActionsOptionalClause).toBeDefined();
+    for (const wf of optionalOrgWorkflows) {
+      expect(ghActionsOptionalClause).toContain(`\`${wf}\``);
+    }
   });
 
   describe.skipIf(existsSync(join(REPO_ROOT, 'press', 'press-receipt.toml')))(
