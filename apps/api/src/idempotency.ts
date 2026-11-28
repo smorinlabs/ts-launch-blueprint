@@ -54,6 +54,7 @@ export function idempotency(options: IdempotencyOptions = {}): MiddlewareHandler
     const url = new URL(c.req.url);
     const cacheKey = JSON.stringify([method, url.pathname, url.search, key]);
     const currentTime = now();
+    const preHeaders = [...c.res.headers.entries()];
 
     const cached = store.get(cacheKey);
     if (cached !== undefined) {
@@ -61,6 +62,9 @@ export function idempotency(options: IdempotencyOptions = {}): MiddlewareHandler
         store.delete(cacheKey);
         store.set(cacheKey, cached);
         const replayHeaders = buildHeaders(cached.headers);
+        for (const [name, value] of preHeaders) {
+          replayHeaders.append(name, value);
+        }
         replayHeaders.set(REPLAYED_HEADER, 'true');
         c.header(REPLAYED_HEADER, undefined);
         c.res = new Response(responseBodyFor(cached.status, cached.body), {
@@ -78,10 +82,21 @@ export function idempotency(options: IdempotencyOptions = {}): MiddlewareHandler
     const body = NULL_BODY_STATUSES.has(original.status)
       ? new ArrayBuffer(0)
       : await original.arrayBuffer();
-    const headerPairs = [...original.headers.entries()].filter(
+    const initialHeaderPairs = [...original.headers.entries()].filter(
       ([name]) => name.toLowerCase() !== REPLAYED_HEADER.toLowerCase()
     );
-    const rebuiltHeaders = buildHeaders(headerPairs);
+    const remainingPre = [...preHeaders];
+    const cacheHeaderPairs = initialHeaderPairs.filter(([name, value]) => {
+      const matchIdx = remainingPre.findIndex(
+        ([preName, preValue]) => preName.toLowerCase() === name.toLowerCase() && preValue === value
+      );
+      if (matchIdx !== -1) {
+        remainingPre.splice(matchIdx, 1);
+        return false;
+      }
+      return true;
+    });
+    const rebuiltHeaders = buildHeaders(initialHeaderPairs);
     c.header(REPLAYED_HEADER, undefined);
     c.res = new Response(responseBodyFor(original.status, body), {
       status: original.status,
@@ -94,7 +109,7 @@ export function idempotency(options: IdempotencyOptions = {}): MiddlewareHandler
       store.set(cacheKey, {
         storedAt: now(),
         status: original.status,
-        headers: headerPairs,
+        headers: cacheHeaderPairs,
         body,
       });
       while (store.size > maxEntries) {

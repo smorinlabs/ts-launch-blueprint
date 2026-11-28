@@ -306,4 +306,104 @@ describe('idempotency middleware mounted in createApp with a tRPC mutation (Q8.A
     expect(replay.headers.get('x-request-id')).not.toBe(first.headers.get('x-request-id'));
     expect(executions).toBe(1);
   });
+
+  it('preserves P09 secureHeaders, CORS isolation, and rateLimit 429 precedence on replay', async () => {
+    let executions = 0;
+    const mutationTestRouter = router({
+      items: router({
+        create: publicProcedure.input(z.object({ title: z.string() })).mutation(({ input }) => {
+          executions += 1;
+          return { id: executions, title: input.title };
+        }),
+      }),
+    });
+    const { logger } = captureLogger();
+    const app = createApp({
+      core: createCore({ source: 'memory' }),
+      logger,
+      router: mutationTestRouter,
+      corsOrigins: ['https://app.example.com'],
+      rateLimit: { limit: 2, windowMs: 60_000, unit: 'minute' },
+    });
+
+    const first = await app.request('/trpc/items.create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'mw-1',
+        origin: 'https://app.example.com',
+        'x-real-ip': '203.0.113.10',
+      },
+      body: JSON.stringify({ title: 'First' }),
+    });
+    expect(first.status).toBe(200);
+    expect(first.headers.get('Idempotency-Replayed')).toBeNull();
+    expect(first.headers.get('access-control-allow-origin')).toBe('https://app.example.com');
+    expect(first.headers.get('x-frame-options')).toBe('DENY');
+    expect(first.headers.get('x-ratelimit-remaining')).toBe('1');
+
+    const replay = await app.request('/trpc/items.create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'mw-1',
+        origin: 'https://evil.example',
+        'x-real-ip': '203.0.113.10',
+      },
+      body: JSON.stringify({ title: 'First' }),
+    });
+    expect(replay.status).toBe(200);
+    expect(replay.headers.get('Idempotency-Replayed')).toBe('true');
+    expect(replay.headers.get('access-control-allow-origin')).toBeNull();
+    expect(replay.headers.get('x-frame-options')).toBe('DENY');
+    expect(replay.headers.get('x-ratelimit-remaining')).toBe('0');
+    expect(executions).toBe(1);
+
+    // Rate limit is outer to idempotency: the 3rd request returns 429 instead of replaying.
+    const limited = await app.request('/trpc/items.create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'mw-1',
+        origin: 'https://app.example.com',
+        'x-real-ip': '203.0.113.10',
+      },
+      body: JSON.stringify({ title: 'First' }),
+    });
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('x-frame-options')).toBe('DENY');
+    expect(limited.headers.get('access-control-allow-origin')).toBe('https://app.example.com');
+    expect(executions).toBe(1);
+
+    // Reverse CORS order: disallowed origin first, allowed origin on replay still gets CORS header.
+    const reverseFirst = await app.request('/trpc/items.create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'mw-2',
+        origin: 'https://evil.example',
+        'x-real-ip': '203.0.113.11',
+      },
+      body: JSON.stringify({ title: 'Second' }),
+    });
+    expect(reverseFirst.status).toBe(200);
+    expect(reverseFirst.headers.get('access-control-allow-origin')).toBeNull();
+
+    const reverseReplay = await app.request('/trpc/items.create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'mw-2',
+        origin: 'https://app.example.com',
+        'x-real-ip': '203.0.113.11',
+      },
+      body: JSON.stringify({ title: 'Second' }),
+    });
+    expect(reverseReplay.status).toBe(200);
+    expect(reverseReplay.headers.get('Idempotency-Replayed')).toBe('true');
+    expect(reverseReplay.headers.get('access-control-allow-origin')).toBe(
+      'https://app.example.com'
+    );
+    expect(executions).toBe(2);
+  });
 });
