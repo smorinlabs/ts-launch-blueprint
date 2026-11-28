@@ -19,7 +19,7 @@ Add guard.sh, CI bootstrap acceptance, press cleanups, and new-ts-project skill
 ### Out of scope
 
 - Blocking non-artifact recipes (`setup`, `install`, `all`, `test`, `lint`, `typecheck`, `check-deps`, `debug-info`, `press-verify`, `clean`) with `_guard`.
-- Removing `scripts/guard.sh` or `tests/guard.test.ts` on `press rebrand` (both ship to child repos so `Justfile` stays intact and child forks remain guarded).
+- Removing `scripts/guard.sh` or `tests/guard.test.ts` on `press rebrand` (both ship to pressed child repos so `Justfile` stays intact while `press/press-receipt.toml` silences the guard; un-pressed blueprint forks remain guarded).
 - Creating `docs/PROJECT_SETUP.md` or `docs/POST_INIT.md` (deferred to `P13`; P07 links only to existing `docs/tutorials/full-project-setup.md` and `press/press-receipt.toml`).
 
 ### Decisions
