@@ -252,7 +252,28 @@ describe('API process lifecycle (built server)', () => {
         // prom-client (and its @opentelemetry/api dependency) is bundled too.
         expect((await fetch(`${server.url}/metrics`)).status).toBe(200);
       } finally {
-        server.child.kill('SIGTERM');
+        // Await child termination/close before deleting `folder` so Windows
+        // does not throw EBUSY while the child still holds its cwd handle.
+        if (server.child.exitCode === null && server.child.signalCode === null) {
+          await new Promise<void>((resolve) => {
+            const killTimer = setTimeout(() => {
+              server.child.kill('SIGKILL');
+            }, 3000);
+            killTimer.unref();
+            const giveUpTimer = setTimeout(resolve, 5000);
+            giveUpTimer.unref();
+            server.child.once('close', () => {
+              clearTimeout(killTimer);
+              clearTimeout(giveUpTimer);
+              resolve();
+            });
+            if (!server.child.kill('SIGTERM')) {
+              clearTimeout(killTimer);
+              clearTimeout(giveUpTimer);
+              resolve();
+            }
+          });
+        }
       }
     } finally {
       rmSync(folder, { recursive: true, force: true });

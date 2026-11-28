@@ -90,6 +90,8 @@ interface RunOptions {
   event?: string;
   headRef?: string;
   headRepo?: string;
+  baseFiles?: Record<string, string>;
+  mutate?: (repo: string) => void;
 }
 
 function runDetect(
@@ -107,12 +109,13 @@ function runDetect(
     git(repo, 'init', '-q', '-b', 'main');
     git(repo, 'config', 'user.email', 'ci@example.invalid');
     git(repo, 'config', 'user.name', 'ci');
-    writeFiles(repo, BASE_FILES);
+    writeFiles(repo, { ...BASE_FILES, ...options.baseFiles });
     git(repo, 'add', '-A');
     git(repo, 'commit', '-qm', 'base');
     const baseSha = git(repo, 'rev-parse', 'HEAD');
 
     writeFiles(repo, change);
+    options.mutate?.(repo);
     git(repo, 'add', '-A');
     git(repo, 'commit', '-qm', 'change');
 
@@ -188,6 +191,26 @@ describe.skipIf(process.platform === 'win32')('CI changes path detector', () => 
 
   it('code pull request runs code jobs and skips release fast path', () => {
     expect(runDetect({ 'packages/core/src/index.ts': 'export const version = 2;\n' })).toEqual({
+      code: 'true',
+      release: 'false',
+    });
+  });
+
+  it('renaming a source file into docs/ is treated as a code change', () => {
+    const sourceLines = Array.from({ length: 20 }, (_, i) => `export const line${i} = ${i};`).join(
+      '\n'
+    );
+    expect(
+      runDetect(
+        {},
+        {
+          baseFiles: { 'packages/core/src/mod.ts': `${sourceLines}\n` },
+          mutate: (repo) => {
+            git(repo, 'mv', 'packages/core/src/mod.ts', 'docs/renamed.md');
+          },
+        }
+      )
+    ).toEqual({
       code: 'true',
       release: 'false',
     });

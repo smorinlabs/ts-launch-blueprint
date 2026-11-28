@@ -80,7 +80,7 @@ jobs:
             echo "INFO: ${EVENT_NAME} event - running all jobs"
             exit 0
           fi
-          changed="$(git diff --name-only "${BASE_SHA}...HEAD")"
+          changed="$(git diff --no-renames --name-only "${BASE_SHA}...HEAD")"
           # No `grep -q` below: it exits on the first match, the writer gets
           # SIGPIPE, and under pipefail a found match reads as "no match".
           # `grep ... >/dev/null` consumes the whole stream.
