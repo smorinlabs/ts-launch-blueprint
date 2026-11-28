@@ -20,10 +20,13 @@ ts-launch-blueprint/
 ├── apps/cli/                       # The ts-projects CLI — the published npm package
 ├── apps/api/                       # Hono + tRPC API (private, not published)
 ├── apps/web/                       # React + Vite web app (private, not published)
-├── tests/                          # Repo-level meta-tests (repo-hygiene)
+├── tests/                          # Repo-level meta-tests (repo-hygiene, press, setup, boundaries)
 ├── docs/                           # Documentation (this tree)
-├── .github/                        # GitHub Actions workflows, issue/PR templates
+├── .github/                        # GitHub Actions workflows, issue/PR templates, policies
+├── .oss-scanner/                   # Offline OSS Scanner Dockerfile & threat model (blueprint-only)
+├── assets/images/logos/            # Branded TS logo artwork (blueprint-only; removed on press)
 ├── press/                          # template-press source identity, rules, and reset stubs
+├── scripts/                        # Setup, check, contract, container, and guard scripts
 ├── Justfile                        # Command surface (build/test/lint/release/...)
 ├── Makefile                        # Bootstrap: check-deps / install-node / install-just
 ├── package.json                    # Private workspace root (shared dev tooling, scripts)
@@ -36,29 +39,42 @@ ts-launch-blueprint/
 ```
 ts-launch-blueprint/
 ├── .github/
-│   ├── ISSUE_TEMPLATE/              # Issue templates (feature/docs/bug)
-│   ├── workflows/                   # CI, CodeQL, dependency-review, difftree, press-verify, release, publish
+│   ├── ISSUE_TEMPLATE/              # Issue templates (feature/docs/bug) + config.yml
+│   ├── codeql/                      # Advanced CodeQL configuration (security-extended)
+│   ├── workflows/                   # CI, CodeQL, dependency/secret scans, press-verify, release, publish
+│   ├── actionlint.yaml              # Actionlint runner labels, vars, and path suppressions
+│   ├── CODEOWNERS                   # Repository code ownership
 │   ├── CODE_OF_CONDUCT.md
 │   ├── CONTRIBUTING.md
 │   ├── dependabot.yml
 │   ├── FUNDING.yml
 │   ├── pull_request_template.md
 │   └── SECURITY.md
+├── .oss-scanner/                    # Offline OSS Scanner Dockerfile + threat_model.md (blueprint-only)
+├── assets/images/logos/             # TS logo PNGs (100x100, 150x150, 1024x1024; blueprint-only)
+├── .devcontainer/                   # VS Code Dev Container configuration
+├── .flox/                           # Flox environment manifest
+├── .greptile/                       # Greptile reviewer config
 ├── press/                           # template-press config (press-source.toml, press-rules.toml, stubs/)
 ├── docs/                            # Flattened CommonMark documentation tree (D-023)
-│   ├── about/                       # Project context and philosophy
+│   ├── about/                       # Project context, philosophy, architecture, design decisions
+│   ├── adr/                         # Retained Architecture Decision Records (ADRs)
+│   ├── api/                         # Checked-in tRPC contract snapshot (contract.snapshot.json)
 │   ├── contributing/                # Contribution guidelines, incl. cla/ (CLA docs)
 │   ├── port/                        # Port process records (D-006; see docs/port/README.md)
 │   ├── reference/                   # Technical references (this page's directory)
+│   ├── skills/                      # Bootstrap skill reference docs
 │   ├── tasks/                       # Step-by-step workflows
 │   ├── tools/                       # Technical tooling reference (one page per tool)
 │   ├── tutorials/                   # Guided learning paths
+│   ├── POST_INIT.md                 # Post-initialization setup pointer
+│   ├── PROJECT_SETUP.md             # Post-press repository configuration checklist
+│   ├── RELEASE.md                   # Release runbook (one-time setup + routine flow)
 │   ├── docs.md                      # Docs-about-docs
-│   ├── github-templates.md          # GitHub issue/PR template reference
-│   └── maintainers-release.md       # Release runbook (one-time setup + routine flow)
+│   └── github-templates.md          # GitHub issue/PR template reference
 ├── packages/core/                   # @ts-launch-blueprint/core (private, no build step)
 │   ├── src/
-│   │   ├── schemas/                 # Zod schemas, converters, domain errors
+│   │   ├── schemas/                 # Zod schemas, converters, domain & ConfigError definitions
 │   │   ├── repositories/            # ProjectsRepository interface + HTTP / in-memory
 │   │   ├── services/                # Business rules (projects service)
 │   │   ├── composition.ts           # Composition root: picks the repository
@@ -66,24 +82,27 @@ ts-launch-blueprint/
 │   └── tests/                       # Core unit, contract, and public-API tests
 ├── apps/cli/                        # ts-launch-blueprint (the published package)
 │   ├── src/
-│   │   ├── cli/                     # CLI controller: router, commands, deps, config,
-│   │   │                            #   colors, logger, format, adapters, exit codes
+│   │   ├── cli/                     # CLI controller: router, noun-verb commands, xdg-paths,
+│   │   │                            #   config, format, logger, pager, diagnostics, crash-log
 │   │   ├── api.ts                   # createApiClient compatibility wrapper
 │   │   ├── cli.ts                   # Thin process entry (argv, signals, exit code)
 │   │   ├── lib.ts                   # Library entry point (importable package surface)
 │   │   └── version.ts               # VERSION, read from package.json at build time
-│   ├── tests/                       # In-process, e2e, and public-API tests
+│   ├── tests/                       # In-process, snapshot, property, e2e, and public-API tests
 │   ├── scripts/                     # copy-package-files.mjs (README/LICENSE for npm)
 │   ├── dist/                        # tsdown build output (generated, not tracked)
 │   └── tsdown.config.ts             # Build (bundler) configuration
 ├── apps/api/                        # @ts-launch-blueprint/api (private, not published)
 │   ├── src/
-│   │   ├── app.ts                   # Hono app: /healthz, /readyz, /trpc/*
-│   │   ├── config.ts                # PORT and TS_PROJECTS_SOURCE parsing (memory default)
-│   │   ├── router.ts                # tRPC router (projects.list) and the AppRouter type
+│   │   ├── app.ts                   # Hono app: /healthz, /readyz, /metrics, /trpc/*
+│   │   ├── config.ts                # Environment parsing (PORT, rate limit, CORS, TS_PROJECTS_SOURCE)
+│   │   ├── idempotency.ts           # Idempotency-Key response caching middleware
+│   │   ├── rate-limit.ts            # Opt-in sliding-window rate limiter
+│   │   ├── router.ts                # tRPC router (projects.list, projects.get) and AppRouter type
 │   │   ├── server.ts                # Thin process entry: config -> createCore -> serve
 │   │   └── trpc.ts                  # initTRPC with a { core } context
-│   ├── tests/                       # Router, app, config and e2e tests
+│   ├── tests/                       # Router, app, config, middleware, and e2e tests
+│   ├── Dockerfile                   # Multi-stage API container image (GHCR)
 │   ├── tsconfig.json                # Own tsconfig: isolatedDeclarations off (D-048)
 │   └── tsdown.config.ts             # Build (bundler) configuration
 ├── apps/web/                        # @ts-launch-blueprint/web (private, not published)
@@ -96,16 +115,20 @@ ts-launch-blueprint/
 │   │   ├── query-client.ts          # createQueryClient(): no 4xx retries, at most 2 otherwise
 │   │   ├── styles.css               # Plain CSS: variables, light/dark
 │   │   └── trpc.ts                  # createTRPCContext<AppRouter> (type-only import)
-│   ├── tests/                       # Screen, error, retry, URL-state, type, config and bundle tests
+│   ├── tests/                       # Screen, error, retry, URL-state, type, config, and E2E tests
 │   ├── index.html                   # Vite's HTML entry
 │   ├── tsconfig.json                # Own tsconfig: browser options, isolatedDeclarations off (D-054)
 │   ├── vite.config.ts               # React plugin; dev proxy /trpc -> :8080
 │   └── vitest.config.ts             # Vitest project `web` (jsdom)
-├── tests/
-│   └── repo-hygiene.test.ts         # Meta-tests (config drift, doc/link consistency)
-├── scripts/
-│   └── check-links.mjs              # Dependency-free relative-link checker for docs-check
+├── tests/                           # Repo-level meta-tests (hygiene, boundaries, press, setup, CI)
+├── scripts/                         # Link checker, setup scripts, shell/gitleaks/container/guard scripts
 ├── .codecov.yml                     # Codecov project/patch thresholds and flags
+├── .coderabbit.yaml                 # CodeRabbit AI review configuration
+├── .contributors.yml                # contributors-please classification and identity map
+├── .editorconfig                    # EditorConfig formatting rules
+├── .editorconfig-checker.json       # EditorConfig checker exclusions
+├── .gitleaks.toml                   # Gitleaks secret-scanning configuration
+├── .gitleaksignore                  # Gitleaks allowlist
 ├── .oxfmtrc.json                    # Oxfmt (formatter) configuration
 ├── .oxlintrc.json                   # Oxlint (linter) configuration
 ├── .release-please-manifest.json    # release-please's tracked current version
@@ -116,11 +139,14 @@ ts-launch-blueprint/
 ├── commitlint.config.mjs            # Conventional Commits enforcement
 ├── commitlint.config.d.mts          # Type declarations for the commitlint config
 ├── CONTRIBUTORS.md                  # Generated by contributors-please
+├── cspell.json                      # cspell dictionary and exclusions
 ├── EXAMPLECLI.md                    # ts-projects UX specification
 ├── Justfile                         # Command surface (see docs/tools/justfiles.md)
 ├── lefthook.yml                     # Git hooks configuration
 ├── LICENSE
+├── llms.txt                         # LLM-friendly repository navigation index
 ├── Makefile                         # Dependency bootstrap (see docs/tools/makefiles.md)
+├── mise.toml                        # mise toolchain manifest
 ├── package.json                     # Private workspace root
 ├── pnpm-workspace.yaml              # Workspace package list
 ├── pnpm-lock.yaml                   # pnpm lockfile
@@ -149,8 +175,8 @@ read the TypeScript directly.
 The `ts-projects` CLI and the published npm package
 (`ts-launch-blueprint`). `cli.ts` is the thin process entry point;
 `cli/router.ts` builds the Commander program and owns the exit-code
-mapping; `cli/commands/projects.ts` implements the default `projects`
-command. `lib.ts` re-exports the surface meant for consumers who import
+mapping; `cli/commands/` implements the noun-verb `projects`, `config`,
+`doctor`, and `completion` subcommands. `lib.ts` re-exports the surface meant for consumers who import
 the package as a library. `just build` bundles it, with the core, into
 `apps/cli/dist/` (never tracked in git).
 
@@ -158,7 +184,7 @@ the package as a library. `just build` bundles it, with the core, into
 
 The Hono + tRPC API (`@ts-launch-blueprint/api`, private): the second
 controller over the core. `src/router.ts` holds the tRPC router
-(`projects.list`, and the `AppRouter` type), `src/app.ts` the Hono app with
+(`projects.list`, `projects.get`, and the `AppRouter` type), `src/app.ts` the Hono app with
 `/healthz`, `/readyz` and `/trpc/*`, `src/config.ts` the environment parsing,
 and `src/server.ts` the thin process entry. It has its own `tsconfig.json`
 with `isolatedDeclarations` off (D-048). `just api` builds and starts it; see

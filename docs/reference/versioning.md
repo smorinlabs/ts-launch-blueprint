@@ -7,10 +7,6 @@ truth; release-please bumps both together (the CLI's through
 `extra-files`), exclusively in its generated Release PRs — never
 hand-edited. A repo-hygiene test keeps the two and the manifest equal.
 
-> **Publishing is paused during the V1 restructure (D-045).** `publish.yml`
-> runs only on manual dispatch, and Release PRs are not merged until V1 is
-> complete.
-
 ## Key Features
 
 - **Automatic Versioning**: release-please scans Conventional Commits
@@ -62,7 +58,7 @@ just release-status
 just pack-check
 ```
 
-See [Release Runbook](../maintainers-release.md) for the one-time
+See [Release Process](../RELEASE.md) for the one-time
 GitHub Environment / npm Trusted Publisher setup and the full routine
 release flow.
 
@@ -75,7 +71,7 @@ pnpm install
 # Check the version the built CLI reports
 just build
 just version
-# -> ts-projects 0.1.0
+# -> ts-projects <version>
 
 # Check the version.ts / package.json source of truth directly
 node -e "console.log(require('./package.json').version)"
@@ -97,15 +93,16 @@ Two workflows implement the release pipeline end to end:
 - **Action**: runs `googleapis/release-please-action` against
   `release-please-config.json` / `.release-please-manifest.json`,
   creating or updating the standing Release PR.
-- Uses the built-in `GITHUB_TOKEN` by default, which means merging the
-  Release PR tags the release but does **not** auto-trigger
-  `publish.yml` (a `GITHUB_TOKEN`-authored push cannot fire other
-  workflows). The workflow file documents, in a commented block, how to
-  upgrade to a GitHub App token so the tag push auto-triggers publish.
+- **Token auth**: mints a short-lived GitHub App installation token via
+  `actions/create-github-app-token@v3` when `RELEASE_PLEASE_CLIENT_ID` and
+  `RELEASE_PLEASE_PRIVATE_KEY` are configured, or falls back to
+  `RELEASE_PLEASE_APP_TOKEN` (fine-grained PAT). It intentionally does **not**
+  fall back to `GITHUB_TOKEN`, because tags pushed by `GITHUB_TOKEN` cannot
+  trigger `publish.yml`.
 
 ### `publish.yml`
 
-- **Trigger**: push of a `v*` tag.
+- **Trigger**: push of a `v*` tag (plus `workflow_dispatch` from a `v*` tag; `apps/cli` only).
 - **`verify` job** (unprivileged, no registry access): checks out full
   history, confirms the tag is an ancestor of `main`, confirms
   `tag == package.json version == manifest version`, runs `just all`,
@@ -115,6 +112,13 @@ Two workflows implement the release pipeline end to end:
   GitHub Environment (human-approved), mints an OIDC token, and runs
   `npm publish` — npm Trusted Publishing exchanges the OIDC token for a
   short-lived credential, so no npm token secret is stored anywhere.
+
+### `publish-container.yml`
+
+- **Trigger**: `release: [published]` (plus PRs and `merge_group` for build/smoke validation).
+- **Action**: builds `apps/api/Dockerfile`, verifies `/healthz`, and pushes
+  versioned and `latest` tags to GHCR using `GITHUB_TOKEN` (`packages: write`).
+  See [Release Process](../RELEASE.md) for details.
 
 ---
 
@@ -140,14 +144,14 @@ build` — `apps/cli/src/version.ts` reads `package.json` at build time via the
   `fix`, etc. — see `release-please-config.json`'s
   `changelog-sections`); `chore` commits are tracked but hidden from
   the changelog and don't trigger a version bump on their own.
-- **Merging the Release PR didn't publish**: with the default
-  `GITHUB_TOKEN` auth, the tag push from the bot does not trigger
-  `publish.yml`. Either push/re-run the tag manually, or configure the
-  GitHub App token upgrade documented in `release-please.yml`.
+- **Merging the Release PR didn't publish**: confirm `RELEASE_PLEASE_CLIENT_ID`
+  and `RELEASE_PLEASE_PRIVATE_KEY` (or `RELEASE_PLEASE_APP_TOKEN`) are configured
+  so the bot tag push triggers `publish.yml` (`GITHUB_TOKEN` pushes cannot trigger
+  downstream workflows; see [Release Process](../RELEASE.md)).
 - **`publish` job never runs**: it waits for approval in the protected
   `npm` environment — configure required reviewers under this
   repository's Settings > Environments (see
-  [Release Runbook](../maintainers-release.md)).
+  [Release Process](../RELEASE.md)).
 - **`npm publish` fails with an auth error**: the npm Trusted Publisher
   must be configured on npmjs.com for this package (repository owner/
   name, workflow file path `.github/workflows/publish.yml`, environment

@@ -1,5 +1,12 @@
-![CI](https://github.com/smorinlabs/ts-launch-blueprint/actions/workflows/ci.yml/badge.svg)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+[![npm version](https://img.shields.io/npm/v/ts-launch-blueprint.svg)](https://www.npmjs.com/package/ts-launch-blueprint)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![CI](https://github.com/smorinlabs/ts-launch-blueprint/actions/workflows/ci.yml/badge.svg)](https://github.com/smorinlabs/ts-launch-blueprint/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/smorinlabs/ts-launch-blueprint/branch/main/graph/badge.svg)](https://codecov.io/gh/smorinlabs/ts-launch-blueprint)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Oxc](https://img.shields.io/badge/Oxc-oxlint%20%2B%20oxfmt-7C3AED)](https://oxc.rs/)
+[![pnpm](https://img.shields.io/badge/pnpm-10-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://www.conventionalcommits.org/)
 
 # TS Launch Blueprint
 
@@ -8,6 +15,8 @@ strong developer-experience, CI, release, and open-source-readiness
 baseline. It is the TypeScript port of
 [py-launch-blueprint](https://github.com/smorinlabs/py-launch-blueprint),
 built in tested vertical slices (see `docs/port/TS_PORT_PLAN.md`).
+
+![TS Launch Blueprint Logo](./assets/images/logos/ts_launch_blueprint_logo_100x100.png)
 
 Zero-config development environment with type safety built in: stamp it with
 [template-press](https://github.com/smorinlabs/template-press) and you have a
@@ -193,7 +202,7 @@ TS_PROJECTS_PREPUSH_TESTS=1`.
 Full documentation lives in [`docs/`](./docs/docs.md) — plain
 GitHub-Flavored Markdown, no generated site:
 
-- [About](./docs/about/index.md) — philosophy and full feature list
+- [About](./docs/about/index.md) — philosophy, feature list, and [design decisions](./docs/about/design-decisions.md) ([ADRs](./docs/adr/README.md))
 - [Architecture](./docs/about/architecture.md) — the layers, how a request flows, how to add a feature
 - [Tutorials](./docs/tutorials/index.md) — guided full-project-setup walkthrough
 - [Tasks](./docs/tasks/index.md) — how-to guides (dependencies, type checking, CI/CD, debugging, contributing code)
@@ -207,7 +216,7 @@ GitHub-Flavored Markdown, no generated site:
 
 Versions are bumped automatically by [release-please](https://github.com/googleapis/release-please) from Conventional Commit history; there is no hand-edited version file. When you merge a Release PR (titled `chore(release): publish v*`), release-please tags the commit as `vX.Y.Z`, which triggers the `publish.yml` workflow. That workflow runs a `verify` job (free of registry contact) that confirms the tag matches package.json and `.release-please-manifest.json`, then runs the full quality gate and build before queuing the `publish` job. Merging the Release PR cuts the release; publishing then requires a one-click approval of the `npm` environment deployment.
 
-Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no long-lived npm token is ever stored. Use `just release-status` to check for version drift (package.json, manifest, latest tag) and `just pack-check` to locally validate the packaged distribution. See [docs/maintainers-release.md](./docs/maintainers-release.md) for setup and release runbook details.
+Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no long-lived npm token is ever stored. Use `just release-status` to check for version drift (package.json, manifest, latest tag) and `just pack-check` to locally validate the packaged distribution. See [docs/RELEASE.md](./docs/RELEASE.md) for setup and release runbook details and [docs/PROJECT_SETUP.md](./docs/PROJECT_SETUP.md) for the post-init repository checklist.
 
 ## Contributing
 

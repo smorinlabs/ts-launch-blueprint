@@ -1,19 +1,19 @@
 # SPDX-License-Identifier: MIT
 
-# Publish (D-021(5), D-012(5)): a `v*` tag (pushed when a release-please Release
-# PR is merged) triggered — and, once re-enabled after D-045, triggers again — a cheap `verify` gate that must pass before the
-# environment-gated `publish` job runs. This is the direct descendant of the
-# Python source's release.yml tag-vs-version guard, upgraded from a
-# commented-out publish block to a wired-but-protected npm Trusted Publishing
-# flow (no long-lived publish secret anywhere; OIDC only).
+# Publish (D-021(5), D-012(5), Q2.A resolving D-045): a `v*` tag (pushed when a
+# release-please Release PR is merged) triggers a cheap `verify` gate that must
+# pass before the environment-gated `publish` job runs. `apps/cli`
+# (`ts-launch-blueprint`) is the sole published package (`Q2.A`);
+# `packages/core` remains private and bundled. Uses npm Trusted Publishing
+# (OIDC only; no long-lived publish secret anywhere).
 
 name: Publish
 
-# Paused during the V1 restructure (D-045); re-enable the `v*` tag trigger
-# once the published package set is decided. Until then a maintainer runs it
-# by hand ("Run workflow", choosing the v* tag as the ref); the verify job
-# rejects any non-tag ref.
 on:
+  push:
+    tags:
+      - 'v*'
+  # Manual dispatch fallback (must target a v* tag, never a branch).
   workflow_dispatch:
 
 # Deny-all baseline (D-022(10)); each job re-grants only what it needs.
@@ -62,7 +62,7 @@ jobs:
       - name: Assert tag is an ancestor of main (D-021(5))
         run: |-
           set -euo pipefail
-          # Manual dispatch (D-045) must target a v* tag, never a branch.
+          # Triggered or manually dispatched runs must target a v* tag, never a branch.
           if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${GITHUB_REF_NAME#v}" = "${GITHUB_REF_NAME}" ]; then
             echo "::error::Run this workflow from a v* tag (got ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME})."
             exit 1

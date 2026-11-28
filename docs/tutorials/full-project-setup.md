@@ -70,7 +70,7 @@ With `just setup-hooks` wired:
 - **pre-commit** runs oxfmt (auto-fixing staged files), oxlint, boundary
   checks (`depcruise`), `shellcheck`, `actionlint`, `editorconfig-checker`,
   `cspell`, `pnpm-lock-check`, `check-large-files`, `gitleaks`, and a
-  full-program `tsc --noEmit` — in parallel.
+  full-program `tsc --noEmit` — sequentially.
 - **commit-msg** runs commitlint against your commit message
   ([Conventional Commits](https://www.conventionalcommits.org/), 100/200/200
   header/body/footer line-length limits).
@@ -146,30 +146,43 @@ just api-dev                # start API in tsx watch mode
 
 ## Project Commands Reference
 
-| Task                 | Recipe                       | Underlying command                               |
-| -------------------- | ---------------------------- | ------------------------------------------------ |
-| Unified setup        | `just setup`                 | Level 2 setup (analyzers, `pnpm install`, hooks) |
-| Install deps         | `just install`               | Pinned tools + `pnpm install`                    |
-| Developer cycle      | `just dev` (`cycle`)         | format + lint + typecheck + test + build         |
-| Setup git hooks      | `just setup-hooks`           | `pnpm exec lefthook install` + `.gitmessage`     |
-| Run pre-commit       | `just hooks-run` (`hooks`)   | `pnpm exec lefthook run pre-commit --all-files`  |
-| CI pre-commit        | `just pre-commit-run` (`pc`) | `pnpm exec lefthook run pre-commit --all-files`  |
-| Verify commits       | `just verify-commits`        | `pnpm exec commitlint`                           |
-| Format               | `just format`                | `pnpm exec oxfmt`                                |
-| Format check         | `just format-check`          | `pnpm exec oxfmt --check`                        |
-| Lint                 | `just lint`                  | `pnpm exec oxlint`                               |
-| Type check           | `just typecheck`             | `pnpm run typecheck`                             |
-| Test                 | `just test`                  | `pnpm exec vitest run`                           |
-| Coverage             | `just coverage`              | `pnpm run test:coverage`                         |
-| Coverage report      | `just open-coverage-report`  | Open `coverage/index.html` in browser            |
-| All quality gates    | `just all`                   | All check, lint, typecheck, and test gates       |
-| Build                | `just build`                 | `pnpm -r --filter './apps/*' build` (tsdown)     |
-| Run built CLI        | `just run [args]`            | `node apps/cli/dist/cli.js [args]`               |
-| Run API / dev API    | `just api` / `just api-dev`  | built `server.js` / `tsx watch src/server.ts`    |
-| Select interactively | `just select-shell`          | `just --choose`                                  |
-| Clean artifacts      | `just clean`                 | Remove `apps/*/dist`, `packages/*/dist`, caches  |
-| Docs link check      | `just docs-check`            | `node scripts/check-links.mjs README.md docs`    |
-| Full CI mirror       | `just ci`                    | install + all + docs-check + build + lefthook    |
+| Task                 | Recipe                                       | Underlying command                               |
+| -------------------- | -------------------------------------------- | ------------------------------------------------ |
+| Unified setup        | `just setup`                                 | Level 2 setup (analyzers, `pnpm install`, hooks) |
+| Check dependencies   | `just check-deps` (`c`)                      | Verify required base and hook tools are present  |
+| Install deps         | `just install`                               | Pinned tools + `pnpm install`                    |
+| Developer cycle      | `just dev` (`cycle`)                         | format + lint + typecheck + test + build         |
+| Setup git hooks      | `just setup-hooks`                           | `pnpm exec lefthook install` + `.gitmessage`     |
+| Run pre-commit       | `just hooks-run` (`hooks`)                   | `pnpm exec lefthook run pre-commit --all-files`  |
+| CI pre-commit        | `just pre-commit-run` (`pc`)                 | `pnpm exec lefthook run pre-commit --all-files`  |
+| Verify commits       | `just verify-commits`                        | `pnpm exec commitlint`                           |
+| Format               | `just format`                                | `pnpm exec oxfmt`                                |
+| Format check         | `just format-check`                          | `pnpm exec oxfmt --check`                        |
+| Lint                 | `just lint`                                  | `pnpm exec oxlint`                               |
+| Architecture rules   | `just check-boundaries`                      | `pnpm exec depcruise` over `packages` + `apps`   |
+| Shell & workflows    | `just check-shell` / `check-workflows`       | `shellcheck` + `actionlint`                      |
+| EditorConfig & spell | `just check-editorconfig` / `check-spelling` | `editorconfig-checker` + `cspell`                |
+| Secret scan          | `just check-gitleaks`                        | `gitleaks` staged/range secret scan              |
+| Dependency audit     | `just audit`                                 | `pnpm audit --audit-level=high`                  |
+| Type check           | `just typecheck`                             | `pnpm run typecheck`                             |
+| Test                 | `just test`                                  | `pnpm exec vitest run`                           |
+| Bun advisory tests   | `just test-bun`                              | `bun run vitest run --exclude tests/e2e.test.ts` |
+| Web E2E tests        | `just test-web-e2e`                          | Playwright Chromium E2E against built API + web  |
+| Coverage             | `just coverage`                              | `pnpm run test:coverage`                         |
+| Coverage report      | `just open-coverage-report`                  | Open `coverage/index.html` in browser            |
+| All quality gates    | `just all`                                   | All check, lint, typecheck, and test gates       |
+| Build                | `just build`                                 | `pnpm -r --filter './apps/*' build` (tsdown)     |
+| Pack & smoke check   | `just pack-check`                            | `publint`, `attw`, tarball install + smoke test  |
+| Release drift check  | `just release-status`                        | Compare `package.json`, manifest, and latest tag |
+| Press verification   | `just press-verify`                          | Hermetic `template-press` verification           |
+| Run built CLI        | `just run [args]`                            | `node apps/cli/dist/cli.js [args]`               |
+| Run API / dev API    | `just api` / `just api-dev`                  | built `server.js` / `tsx watch src/server.ts`    |
+| Run web dev server   | `just web`                                   | Vite dev server proxying `/trpc` to `:8080`      |
+| Select interactively | `just select-shell`                          | `just --choose`                                  |
+| Debug info           | `just debug-info`                            | Collect system/tool info for bug reports         |
+| Clean artifacts      | `just clean`                                 | Remove `apps/*/dist`, `packages/*/dist`, caches  |
+| Docs link check      | `just docs-check`                            | `node scripts/check-links.mjs README.md docs`    |
+| Full CI mirror       | `just ci`                                    | install + all + docs-check + build + lefthook    |
 
 ## Release Flow
 
@@ -187,9 +200,11 @@ just pack-check        # local-only: build, publint, attw, npm pack --dry-run,
                         # install the tarball, smoke-test the bin + ESM import
 ```
 
-See [docs/maintainers-release.md](../maintainers-release.md) for the
-full release runbook (one-time environment setup + routine release
-steps).
+See [docs/RELEASE.md](../RELEASE.md) for the full release runbook (one-time
+environment setup + routine release steps),
+[docs/PROJECT_SETUP.md](../PROJECT_SETUP.md) for the post-initialization
+repository checklist, and [docs/POST_INIT.md](../POST_INIT.md) for the post-stamp
+entry pointer.
 
 ## Additional Resources
 

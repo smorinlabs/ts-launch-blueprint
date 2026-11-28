@@ -58,7 +58,7 @@ settings — there is no separate config file for those formats.
 ## Pre-commit integration
 
 Formatting runs automatically on every commit via
-[lefthook](lefthook.md#pre-commit-parallel-jobs-staged-files-only): the
+[lefthook](lefthook.md#pre-commit-sequential-jobs-staged-files-only): the
 `format` job runs `oxfmt` on staged files matching
 `*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,toml,md}` and re-stages any fixes
 (`stage_fixed: true`).

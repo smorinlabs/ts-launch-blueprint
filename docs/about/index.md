@@ -5,10 +5,4 @@ Welcome to TS Launch Blueprint! This section covers the project's purpose, philo
 - [Philosophy](philosophy.md)
 - [Features](features.md)
 - [Architecture](architecture.md) — the layers, how a request flows, how to add a feature
-
-> [!NOTE]
-> This project does not yet have its own logo. The source repository's logo
-> was Python-branded artwork and was not carried over; a new TS-branded logo
-> is future work. See
-> [`assets/images/logos/PLACEHOLDER.md`](../../assets/images/logos/PLACEHOLDER.md)
-> for where it goes and how to wire it in once it exists.
+- [Design Decisions](design-decisions.md) — thematic index of every tool, library, and configuration choice (linking to [ADRs](../adr/README.md))

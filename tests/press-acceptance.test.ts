@@ -43,11 +43,14 @@ const DEST_IDENTITY = {
 } as const;
 
 function runOrThrow(cmd: string, args: string[], cwd: string): string {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  delete env['pnpm_config_verify_deps_before_run'];
+  delete env['npm_config_verify_deps_before_run'];
   const result = spawnSync(cmd, args, {
     cwd,
     encoding: 'utf8',
     timeout: 240_000,
-    env: process.env,
+    env,
   });
   if (result.status !== 0) {
     throw new Error(
@@ -281,6 +284,7 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
         'docs/port',
         'projects',
         'assets/images/logos',
+        '.oss-scanner',
       ]) {
         expect(existsSync(join(target, removed)), `expected removed: ${removed}`).toBe(false);
       }
@@ -346,6 +350,7 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
         ['.github/SECURITY.md', 'press/stubs/security.md'],
         ['.claude/skills/new-ts-project/README.md', 'press/stubs/retired-bootstrap.md'],
         ['docs/skills/new-ts-project.md', 'press/stubs/bootstrap-provenance.md'],
+        ['docs/POST_INIT.md', 'press/stubs/post-init.md'],
         ['docs/about/index.md', 'press/stubs/about-index.md'],
         ['docs/about/philosophy.md', 'press/stubs/project-philosophy.md'],
         ['docs/tutorials/full-project-setup.md', 'press/stubs/application-setup.md'],
@@ -356,8 +361,20 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
       }
 
       const provenanceDoc = readFileSync(join(target, 'docs/skills/new-ts-project.md'), 'utf8');
-      expect(provenanceDoc).not.toContain('PROJECT_SETUP.md');
-      expect(provenanceDoc).not.toContain('POST_INIT.md');
+      expect(provenanceDoc).toContain('PROJECT_SETUP.md');
+      expect(provenanceDoc).toContain('RELEASE.md');
+      expect(provenanceDoc).not.toContain('maintainers-release.md');
+
+      for (const retainedDoc of [
+        'docs/PROJECT_SETUP.md',
+        'docs/RELEASE.md',
+        'docs/adr/README.md',
+        'docs/about/design-decisions.md',
+      ]) {
+        expect(existsSync(join(target, retainedDoc)), `expected retained doc: ${retainedDoc}`).toBe(
+          true
+        );
+      }
 
       // 6. Regenerated lockfile carries the new workspace scope and no source identity.
       const lockfile = readFileSync(join(target, 'pnpm-lock.yaml'), 'utf8');

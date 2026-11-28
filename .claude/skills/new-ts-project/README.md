@@ -51,7 +51,7 @@ the template exits the skill without introducing a separate minimal-setup mode.
 | Order         | Check base tools (`make check` / `make bootstrap`), check press tools, preview cleanup, clean, preview rebrand, apply, `just setup`, `oxfmt`, validate                          |
 | Validation    | `just all`, `just docs-check`, `just build` (including `apps/web`), `just pack-check`, `press verify`, CLI `--help` / `--version`, and `scripts/smoke-api.sh` against built API |
 | Delivery      | Initialization branch and pull request with validation evidence                                                                                                                 |
-| Ongoing setup | Generated `docs/tutorials/full-project-setup.md` and `docs/maintainers-release.md` hold setup and release steps                                                                 |
+| Ongoing setup | Generated `docs/PROJECT_SETUP.md` (`docs/POST_INIT.md`) and `docs/RELEASE.md` hold setup and release steps                                                                      |
 
 The template's declared edits reset initial versions before lock regeneration.
 Declared resets and removals retire template history and maintenance content.

@@ -1,38 +1,26 @@
 # SPDX-License-Identifier: MIT
 # cspell:ignore smorinlabs
 
-# Automated contributors-list bot PR (D-022(11), D-024(9)).
+# Automated contributors-list bot PR (D-022(11), D-024(9), P13-T07).
 #
-# Ports the Python source's bot-PR *pattern* (idempotent branch sync, bot
-# commit identity, PR-not-push, explicit permissions) but replaces both the
-# Python source's contributor-list-generation script AND the separate
-# peter-evans/create-pull-request step with the org's own
-# smorinlabs/contributors-please-action, which performs generation, the
-# branch-sync/commit, and the PR creation/update as a single atomic step in
-# `mode: pull-request` (verified against its README 2026-07: this mode is
-# generative/commit-oriented, not merely a PR-comment reviewer, so it is a
-# faithful single-implementation replacement for the source's two-step
-# script+create-pull-request pipeline).
+# Replaces the Python source's separate generation script + create-pull-request
+# pipeline with smorinlabs/contributors-please-action in `mode: pull-request`.
 #
-# Trigger set is schedule + workflow_dispatch (per plan), which intentionally
-# diverges from the source workflow's literal push/pull_request/workflow_dispatch
-# triggers: neither the source file nor contributors-please-action's own
-# documented usage example runs on a schedule, but a weekly cadence avoids the
-# run-on-every-push noise a push trigger would add on top of the already-heavy
-# CI/CodeQL/dependency-review triggers, while workflow_dispatch keeps the
-# on-demand escape hatch the source relied on.
+# Triggers on push to `main` (ignoring CONTRIBUTORS.md and .contributors.jsonl
+# so bot merges never loop) plus `workflow_dispatch`. Does NOT use `[skip ci]`
+# in `commit-message` so required PR checks still run on bot PRs.
 #
-# Credentials: `pat` uses the workflow's own GITHUB_TOKEN so the template
-# works out of the box with zero extra setup. Adopters who install the
-# contributors-please GitHub App can additionally set the
-# CONTRIBUTORS_PLEASE_APP_ID / CONTRIBUTORS_PLEASE_PRIVATE_KEY repository
-# secrets — the action prefers App credentials over the PAT fallback whenever
-# both are present, with no workflow change required.
+# Credentials: `pat` uses GITHUB_TOKEN out of the box, while optional
+# CONTRIBUTORS_PLEASE_CLIENT_ID / CONTRIBUTORS_PLEASE_PRIVATE_KEY secrets take
+# precedence when configured.
 name: Update Contributors
 
 on:
-  schedule:
-    - cron: '17 6 * * 1' # weekly, Monday 06:17 UTC
+  push:
+    branches: [main]
+    paths-ignore:
+      - CONTRIBUTORS.md
+      - .contributors.jsonl
   workflow_dispatch:
 
 # Deny-all baseline (D-022(10)); the job re-grants the least-privilege set
@@ -41,7 +29,7 @@ permissions: {}
 
 jobs:
   update-contributors:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
     permissions:
       contents: write
       pull-requests: write
@@ -51,6 +39,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # Third-party action → full-SHA pin + version comment (D-022(9)); kept
       # fresh by the Dependabot github-actions ecosystem.
@@ -67,3 +56,7 @@ jobs:
           state-file: .contributors.jsonl
           config-file: .contributors.yml
           bootstrap: 'true'
+          # Omit [skip ci] (action default): [skip ci] suppresses pull_request
+          # workflows required by main branch protection, deadlocking bot PRs.
+          # Loop prevention relies on paths-ignore above instead.
+          commit-message: 'docs: update contributors'

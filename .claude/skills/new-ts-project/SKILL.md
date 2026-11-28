@@ -15,9 +15,9 @@ directory without a local blueprint clone) or **project-scoped** inside a
 `ts-launch-blueprint` checkout. Rebranding removes the generated target's copy
 of `SKILL.md` and retires its companion documentation, so when running from a
 local blueprint checkout keep reading the runbook from that checkout rather
-than the generated target. The generated project's ongoing setup guide is
-`docs/tutorials/full-project-setup.md`, and its release guide is
-`docs/maintainers-release.md`.
+than the generated target. The generated project's ongoing setup checklist is
+`docs/PROJECT_SETUP.md` (with `docs/POST_INIT.md` as its post-init pointer), and
+its release guide is `docs/RELEASE.md`.
 
 ## Scope and authorization
 
@@ -312,9 +312,9 @@ local checks from pending or completed GitHub checks. The delivered result is
 an initialization PR; do not push the initialization directly to the default
 branch or treat an open PR as merged.
 
-Point to the generated `docs/tutorials/full-project-setup.md` for ongoing setup
-and `docs/maintainers-release.md` for npm Trusted Publishing and release
-configuration. Continue those tasks only when they are part of the user's
+Point to the generated `docs/PROJECT_SETUP.md` (and `docs/POST_INIT.md`) for
+ongoing repository setup and `docs/RELEASE.md` for npm Trusted Publishing and
+release configuration. Continue those tasks only when they are part of the user's
 requested scope.
 
 ## Failure handling

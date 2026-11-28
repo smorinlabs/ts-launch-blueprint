@@ -170,6 +170,25 @@ describe('template-press configuration contract', () => {
     expect(removedFiles).not.toContain('scripts/guard.sh');
     expect(removedFiles).not.toContain('tests/guard.test.ts');
   });
+
+  it('excludes and resets docs/POST_INIT.md via press/stubs/post-init.md (P13)', () => {
+    const excludeSection = rulesToml.match(/extra_exclude_files\s*=\s*\[([\s\S]*?)\]/)?.[1] ?? '';
+    expect(excludeSection).toContain('"docs/POST_INIT.md"');
+    expect(rulesToml).toMatch(
+      /\[\[reset\]\]\s+file\s*=\s*"docs\/POST_INIT\.md"\s+stub_file\s*=\s*"press\/stubs\/post-init\.md"/
+    );
+  });
+
+  it('removes .oss-scanner and assets/images/logos and keeps press/stubs/security.md aligned (P13 M6)', () => {
+    expect(rulesToml).toMatch(/\[\[remove\]\]\s+dir\s*=\s*"\.oss-scanner"/);
+    expect(rulesToml).toMatch(/\[\[remove\]\]\s+dir\s*=\s*"assets\/images\/logos"/);
+    expect(rulesToml).not.toContain('template logo placeholder');
+
+    const securityStub = readText('press/stubs/security.md');
+    expect(securityStub).toContain('Reporting a Vulnerability');
+    expect(securityStub).toContain('Code Scanning Setup');
+    expect(securityStub).toContain('not-configured');
+  });
 });
 
 describe('scripts/reset-version.mjs', () => {
