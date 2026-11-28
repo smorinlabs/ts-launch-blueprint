@@ -128,7 +128,12 @@ describe('audit-triage workflow & policy contracts', () => {
     expect(validate.env?.MUSE_ACTION_CONCLUSION).toBe('${{ steps.muse.outputs.conclusion }}');
 
     const finish = stepNamed(workflow, 'Verify scope and touched URLs');
-    expect(finish.if).toBe("always() && steps.create-pr.outcome == 'success'");
+    expect(finish.if).toContain("steps.create-pr.outcome == 'success'");
+    expect(finish.if).toContain("steps.prepare.outputs.resume_mode == 'finish'");
+    expect(finish.env?.MUSE_CI_PR).toContain('steps.prepare.outputs.resume_pr');
+
+    const createPr = stepNamed(workflow, 'Create triage PR');
+    expect(createPr.if).toContain("steps.prepare.outputs.resume_mode == 'create_pr'");
 
     const names = workflow.jobs.triage.steps.map((s) => s.name);
     expect(names.indexOf('Validate repair before publication')).toBeLessThan(
@@ -377,11 +382,138 @@ summary_text = mod.summarize_url_checks(
 )
 assert "1 pass" in summary_text and "1 skip" in summary_text and "manual verification" in summary_text
 
+# P14: check-links.mjs broken-link format & finding target extraction
+check_links_log = (
+    "2026-11-28T05:00:01Z broken link: docs/guide.md -> ./missing.md (resolved: /repo/docs/missing.md)\\n"
+    "2026-11-28T05:00:02Z docs-check: 10 file(s) scanned, 20 relative link(s) checked, 1 broken\\n"
+)
+cl_broken = mod.extract_broken_lines(check_links_log)
+assert cl_broken == ["broken link: docs/guide.md -> ./missing.md (resolved: /repo/docs/missing.md)"]
+files, targets = mod.extract_finding_targets(broken + cl_broken)
+assert "docs/x" in files and "docs/guide.md" in files
+assert "https://example.invalid/dead" in targets and "./missing.md" in targets
+
+# P14: diff validation rejects unrelated docs edits and accepts link fixes or created targets
+assert mod.diff_addresses_findings(["docs/other.md"], "--- a/docs/other.md\\n+++ b/docs/other.md\\n-unrelated\\n+changed\\n", ["docs/guide.md"], ["./missing.md"]) is False
+assert mod.diff_addresses_findings(["docs/guide.md"], "--- a/docs/guide.md\\n+++ b/docs/guide.md\\n-see [x](./missing.md)\\n+see [x](./real.md)\\n", ["docs/guide.md"], ["./missing.md"]) is True
+assert mod.diff_addresses_findings(["docs/missing.md"], "--- /dev/null\\n+++ b/docs/missing.md\\n+# New\\n", ["docs/guide.md"], ["./missing.md"]) is True
+assert mod.diff_addresses_findings(["docs/x.md"], "--- a/docs/x.md\\n+++ b/docs/x.md\\n-old https://example.invalid/dead\\n+new https://example.invalid/ok\\n", ["docs/x"], ["https://example.invalid/dead"]) is True
+
+# P14: safe root .npmrc allowed while secret-bearing or nested .npmrc is rejected
+import tempfile, subprocess
+from pathlib import Path
+with tempfile.TemporaryDirectory() as td:
+    tmp = Path(td)
+    (tmp / ".npmrc").write_text("managePackageManagerVersions=true\\npackageManagerStrict=true\\npublic-hoist-pattern[]=@typescript/typescript-*\\n")
+    assert mod.is_safe_tracked_npmrc(tmp, ".npmrc") is True
+    assert mod.is_safe_tracked_npmrc(tmp, "sub/.npmrc") is False
+    (tmp / ".npmrc").write_text("//registry.npmjs.org/:_authToken=secret\\n")
+    assert mod.is_safe_tracked_npmrc(tmp, ".npmrc") is False
+    (tmp / ".npmrc").write_text("token=\${NPM_TOKEN}\\n")
+    assert mod.is_safe_tracked_npmrc(tmp, ".npmrc") is False
+
+# P14: validate_triage_tree allows safe tracked .npmrc and rejects secret .npmrc or untracked .env
+guard = mod.guard_module()
+with tempfile.TemporaryDirectory() as td:
+    t_repo = Path(td)
+    subprocess.run(["git", "init", "-q", "--initial-branch=main", str(t_repo)], check=True)
+    subprocess.run(["git", "-C", str(t_repo), "config", "user.name", "Test"], check=True)
+    subprocess.run(["git", "-C", str(t_repo), "config", "user.email", "t@example.com"], check=True)
+    (t_repo / ".npmrc").write_text("managePackageManagerVersions=true\\npackageManagerStrict=true\\n")
+    (t_repo / "README.md").write_text("# hi\\n")
+    subprocess.run(["git", "-C", str(t_repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(t_repo), "commit", "-q", "-m", "init"], check=True)
+    mod.validate_triage_tree(guard, t_repo)
+    # Untracked .env must be refused
+    (t_repo / ".env").write_text("SECRET=1\\n")
+    try:
+        mod.validate_triage_tree(guard, t_repo)
+        raise AssertionError("expected refusal for untracked .env")
+    except mod.RefusalError:
+        pass
+    (t_repo / ".env").unlink()
+    # Secret-bearing tracked .npmrc must be refused
+    (t_repo / ".npmrc").write_text("//registry.npmjs.org/:_authToken=secret\\n")
+    try:
+        mod.validate_triage_tree(guard, t_repo)
+        raise AssertionError("expected refusal for secret .npmrc")
+    except mod.RefusalError:
+        pass
+
+# P14: partial-run resume (branch-only -> create_pr, PR-without-table -> finish, completed PR -> refuse, foreign branch -> refuse)
+with tempfile.TemporaryDirectory() as td:
+    td_path = Path(td)
+    remote = td_path / "remote.git"
+    repo = td_path / "repo"
+    runner_tmp = td_path / "tmp"
+    runner_tmp.mkdir()
+    subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+    subprocess.run(["git", "init", "-q", "--initial-branch=main", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "Maintainer"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "m@example.com"], check=True)
+    (repo / "docs").mkdir()
+    (repo / "docs" / "a.md").write_text("hello\\n")
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], check=True)
+    base_sha = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", str(remote)], check=True)
+    subprocess.run(["git", "-C", str(repo), "push", "-q", "origin", "main"], check=True)
+
+    # Create a bot-authored triage branch pushed to origin
+    branch = "bot/weekly-audit-77"
+    subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", branch], check=True)
+    (repo / "docs" / "a.md").write_text("fixed\\n")
+    subprocess.run(["git", "-C", str(repo), "add", "docs/a.md"], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=github-actions[bot]", "-c", f"user.email={mod.BOT_EMAIL}", "commit", "-q", "-m", "fix(docs): triage weekly-audit run 77"], check=True)
+    subprocess.run(["git", "-C", str(repo), "push", "-q", "origin", branch], check=True)
+    subprocess.run(["git", "-C", str(repo), "checkout", "-q", "main"], check=True)
+    subprocess.run(["git", "-C", str(repo), "branch", "-q", "-D", branch], check=True)
+
+    gh_out = td_path / "out"
+    gh_env = td_path / "env"
+    env_map = {"RUNNER_TEMP": str(runner_tmp), "GITHUB_OUTPUT": str(gh_out), "GITHUB_ENV": str(gh_env)}
+
+    class ResumeAPI:
+        def __init__(self, pulls, refs, comments=None):
+            self.pulls, self.refs, self.comments = pulls, refs, comments or []
+        def get(self, path):
+            if "/pulls?" in path:
+                return self.pulls
+            if "/matching-refs/" in path:
+                return self.refs
+            if "/comments" in path:
+                return self.comments
+            raise AssertionError(f"unexpected path {path}")
+
+    # 1. Branch exists without PR -> resumes create_pr
+    mode = mod.prepare_resume(repo, ResumeAPI([], [{"ref": f"refs/heads/{branch}"}]), "o/r", "o", "main", "77", base_sha, base_sha, branch, env_map)
+    assert mode == "create_pr" and "resume_mode" in gh_out.read_text()
+
+    # 2. PR exists without verification table -> resumes finish
+    pr_obj = {"number": 501, "user": {"login": mod.BOT_LOGIN, "type": "Bot"}, "head": {"ref": branch}, "base": {"ref": "main"}}
+    mode2 = mod.prepare_resume(repo, ResumeAPI([pr_obj], [], comments=[]), "o/r", "o", "main", "77", base_sha, base_sha, branch, env_map)
+    assert mode2 == "finish"
+
+    # 3. PR exists WITH verification table -> refuses
+    try:
+        mod.prepare_resume(repo, ResumeAPI([pr_obj], [], comments=[{"user": {"login": mod.BOT_LOGIN}, "body": "## Triage URL verification\\n| URL |"}]), "o/r", "o", "main", "77", base_sha, base_sha, branch, env_map)
+        raise AssertionError("expected refusal for completed PR")
+    except mod.RefusalError:
+        pass
+
+    # 4. PR owned by non-bot user -> refuses
+    foreign_pr = {"number": 502, "user": {"login": "mallory", "type": "User"}, "head": {"ref": branch}, "base": {"ref": "main"}}
+    try:
+        mod.prepare_resume(repo, ResumeAPI([foreign_pr], []), "o/r", "o", "main", "77", base_sha, base_sha, branch, env_map)
+        raise AssertionError("expected refusal for non-bot PR")
+    except mod.RefusalError:
+        pass
+
 print("OK")
 `;
       const result = runPython(pyScript);
       expect(result.status).toBe(0);
-      expect(result.stdout.trim()).toBe('OK');
+      expect(result.stdout.trim().split('\n').at(-1)).toBe('OK');
     }
   );
 });

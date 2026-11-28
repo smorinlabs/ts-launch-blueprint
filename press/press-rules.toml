@@ -183,6 +183,10 @@ file = ".contributors.yml"
 reason = "template contributor automation configuration"
 
 [[remove]]
+file = ".contributors.jsonl"
+reason = "template contributor state ledger; a child repository starts its own"
+
+[[remove]]
 file = "CONTRIBUTORS.md"
 reason = "template contributor roster; a child repository starts its own"
 
