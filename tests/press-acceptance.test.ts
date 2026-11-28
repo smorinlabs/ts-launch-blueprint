@@ -6,17 +6,22 @@
 // Optionally point at a local template-press checkout:
 //   PRESS_ACCEPTANCE=1 TEMPLATE_PRESS_PROJECT=/path/to/template-press \
 //     pnpm exec vitest run tests/press-acceptance.test.ts
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   rmSync,
+  statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -89,7 +94,11 @@ function copyWorkingTreeToTempRepo(targetDir: string): void {
     if (!existsSync(src)) continue;
     const dst = join(targetDir, rel);
     mkdirSync(dirname(dst), { recursive: true });
-    cpSync(src, dst, { verbatimSymlinks: true });
+    if (lstatSync(src).isSymbolicLink()) {
+      symlinkSync(readlinkSync(src), dst);
+    } else {
+      cpSync(src, dst, { verbatimSymlinks: true });
+    }
   }
   runOrThrow('git', ['init', '-q', '--initial-branch=main'], targetDir);
   runOrThrow('git', ['config', 'user.name', 'Press Acceptance'], targetDir);
@@ -108,8 +117,66 @@ function copyWorkingTreeToTempRepo(targetDir: string): void {
   );
 }
 
+function getFreePort(): Promise<number> {
+  return new Promise((resolvePort, rejectPort) => {
+    const srv = createServer();
+    srv.unref();
+    srv.on('error', rejectPort);
+    srv.listen(0, '127.0.0.1', () => {
+      const addr = srv.address();
+      if (addr === null || typeof addr === 'string') {
+        srv.close(() => rejectPort(new Error('Failed to bind ephemeral TCP port')));
+        return;
+      }
+      const { port } = addr;
+      srv.close((err) => {
+        if (err) rejectPort(err);
+        else resolvePort(port);
+      });
+    });
+  });
+}
+
+async function smokeTestBuiltApi(targetDir: string): Promise<void> {
+  const port = await getFreePort();
+  const child = spawn(process.execPath, ['apps/api/dist/server.js'], {
+    cwd: targetDir,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      LOG_LEVEL: 'silent',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stderr = '';
+  child.stderr.on('data', (chunk: Buffer) => {
+    stderr += chunk.toString('utf8');
+  });
+
+  try {
+    runOrThrow('sh', ['scripts/smoke-api.sh', `http://127.0.0.1:${port}`, '20'], targetDir);
+  } catch (err) {
+    throw new Error(`${err instanceof Error ? err.message : String(err)}\napi stderr:\n${stderr}`, {
+      cause: err,
+    });
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      await new Promise<void>((resolveStop) => {
+        const killTimer = setTimeout(() => {
+          child.kill('SIGKILL');
+        }, 5000);
+        child.once('exit', () => {
+          clearTimeout(killTimer);
+          resolveStop();
+        });
+        child.kill('SIGTERM');
+      });
+    }
+  }
+}
+
 describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
-  it('stamps a child repo cleanly, preserves difftree-pr-comment.yml intact, and passes child gates', () => {
+  it('stamps a child repo cleanly, preserves difftree-pr-comment.yml intact, and passes child gates', async () => {
     const scratch = mkdtempSync(join(tmpdir(), 'ts-press-acceptance-'));
     const target = join(scratch, DEST_IDENTITY.repo_name);
     mkdirSync(target, { recursive: true });
@@ -127,6 +194,44 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
       const [pressBin, pressBaseArgs] = pressCommand();
       const runPress = (args: string[]): string =>
         runOrThrow(pressBin, [...pressBaseArgs, ...args], target);
+
+      // 0. [[clean]] removes declared ignored build/coverage outputs without
+      // touching tracked files or unignored untracked files.
+      mkdirSync(join(target, 'coverage'), { recursive: true });
+      writeFileSync(join(target, 'coverage', 'tracked-control.txt'), 'tracked\n', 'utf8');
+      runOrThrow('git', ['add', '--force', 'coverage/tracked-control.txt'], target);
+      runOrThrow('git', ['commit', '-q', '-m', 'test: add tracked control'], target);
+      writeFileSync(join(target, 'tests', 'local-control.txt'), 'unignored\n', 'utf8');
+
+      const cleanableOutputs = [
+        'apps/cli/dist/stale.js',
+        'apps/api/dist/stale.js',
+        'apps/web/dist/stale.js',
+        'packages/core/dist/stale.js',
+        'coverage/stale.txt',
+        'apps/cli/README.md',
+        'apps/cli/LICENSE',
+      ];
+      for (const rel of cleanableOutputs) {
+        mkdirSync(dirname(join(target, rel)), { recursive: true });
+        writeFileSync(join(target, rel), 'stale\n', 'utf8');
+      }
+
+      runPress(['clean', '--target', '.', '--show']);
+      for (const rel of cleanableOutputs) {
+        expect(existsSync(join(target, rel)), `clean --show must keep ${rel}`).toBe(true);
+      }
+
+      runPress(['clean', '--target', '.']);
+      for (const rel of cleanableOutputs) {
+        expect(existsSync(join(target, rel)), `clean must remove ${rel}`).toBe(false);
+      }
+      expect(existsSync(join(target, 'coverage', 'tracked-control.txt'))).toBe(true);
+      expect(existsSync(join(target, 'tests', 'local-control.txt'))).toBe(true);
+
+      rmSync(join(target, 'tests', 'local-control.txt'));
+      runOrThrow('git', ['rm', '-q', '-f', 'coverage/tracked-control.txt'], target);
+      runOrThrow('git', ['commit', '-q', '-m', 'test: drop tracked control'], target);
 
       // 1. Tool check, dry-run (leaves tree clean), then real rebrand.
       runPress(['check-tools', '--target', '.']);
@@ -156,24 +261,43 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
       expect(childDifftree).toBe(sourceDifftree);
       expect(childDifftree).toContain('uses: smorinlabs/difftree-action@');
 
-      // 4. press-verify.yml ships intact; template-only files are removed.
+      // 4. press-verify.yml and fork guard ship intact; template-only files are removed.
       expect(
         readFileSync(join(target, '.github', 'workflows', 'press-verify.yml'), 'utf8')
       ).toContain(TEMPLATE_PRESS_SPEC);
+      expect(statSync(join(target, 'scripts', 'guard.sh')).isFile()).toBe(true);
+      expect(statSync(join(target, 'tests', 'guard.test.ts')).isFile()).toBe(true);
 
       for (const removed of [
         '.github/workflows/template-receipt-guard.yml',
         '.github/workflows/update-contributors.yml',
+        '.github/workflows/bootstrap-acceptance.yml',
         '.contributors.yml',
         'CONTRIBUTORS.md',
         'tests/contributors-automation.test.ts',
         'tests/press-acceptance.test.ts',
+        'tests/bootstrap-skill.test.ts',
+        '.claude/skills/new-ts-project/SKILL.md',
         'docs/port',
         'projects',
         'assets/images/logos',
       ]) {
         expect(existsSync(join(target, removed)), `expected removed: ${removed}`).toBe(false);
       }
+
+      const agentsSkillDir = join(target, '.agents', 'skills', 'new-ts-project');
+      const retiredStubText = readFileSync(
+        join(target, 'press', 'stubs', 'retired-bootstrap.md'),
+        'utf8'
+      );
+      const isSkillDir =
+        process.platform === 'win32' ? true : statSync(agentsSkillDir).isDirectory();
+      const resolvedSkillReadme =
+        process.platform === 'win32'
+          ? retiredStubText
+          : readFileSync(join(agentsSkillDir, 'README.md'), 'utf8');
+      expect(isSkillDir).toBe(true);
+      expect(resolvedSkillReadme).toBe(retiredStubText);
 
       // .project-harness config ships intact into stamped child repositories.
       expect(
@@ -198,6 +322,9 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
       const apiPkg = JSON.parse(readFileSync(join(target, 'apps/api/package.json'), 'utf8')) as {
         name: string;
       };
+      const webPkg = JSON.parse(readFileSync(join(target, 'apps/web/package.json'), 'utf8')) as {
+        name: string;
+      };
       const manifest = JSON.parse(
         readFileSync(join(target, '.release-please-manifest.json'), 'utf8')
       ) as Record<string, string>;
@@ -209,12 +336,16 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
       expect(cliPkg.bin).toEqual({ [DEST_IDENTITY.cli_name]: 'dist/cli.js' });
       expect(corePkg.name).toBe(`@${DEST_IDENTITY.repo_name}/core`);
       expect(apiPkg.name).toBe(`@${DEST_IDENTITY.repo_name}/api`);
+      expect(webPkg.name).toBe(`@${DEST_IDENTITY.repo_name}/web`);
       expect(manifest['.']).toBe('0.1.0');
       expect(readFileSync(join(target, 'CHANGELOG.md'), 'utf8')).toBe('# Changelog\n');
 
       for (const [page, stub] of [
         ['README.md', 'press/stubs/readme.md'],
         ['PROJECTS.md', 'press/stubs/projects.md'],
+        ['.github/SECURITY.md', 'press/stubs/security.md'],
+        ['.claude/skills/new-ts-project/README.md', 'press/stubs/retired-bootstrap.md'],
+        ['docs/skills/new-ts-project.md', 'press/stubs/bootstrap-provenance.md'],
         ['docs/about/index.md', 'press/stubs/about-index.md'],
         ['docs/about/philosophy.md', 'press/stubs/project-philosophy.md'],
         ['docs/tutorials/full-project-setup.md', 'press/stubs/application-setup.md'],
@@ -223,6 +354,10 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
           readFileSync(join(target, stub), 'utf8')
         );
       }
+
+      const provenanceDoc = readFileSync(join(target, 'docs/skills/new-ts-project.md'), 'utf8');
+      expect(provenanceDoc).not.toContain('PROJECT_SETUP.md');
+      expect(provenanceDoc).not.toContain('POST_INIT.md');
 
       // 6. Regenerated lockfile carries the new workspace scope and no source identity.
       const lockfile = readFileSync(join(target, 'pnpm-lock.yaml'), 'utf8');
@@ -249,21 +384,27 @@ describe.skipIf(!RUN_ACCEPTANCE)('live template-press acceptance', () => {
       }
       expect(leaks).toEqual([]);
 
-      // 8. Child repository installs from its regenerated lockfile, formats,
-      // passes every quality gate, docs-check, build, CLI --version, and press verify!
+      // 8. Child repository verifies frozen lockfile, runs just setup, formats,
+      // passes every quality gate, docs-check, build (including web), CLI --version,
+      // live API HTTP smoke test, and press verify!
       runOrThrow('pnpm', ['install', '--frozen-lockfile', '--prefer-offline'], target);
+      runOrThrow('just', ['setup'], target);
       runOrThrow('pnpm', ['exec', 'oxfmt'], target);
       runOrThrow('git', ['add', '--all'], target);
       runOrThrow('git', ['commit', '-q', '-m', 'feat: initialize application'], target);
       runOrThrow('just', ['all'], target);
       runOrThrow('just', ['docs-check'], target);
       runOrThrow('just', ['build'], target);
+      expect(existsSync(join(target, 'apps/web/dist/index.html'))).toBe(true);
+      expect(existsSync(join(target, 'apps/api/dist/server.js'))).toBe(true);
+      expect(existsSync(join(target, 'apps/cli/dist/cli.js'))).toBe(true);
       expect(runOrThrow('just', ['version'], target).trim()).toBe(
         `${DEST_IDENTITY.cli_name} 0.1.0`
       );
+      await smokeTestBuiltApi(target);
       runPress(['verify', '--target', '.']);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
-  }, 300_000);
+  }, 360_000);
 });

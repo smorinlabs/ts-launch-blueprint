@@ -4,6 +4,13 @@ repo_name := "ts-launch-blueprint"
 command_name := "ts-projects"
 args := " "
 
+# Blueprint setup guard — Tier 1 (universal discovery warning).
+# `just` evaluates top-level `:=` variables EAGERLY on every recipe run, so this
+# fires on every recipe with zero per-recipe boilerplate. `guard.sh warn` prints
+# to stderr and MUST exit 0 — a non-zero exit from a `shell()` call aborts `just`.
+# `just --list` / `--summary` do not evaluate variables, so introspection stays silent.
+_blueprint_notice := shell('bash scripts/guard.sh warn')
+
 # Text colors
 BLACK := '\033[30m'
 RED := '\033[31m'
@@ -143,11 +150,18 @@ setup:
     just check-deps
     pnpm install
 
+# Blueprint setup guard — Tier 2 (hard block on the risk subset).
+# Private. Used as a dependency on recipes that produce an identity-bearing
+# artifact or package check when run un-migrated.
+[private]
+@_guard:
+    bash scripts/guard.sh block
+
 # Build every app present (apps/*/dist/) with tsdown. A glob filter, so a
 # deleted app never breaks it (just check-removable); publishing uses the
 # CLI package's own build (pnpm run build), not this recipe.
 [group('build'), group('dev')]
-@build:
+@build: _guard
     pnpm -r --filter './apps/*' build
 
 alias b := build
@@ -382,7 +396,7 @@ alias cycle := dev
 
 # Build the API container image from the repo root (apps/api/Dockerfile, D-050)
 [group('run')]
-@docker-build:
+@docker-build: _guard
     docker build -f apps/api/Dockerfile -t ts-launch-blueprint-api .
 
 # Run the API container on port 8080 (Ctrl-C stops it gracefully)
@@ -446,7 +460,7 @@ release-status:
 # array shape parsed) and runs prepare, and npm install of the tarball mirrors
 # how a published-to-npm consumer actually installs the package (D-035).
 [group('releases'), group('build')]
-pack-check:
+pack-check: _guard
     #!/usr/bin/env sh
     set -eu
     # The published package is apps/cli (D-040); every step runs there.

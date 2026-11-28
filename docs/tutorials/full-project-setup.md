@@ -124,7 +124,9 @@ environment variable prefixes in one verified pass:
 3. Run `just all` and `just press-verify` to confirm every gate is green.
 
 See [Setting Up Development](../tasks/setting-up-development.md#customization-for-new-projects)
-for the exact commands.
+for the exact commands, or use the
+[`new-ts-project` skill](../../.claude/skills/new-ts-project/SKILL.md)
+([guide](../skills/new-ts-project.md)) for an agent-driven bootstrap.
 
 ### 8. Keep Developing
 

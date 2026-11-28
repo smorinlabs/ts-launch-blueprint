@@ -136,6 +136,40 @@ describe('template-press configuration contract', () => {
     );
     expect(hasGuard).toBe(!hasReceipt);
   });
+
+  it('declares explicit [[clean]] build/coverage paths without globs (P07)', () => {
+    const cleanBlocks = rulesToml
+      .split(/^\[\[clean\]\]/m)
+      .slice(1)
+      .map((block) => block.split(/^\[/m)[0] ?? block);
+    expect(cleanBlocks.length).toBeGreaterThan(0);
+    const cleanSection = cleanBlocks.join('\n');
+    for (const expectedPath of [
+      'apps/cli/dist',
+      'apps/api/dist',
+      'apps/web/dist',
+      'packages/core/dist',
+      'coverage',
+      'apps/cli/README.md',
+      'apps/cli/LICENSE',
+    ]) {
+      expect(cleanSection).toContain(`"${expectedPath}"`);
+    }
+    expect(cleanSection).not.toContain('*');
+  });
+
+  it('resets .github/SECURITY.md via press/stubs/security.md and keeps guard files in pressed children (P07)', () => {
+    expect(rulesToml).toContain('".github/SECURITY.md"');
+    expect(rulesToml).toContain('file = ".github/SECURITY.md"');
+    expect(rulesToml).toContain('stub_file = "press/stubs/security.md"');
+
+    const removeBlocks = rulesToml.split(/^\[\[remove\]\]/m).slice(1);
+    const removedFiles = removeBlocks
+      .map((block) => block.match(/^\s*file\s*=\s*"([^"]+)"/m)?.[1])
+      .filter((file): file is string => file !== undefined);
+    expect(removedFiles).not.toContain('scripts/guard.sh');
+    expect(removedFiles).not.toContain('tests/guard.test.ts');
+  });
 });
 
 describe('scripts/reset-version.mjs', () => {

@@ -52,7 +52,10 @@ This repository is a _template_: stamp a new repository from it with
 [template-press](https://github.com/smorinlabs/template-press) (which rewrites
 every identity surface, resets blueprint history and prose, regenerates
 `pnpm-lock.yaml`, and keeps `.github/workflows/difftree-pr-comment.yml` intact),
-then build on top of `ts-projects` or delete it and start fresh.
+then build on top of `ts-projects` or delete it and start fresh. For automated
+agent-driven creation, see the
+[`new-ts-project` skill](./.claude/skills/new-ts-project/SKILL.md)
+([docs](./docs/skills/new-ts-project.md)).
 
 ```bash
 # 1. Create a repo from this template (or clone it) and prepare an answers file
