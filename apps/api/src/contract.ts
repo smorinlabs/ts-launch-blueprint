@@ -328,6 +328,31 @@ function formatBound(bound: EffectiveBound | undefined, kind: 'min' | 'max'): st
   return `${op} ${bound.value}`;
 }
 
+function positiveMultipleOf(schema: JsonSchemaObject): number | undefined {
+  const value = schema['multipleOf'];
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+function decimalParts(value: number): { digits: bigint; scale: number } {
+  const str = value.toString().toLowerCase();
+  const [mantissa, expPart] = str.split('e');
+  const [intPart, fracPart = ''] = mantissa!.split('.');
+  const exp = expPart === undefined ? 0 : Number.parseInt(expPart, 10);
+  return {
+    digits: BigInt(`${intPart}${fracPart}`),
+    scale: exp - fracPart.length,
+  };
+}
+
+function isDivisibleMultiple(dividend: number, divisor: number): boolean {
+  const a = decimalParts(dividend);
+  const b = decimalParts(divisor);
+  const minScale = Math.min(a.scale, b.scale);
+  const scaledA = a.digits * 10n ** BigInt(a.scale - minScale);
+  const scaledB = b.digits * 10n ** BigInt(b.scale - minScale);
+  return scaledA % scaledB === 0n;
+}
+
 function compareInputSchema(
   procedure: string,
   path: string,
@@ -416,6 +441,30 @@ function compareInputSchema(
     });
   } else if (isUpperLooser(hUpper, bUpper)) {
     nonBreaking.push(`${procedure} ${path}: input maximum loosened`);
+  }
+
+  const baseMultiple = positiveMultipleOf(base);
+  const headMultiple = positiveMultipleOf(head);
+  if (headMultiple !== undefined) {
+    if (baseMultiple === undefined) {
+      breaking.push({
+        procedure,
+        path,
+        reason: `Input multipleOf added (${headMultiple})`,
+      });
+    } else if (!isDivisibleMultiple(baseMultiple, headMultiple)) {
+      breaking.push({
+        procedure,
+        path,
+        reason: `Input multipleOf changed from ${baseMultiple} to ${headMultiple}`,
+      });
+    } else if (baseMultiple !== headMultiple) {
+      nonBreaking.push(
+        `${procedure} ${path}: input multipleOf loosened (${baseMultiple} -> ${headMultiple})`
+      );
+    }
+  } else if (baseMultiple !== undefined) {
+    nonBreaking.push(`${procedure} ${path}: input multipleOf removed`);
   }
 
   for (const bound of ['minLength', 'minItems'] as const) {
@@ -525,6 +574,23 @@ function compareInputSchema(
       nonBreaking.push(`${procedure} ${path}: input additionalProperties constraint loosened`);
     }
 
+    if (isRecord(base['propertyNames']) || isRecord(head['propertyNames'])) {
+      const effectiveBasePN = isRecord(base['propertyNames'])
+        ? base['propertyNames']
+        : { type: 'string' };
+      const effectiveHeadPN = isRecord(head['propertyNames'])
+        ? head['propertyNames']
+        : { type: 'string' };
+      compareInputSchema(
+        procedure,
+        `${path}.<key>`,
+        effectiveBasePN,
+        effectiveHeadPN,
+        breaking,
+        nonBreaking
+      );
+    }
+
     const baseProps = propertiesOf(base);
     const headProps = propertiesOf(head);
     const baseReq = new Set(stringList(base['required']));
@@ -605,15 +671,23 @@ function compareInputSchema(
           reason: `Input tuple arity changed from ${bTuple.length} to ${hTuple.length}`,
         });
       }
-    } else if (isRecord(base['items']) && isRecord(head['items'])) {
-      compareInputSchema(
+    }
+    const baseItems = base['items'];
+    const headItems = head['items'];
+    const itemPath = basePrefix !== null || headPrefix !== null ? `${path}[...]` : `${path}[]`;
+    if (baseItems !== false && headItems === false) {
+      breaking.push({
         procedure,
-        `${path}[]`,
-        base['items'],
-        head['items'],
-        breaking,
-        nonBreaking
-      );
+        path,
+        reason: 'Input array no longer allows additional items',
+      });
+    } else if (baseItems === false && headItems !== false) {
+      nonBreaking.push(`${procedure} ${path}: input array now allows additional items`);
+    } else if (isRecord(headItems)) {
+      const effectiveBaseItems = isRecord(baseItems) ? baseItems : {};
+      compareInputSchema(procedure, itemPath, effectiveBaseItems, headItems, breaking, nonBreaking);
+    } else if (isRecord(baseItems)) {
+      nonBreaking.push(`${procedure} ${path}: input items constraint loosened`);
     }
   }
 }
@@ -700,6 +774,30 @@ function compareOutputSchema(
     nonBreaking.push(`${procedure} ${path}: output maximum tightened`);
   }
 
+  const baseMultiple = positiveMultipleOf(base);
+  const headMultiple = positiveMultipleOf(head);
+  if (baseMultiple !== undefined) {
+    if (headMultiple === undefined) {
+      breaking.push({
+        procedure,
+        path,
+        reason: `Output multipleOf (${baseMultiple}) removed`,
+      });
+    } else if (!isDivisibleMultiple(headMultiple, baseMultiple)) {
+      breaking.push({
+        procedure,
+        path,
+        reason: `Output multipleOf changed from ${baseMultiple} to ${headMultiple}`,
+      });
+    } else if (headMultiple !== baseMultiple) {
+      nonBreaking.push(
+        `${procedure} ${path}: output multipleOf tightened (${baseMultiple} -> ${headMultiple})`
+      );
+    }
+  } else if (headMultiple !== undefined) {
+    nonBreaking.push(`${procedure} ${path}: output multipleOf added (${headMultiple})`);
+  }
+
   for (const bound of ['minLength', 'minItems'] as const) {
     const bVal = numberOrUndefined(base[bound]);
     const hVal = numberOrUndefined(head[bound]);
@@ -726,6 +824,21 @@ function compareOutputSchema(
     } else if (hVal !== undefined && (bVal === undefined || hVal < bVal)) {
       nonBreaking.push(`${procedure} ${path}: output ${bound} tightened`);
     }
+  }
+
+  const basePattern = typeof base['pattern'] === 'string' ? base['pattern'] : undefined;
+  const headPattern = typeof head['pattern'] === 'string' ? head['pattern'] : undefined;
+  if (basePattern !== undefined && headPattern !== basePattern) {
+    breaking.push({
+      procedure,
+      path,
+      reason:
+        headPattern === undefined
+          ? `Output pattern removed (${basePattern})`
+          : `Output pattern changed from ${basePattern} to ${headPattern}`,
+    });
+  } else if (basePattern === undefined && headPattern !== undefined) {
+    nonBreaking.push(`${procedure} ${path}: output pattern added`);
   }
 
   const hasBaseConst = Object.hasOwn(base, 'const');
@@ -777,6 +890,40 @@ function compareOutputSchema(
   }
 
   if (base['type'] === 'object' && head['type'] === 'object') {
+    const baseAP = base['additionalProperties'];
+    const headAP = head['additionalProperties'];
+    if (baseAP === false && headAP !== false) {
+      breaking.push({
+        procedure,
+        path,
+        reason: 'Output now allows additional properties',
+      });
+    } else if (baseAP !== false && headAP === false) {
+      nonBreaking.push(`${procedure} ${path}: output no longer allows additional properties`);
+    } else if (isRecord(baseAP)) {
+      const effectiveHeadAP = isRecord(headAP) ? headAP : {};
+      compareOutputSchema(procedure, `${path}.*`, baseAP, effectiveHeadAP, breaking, nonBreaking);
+    } else if (isRecord(headAP)) {
+      nonBreaking.push(`${procedure} ${path}: output additionalProperties constraint tightened`);
+    }
+
+    if (isRecord(base['propertyNames']) || isRecord(head['propertyNames'])) {
+      const effectiveBasePN = isRecord(base['propertyNames'])
+        ? base['propertyNames']
+        : { type: 'string' };
+      const effectiveHeadPN = isRecord(head['propertyNames'])
+        ? head['propertyNames']
+        : { type: 'string' };
+      compareOutputSchema(
+        procedure,
+        `${path}.<key>`,
+        effectiveBasePN,
+        effectiveHeadPN,
+        breaking,
+        nonBreaking
+      );
+    }
+
     const baseProps = propertiesOf(base);
     const headProps = propertiesOf(head);
     const baseReq = stringList(base['required']);
@@ -840,15 +987,30 @@ function compareOutputSchema(
           reason: `Output tuple arity changed from ${bTuple.length} to ${hTuple.length}`,
         });
       }
-    } else if (isRecord(base['items']) && isRecord(head['items'])) {
+    }
+    const baseItems = base['items'];
+    const headItems = head['items'];
+    const itemPath = basePrefix !== null || headPrefix !== null ? `${path}[...]` : `${path}[]`;
+    if (baseItems === false && headItems !== false) {
+      breaking.push({
+        procedure,
+        path,
+        reason: 'Output array now allows additional items',
+      });
+    } else if (baseItems !== false && headItems === false) {
+      nonBreaking.push(`${procedure} ${path}: output array no longer allows additional items`);
+    } else if (isRecord(baseItems)) {
+      const effectiveHeadItems = isRecord(headItems) ? headItems : {};
       compareOutputSchema(
         procedure,
-        `${path}[]`,
-        base['items'],
-        head['items'],
+        itemPath,
+        baseItems,
+        effectiveHeadItems,
         breaking,
         nonBreaking
       );
+    } else if (isRecord(headItems)) {
+      nonBreaking.push(`${procedure} ${path}: output items constraint tightened`);
     }
   }
 }

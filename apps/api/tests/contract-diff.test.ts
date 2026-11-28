@@ -910,4 +910,554 @@ describe('detectBreakingContractChanges', () => {
     expect(brokenDiff.breaking.some((b) => b.path === 'output.arrMax')).toBe(true);
     expect(brokenDiff.breaking.some((b) => b.path === 'output.tuple')).toBe(true);
   });
+
+  it('detects multipleOf tightening, loosening, incompatibility, and decimal precision on input and output', () => {
+    const base = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              unconstrained: z.number(),
+              step2: z.number().multipleOf(2),
+              step4: z.number().multipleOf(4),
+              step5: z.number().multipleOf(5),
+              dec04: z.number().multipleOf(0.4),
+              dec03: z.number().multipleOf(0.3),
+              dec01: z.number().multipleOf(0.1),
+              same: z.number().multipleOf(5),
+            })
+          )
+          .output(
+            z.object({
+              unconstrained: z.number(),
+              step2: z.number().multipleOf(2),
+              step4: z.number().multipleOf(4),
+              step5: z.number().multipleOf(5),
+              dec02: z.number().multipleOf(0.2),
+              dec01: z.number().multipleOf(0.1),
+              dec03: z.number().multipleOf(0.3),
+              same: z.number().multipleOf(5),
+            })
+          )
+          .query(() => ({
+            unconstrained: 1,
+            step2: 2,
+            step4: 4,
+            step5: 5,
+            dec02: 0.2,
+            dec01: 0.1,
+            dec03: 0.3,
+            same: 5,
+          })),
+      }),
+    });
+
+    const compatHead = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              unconstrained: z.number(),
+              step2: z.number().multipleOf(2),
+              step4: z.number().multipleOf(2),
+              step5: z.number(),
+              dec04: z.number().multipleOf(0.2),
+              dec03: z.number().multipleOf(0.1),
+              dec01: z.number().multipleOf(0.1),
+              same: z.number().multipleOf(5),
+            })
+          )
+          .output(
+            z.object({
+              unconstrained: z.number().multipleOf(5),
+              step2: z.number().multipleOf(4),
+              step4: z.number().multipleOf(4),
+              step5: z.number().multipleOf(5),
+              dec02: z.number().multipleOf(0.4),
+              dec01: z.number().multipleOf(0.3),
+              dec03: z.number().multipleOf(0.3),
+              same: z.number().multipleOf(5),
+            })
+          )
+          .query(() => ({
+            unconstrained: 5,
+            step2: 4,
+            step4: 4,
+            step5: 5,
+            dec02: 0.4,
+            dec01: 0.3,
+            dec03: 0.3,
+            same: 5,
+          })),
+      }),
+    });
+
+    const compatDiff = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(compatHead));
+    expect(compatDiff.breaking).toEqual([]);
+    expect(compatDiff.nonBreaking.some((m) => m.includes('input multipleOf loosened'))).toBe(true);
+    expect(compatDiff.nonBreaking.some((m) => m.includes('input multipleOf removed'))).toBe(true);
+    expect(compatDiff.nonBreaking.some((m) => m.includes('output multipleOf added'))).toBe(true);
+    expect(compatDiff.nonBreaking.some((m) => m.includes('output multipleOf tightened'))).toBe(
+      true
+    );
+
+    const breakingHead = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              unconstrained: z.number().multipleOf(5),
+              step2: z.number().multipleOf(3),
+              step4: z.number().multipleOf(8),
+              step5: z.number().multipleOf(5),
+              dec04: z.number().multipleOf(0.4),
+              dec03: z.number().multipleOf(0.3),
+              dec01: z.number().multipleOf(0.3),
+              same: z.number().multipleOf(5),
+            })
+          )
+          .output(
+            z.object({
+              unconstrained: z.number(),
+              step2: z.number().multipleOf(3),
+              step4: z.number().multipleOf(2),
+              step5: z.number(),
+              dec02: z.number().multipleOf(0.2),
+              dec01: z.number().multipleOf(0.1),
+              dec03: z.number().multipleOf(0.1),
+              same: z.number().multipleOf(5),
+            })
+          )
+          .query(() => ({
+            unconstrained: 1,
+            step2: 3,
+            step4: 2,
+            step5: 5,
+            dec02: 0.2,
+            dec01: 0.1,
+            dec03: 0.1,
+            same: 5,
+          })),
+      }),
+    });
+
+    const badDiff = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(breakingHead));
+    expect(
+      badDiff.breaking.some(
+        (b) => b.path === 'input.unconstrained' && b.reason.includes('multipleOf')
+      )
+    ).toBe(true);
+    expect(
+      badDiff.breaking.some((b) => b.path === 'input.step2' && b.reason.includes('multipleOf'))
+    ).toBe(true);
+    expect(
+      badDiff.breaking.some((b) => b.path === 'input.step4' && b.reason.includes('multipleOf'))
+    ).toBe(true);
+    expect(
+      badDiff.breaking.some((b) => b.path === 'input.dec01' && b.reason.includes('multipleOf'))
+    ).toBe(true);
+    expect(
+      badDiff.breaking.some((b) => b.path === 'output.step2' && b.reason.includes('multipleOf'))
+    ).toBe(true);
+    expect(
+      badDiff.breaking.some((b) => b.path === 'output.step4' && b.reason.includes('multipleOf'))
+    ).toBe(true);
+    expect(
+      badDiff.breaking.some((b) => b.path === 'output.step5' && b.reason.includes('multipleOf'))
+    ).toBe(true);
+    expect(
+      badDiff.breaking.some((b) => b.path === 'output.dec03' && b.reason.includes('multipleOf'))
+    ).toBe(true);
+  });
+
+  it('handles scientific-notation and invalid multipleOf values cleanly', () => {
+    const baseSnap: ApiContractSnapshot = {
+      schemaVersion: 1,
+      version: '0.0.0',
+      procedures: {
+        p: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            type: 'object',
+            properties: {
+              sci: { type: 'number', multipleOf: 1e-7 },
+              zero: { type: 'number', multipleOf: 0 },
+              neg: { type: 'number', multipleOf: -2 },
+              str: { type: 'number', multipleOf: '5' as unknown as number },
+              nan: { type: 'number', multipleOf: Number.NaN },
+            },
+          },
+          output: { type: 'number', multipleOf: 5e-8 },
+        },
+      },
+    };
+    const compatSnap: ApiContractSnapshot = {
+      schemaVersion: 1,
+      version: '0.0.0',
+      procedures: {
+        p: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            type: 'object',
+            properties: {
+              sci: { type: 'number', multipleOf: 5e-8 },
+              zero: { type: 'number' },
+              neg: { type: 'number' },
+              str: { type: 'number' },
+              nan: { type: 'number' },
+            },
+          },
+          output: { type: 'number', multipleOf: 1e-7 },
+        },
+      },
+    };
+    const compatDiff = detectBreakingContractChanges(baseSnap, compatSnap);
+    expect(compatDiff.breaking).toEqual([]);
+    expect(compatDiff.nonBreaking.some((m) => m.includes('input multipleOf loosened'))).toBe(true);
+    expect(compatDiff.nonBreaking.some((m) => m.includes('output multipleOf tightened'))).toBe(
+      true
+    );
+
+    const breakingSnap: ApiContractSnapshot = {
+      schemaVersion: 1,
+      version: '0.0.0',
+      procedures: {
+        p: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            type: 'object',
+            properties: {
+              sci: { type: 'number', multipleOf: 2e-7 },
+              zero: { type: 'number' },
+              neg: { type: 'number' },
+              str: { type: 'number' },
+              nan: { type: 'number' },
+            },
+          },
+          output: { type: 'number', multipleOf: 2e-8 },
+        },
+      },
+    };
+    const badDiff = detectBreakingContractChanges(baseSnap, breakingSnap);
+    expect(
+      badDiff.breaking.some((b) => b.path === 'input.sci' && b.reason.includes('multipleOf'))
+    ).toBe(true);
+    expect(
+      badDiff.breaking.some((b) => b.path === 'output' && b.reason.includes('multipleOf'))
+    ).toBe(true);
+  });
+
+  it('detects output pattern removal, change, and addition', () => {
+    const base = router({
+      items: router({
+        op: publicProcedure
+          .output(
+            z.object({
+              removedPat: z.string().regex(/^[a-z]+$/),
+              changedPat: z.string().regex(/^[a-z]+$/),
+              samePat: z.string().regex(/^[a-z]+$/),
+              addedPat: z.string(),
+            })
+          )
+          .query(() => ({
+            removedPat: 'abc',
+            changedPat: 'abc',
+            samePat: 'abc',
+            addedPat: 'abc',
+          })),
+      }),
+    });
+
+    const compatHead = router({
+      items: router({
+        op: publicProcedure
+          .output(
+            z.object({
+              removedPat: z.string().regex(/^[a-z]+$/),
+              changedPat: z.string().regex(/^[a-z]+$/),
+              samePat: z.string().regex(/^[a-z]+$/),
+              addedPat: z.string().regex(/^[a-z]+$/),
+            })
+          )
+          .query(() => ({
+            removedPat: 'abc',
+            changedPat: 'abc',
+            samePat: 'abc',
+            addedPat: 'abc',
+          })),
+      }),
+    });
+    const compatDiff = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(compatHead));
+    expect(compatDiff.breaking).toEqual([]);
+    expect(compatDiff.nonBreaking.some((m) => m.includes('output pattern added'))).toBe(true);
+
+    const brokenHead = router({
+      items: router({
+        op: publicProcedure
+          .output(
+            z.object({
+              removedPat: z.string(),
+              changedPat: z.string().regex(/^[0-9]+$/),
+              samePat: z.string().regex(/^[a-z]+$/),
+              addedPat: z.string(),
+            })
+          )
+          .query(() => ({
+            removedPat: 'abc',
+            changedPat: '123',
+            samePat: 'abc',
+            addedPat: 'abc',
+          })),
+      }),
+    });
+    const badDiff = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(brokenHead));
+    expect(
+      badDiff.breaking.some((b) => b.path === 'output.removedPat' && b.reason.includes('pattern'))
+    ).toBe(true);
+    expect(
+      badDiff.breaking.some((b) => b.path === 'output.changedPat' && b.reason.includes('pattern'))
+    ).toBe(true);
+  });
+
+  it('detects tuple .rest() items, raw array items transitions, and z.record propertyNames/additionalProperties', () => {
+    const base = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              restType: z.tuple([z.string()]).rest(z.number()),
+              restBound: z.tuple([z.string()]).rest(z.number().min(0)),
+              fixedToRest: z.tuple([z.string()]),
+              restToFixed: z.tuple([z.string()]).rest(z.number()),
+              recEnum: z.record(z.enum(['a', 'b']), z.number()),
+              recStr: z.record(z.string(), z.number()),
+              recMin: z.record(z.string().min(2), z.number()),
+              plainObj: z.looseObject({}),
+            })
+          )
+          .output(
+            z.object({
+              restType: z.tuple([z.string()]).rest(z.number()),
+              fixedToRest: z.tuple([z.string()]),
+              restToFixed: z.tuple([z.string()]).rest(z.number()),
+              recEnum: z.record(z.enum(['a']), z.number()),
+              recStr: z.record(z.string(), z.number()),
+              recMin: z.record(z.string().min(2), z.number()),
+              recVal: z.record(z.string(), z.number()),
+              openObj: z.looseObject({ a: z.string() }),
+              strictObj: z.strictObject({ a: z.string() }),
+            })
+          )
+          .query(() => ({
+            restType: ['x', 1] as [string, ...number[]],
+            fixedToRest: ['x'] as [string],
+            restToFixed: ['x', 1] as [string, ...number[]],
+            recEnum: { a: 1 },
+            recStr: {},
+            recMin: {},
+            recVal: {},
+            openObj: { a: 'x' },
+            strictObj: { a: 'x' },
+          })),
+      }),
+    });
+
+    const compatHead = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              restType: z.tuple([z.string()]).rest(z.number()),
+              restBound: z.tuple([z.string()]).rest(z.number().min(0)),
+              fixedToRest: z.tuple([z.string()]).rest(z.number()),
+              restToFixed: z.tuple([z.string()]).rest(z.number()),
+              recEnum: z.record(z.enum(['a', 'b']), z.number()),
+              recStr: z.record(z.string(), z.number()),
+              recMin: z.record(z.string(), z.number()),
+              plainObj: z.looseObject({}),
+            })
+          )
+          .output(
+            z.object({
+              restType: z.tuple([z.string()]).rest(z.number()),
+              fixedToRest: z.tuple([z.string()]),
+              restToFixed: z.tuple([z.string()]),
+              recEnum: z.record(z.enum(['a']), z.number()),
+              recStr: z.record(z.string().min(2), z.number()),
+              recMin: z.record(z.string().min(2), z.number()),
+              recVal: z.record(z.string(), z.number()),
+              openObj: z.strictObject({ a: z.string() }),
+              strictObj: z.strictObject({ a: z.string() }),
+            })
+          )
+          .query(() => ({
+            restType: ['x', 1] as [string, ...number[]],
+            fixedToRest: ['x'] as [string],
+            restToFixed: ['x'] as [string],
+            recEnum: { a: 1 },
+            recStr: {},
+            recMin: {},
+            recVal: {},
+            openObj: { a: 'x' },
+            strictObj: { a: 'x' },
+          })),
+      }),
+    });
+    const compatDiff = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(compatHead));
+    expect(compatDiff.breaking).toEqual([]);
+
+    const breakingHead = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              restType: z.tuple([z.string()]).rest(z.boolean()),
+              restBound: z.tuple([z.string()]).rest(z.number().min(5)),
+              fixedToRest: z.tuple([z.string()]),
+              restToFixed: z.tuple([z.string()]),
+              recEnum: z.record(z.enum(['a']), z.number()),
+              recStr: z.record(z.string().min(2), z.number()),
+              recMin: z.record(z.string().min(2), z.number()),
+              plainObj: z.record(z.string().min(2), z.number()),
+            })
+          )
+          .output(
+            z.object({
+              restType: z.tuple([z.string()]).rest(z.boolean()),
+              fixedToRest: z.tuple([z.string()]).rest(z.number()),
+              restToFixed: z.tuple([z.string()]).rest(z.number()),
+              recEnum: z.record(z.enum(['a', 'b']), z.number()),
+              recStr: z.record(z.string(), z.number()),
+              recMin: z.record(z.string(), z.number()),
+              recVal: z.record(z.string(), z.boolean()),
+              openObj: z.looseObject({ a: z.string() }),
+              strictObj: z.looseObject({ a: z.string() }),
+            })
+          )
+          .query(() => ({
+            restType: ['x', true] as [string, ...boolean[]],
+            fixedToRest: ['x', 1] as [string, ...number[]],
+            restToFixed: ['x', 1] as [string, ...number[]],
+            recEnum: { a: 1, b: 2 },
+            recStr: {},
+            recMin: {},
+            recVal: {},
+            openObj: { a: 'x' },
+            strictObj: { a: 'x' },
+          })),
+      }),
+    });
+    const badDiff = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(breakingHead));
+    expect(badDiff.breaking.some((b) => b.path === 'input.restType[...]')).toBe(true);
+    expect(badDiff.breaking.some((b) => b.path === 'input.restBound[...]')).toBe(true);
+    expect(badDiff.breaking.some((b) => b.path === 'input.restToFixed')).toBe(true);
+    expect(badDiff.breaking.some((b) => b.path === 'input.recEnum.<key>')).toBe(true);
+    expect(badDiff.breaking.some((b) => b.path === 'input.recStr.<key>')).toBe(true);
+    expect(badDiff.breaking.some((b) => b.path === 'input.plainObj.<key>')).toBe(true);
+    expect(badDiff.breaking.some((b) => b.path === 'output.restType[...]')).toBe(true);
+    expect(badDiff.breaking.some((b) => b.path === 'output.fixedToRest')).toBe(true);
+    expect(badDiff.breaking.some((b) => b.path === 'output.recEnum.<key>')).toBe(true);
+    expect(badDiff.breaking.some((b) => b.path === 'output.recMin.<key>')).toBe(true);
+    expect(badDiff.breaking.some((b) => b.path === 'output.recVal.*')).toBe(true);
+    expect(badDiff.breaking.some((b) => b.path === 'output.strictObj')).toBe(true);
+  });
+
+  it('handles raw array items and object additionalProperties schema transitions', () => {
+    const baseSnap: ApiContractSnapshot = {
+      schemaVersion: 1,
+      version: '0.0.0',
+      procedures: {
+        compat: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            type: 'object',
+            properties: {
+              dropItemSchema: { type: 'array', items: { type: 'string' } },
+              dropAPSchema: { type: 'object', additionalProperties: { type: 'string' } },
+            },
+          },
+          output: {
+            type: 'object',
+            properties: {
+              addItemSchema: { type: 'array' },
+              addAPSchema: { type: 'object' },
+            },
+          },
+        },
+        broken: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            type: 'object',
+            properties: {
+              addItemSchema: { type: 'array' },
+            },
+          },
+          output: {
+            type: 'object',
+            properties: {
+              dropItemSchema: { type: 'array', items: { type: 'string' } },
+              dropAPSchema: { type: 'object', additionalProperties: { type: 'string' } },
+            },
+          },
+        },
+      },
+    };
+    const headSnap: ApiContractSnapshot = {
+      schemaVersion: 1,
+      version: '0.0.0',
+      procedures: {
+        compat: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            type: 'object',
+            properties: {
+              dropItemSchema: { type: 'array' },
+              dropAPSchema: { type: 'object' },
+            },
+          },
+          output: {
+            type: 'object',
+            properties: {
+              addItemSchema: { type: 'array', items: { type: 'string' } },
+              addAPSchema: { type: 'object', additionalProperties: { type: 'string' } },
+            },
+          },
+        },
+        broken: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            type: 'object',
+            properties: {
+              addItemSchema: { type: 'array', items: { type: 'string' } },
+            },
+          },
+          output: {
+            type: 'object',
+            properties: {
+              dropItemSchema: { type: 'array' },
+              dropAPSchema: { type: 'object' },
+            },
+          },
+        },
+      },
+    };
+    const diff = detectBreakingContractChanges(baseSnap, headSnap);
+    expect(diff.breaking.some((b) => b.procedure === 'compat')).toBe(false);
+    expect(
+      diff.breaking.some((b) => b.procedure === 'broken' && b.path === 'input.addItemSchema[]')
+    ).toBe(true);
+    expect(
+      diff.breaking.some((b) => b.procedure === 'broken' && b.path === 'output.dropItemSchema[]')
+    ).toBe(true);
+    expect(
+      diff.breaking.some((b) => b.procedure === 'broken' && b.path === 'output.dropAPSchema.*')
+    ).toBe(true);
+  });
 });
