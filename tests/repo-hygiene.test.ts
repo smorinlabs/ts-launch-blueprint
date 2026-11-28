@@ -787,11 +787,15 @@ describe('release, versioning & packaging (S5: D-021, D-012)', () => {
 
   it('publish.yml gates publish behind a verify job with id-token + npm env (D-012(5))', () => {
     const publish = parse(readWorkflow('publish.yml')) as {
+      on?: { push?: { tags?: string[] }; workflow_dispatch?: unknown };
+      concurrency?: { group?: string; 'cancel-in-progress'?: boolean };
       jobs: Record<
         string,
         { needs?: string | string[]; environment?: string; permissions?: Record<string, string> }
       >;
     };
+    expect(publish.on?.push?.tags).toContain('v*');
+    expect(publish.concurrency?.['cancel-in-progress']).toBe(false);
     const verifyJob = publish.jobs.verify;
     const publishJob = publish.jobs.publish;
     expect(verifyJob).toBeDefined();
@@ -2480,5 +2484,89 @@ describe('P10 API contract snapshot workflow', () => {
     expect(runs).toContain('docs/api/contract.snapshot.json');
     expect(runs).toContain('scripts/check-contract-breaking.mjs');
     expect(runs).toContain('"schemaVersion":1');
+  });
+});
+
+describe('P13 M5 setup/release docs, ADRs, and design-decisions contract', () => {
+  it('ships retained setup, post-init, release, ADR, and design-decisions docs and retires maintainers-release.md', () => {
+    for (const relPath of [
+      'docs/PROJECT_SETUP.md',
+      'docs/POST_INIT.md',
+      'docs/RELEASE.md',
+      'docs/adr/README.md',
+      'docs/adr/template.md',
+      'docs/about/design-decisions.md',
+    ]) {
+      expect(existsSync(join(REPO_ROOT, relPath)), `missing ${relPath}`).toBe(true);
+    }
+
+    const retiredName = 'maintainers-release.md';
+    expect(existsSync(join(REPO_ROOT, 'docs', retiredName))).toBe(false);
+
+    const tracked = execFileSync(
+      'git',
+      [
+        'ls-files',
+        '-z',
+        'README.md',
+        'AGENTS.md',
+        'llms.txt',
+        'docs',
+        '.claude',
+        'press',
+        '.github',
+        'scripts',
+      ],
+      { cwd: REPO_ROOT, encoding: 'utf8' }
+    )
+      .split('\0')
+      .filter(
+        (rel) => Boolean(rel) && !rel.startsWith('docs/port/') && existsSync(join(REPO_ROOT, rel))
+      );
+
+    const staleRefs = tracked.filter((rel) =>
+      readFileSync(join(REPO_ROOT, rel), 'utf8').includes(retiredName)
+    );
+    expect(staleRefs).toEqual([]);
+  });
+
+  it('retained docs and ADRs never link to template-only docs/port/ or projects/', () => {
+    const adrFiles = readdirSync(join(REPO_ROOT, 'docs', 'adr'))
+      .filter((name) => name.endsWith('.md'))
+      .map((name) => `docs/adr/${name}`);
+
+    const retainedDocs = [
+      'docs/PROJECT_SETUP.md',
+      'docs/POST_INIT.md',
+      'docs/RELEASE.md',
+      'docs/about/design-decisions.md',
+      'docs/about/index.md',
+      'docs/about/architecture.md',
+      ...adrFiles,
+    ];
+
+    const badLinks: string[] = [];
+    for (const relPath of retainedDocs) {
+      const content = readFileSync(join(REPO_ROOT, relPath), 'utf8');
+      for (const match of content.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)) {
+        const target = match[1]?.trim() ?? '';
+        if (
+          target.startsWith('http://') ||
+          target.startsWith('https://') ||
+          target.startsWith('#')
+        ) {
+          continue;
+        }
+        if (
+          target.includes('docs/port') ||
+          target.includes('../port/') ||
+          target.includes('/projects/') ||
+          target.startsWith('projects/')
+        ) {
+          badLinks.push(`${relPath} -> ${target}`);
+        }
+      }
+    }
+    expect(badLinks).toEqual([]);
   });
 });

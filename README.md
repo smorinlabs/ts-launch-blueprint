@@ -193,7 +193,7 @@ TS_PROJECTS_PREPUSH_TESTS=1`.
 Full documentation lives in [`docs/`](./docs/docs.md) — plain
 GitHub-Flavored Markdown, no generated site:
 
-- [About](./docs/about/index.md) — philosophy and full feature list
+- [About](./docs/about/index.md) — philosophy, feature list, and [design decisions](./docs/about/design-decisions.md) ([ADRs](./docs/adr/README.md))
 - [Architecture](./docs/about/architecture.md) — the layers, how a request flows, how to add a feature
 - [Tutorials](./docs/tutorials/index.md) — guided full-project-setup walkthrough
 - [Tasks](./docs/tasks/index.md) — how-to guides (dependencies, type checking, CI/CD, debugging, contributing code)
@@ -207,7 +207,7 @@ GitHub-Flavored Markdown, no generated site:
 
 Versions are bumped automatically by [release-please](https://github.com/googleapis/release-please) from Conventional Commit history; there is no hand-edited version file. When you merge a Release PR (titled `chore(release): publish v*`), release-please tags the commit as `vX.Y.Z`, which triggers the `publish.yml` workflow. That workflow runs a `verify` job (free of registry contact) that confirms the tag matches package.json and `.release-please-manifest.json`, then runs the full quality gate and build before queuing the `publish` job. Merging the Release PR cuts the release; publishing then requires a one-click approval of the `npm` environment deployment.
 
-Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no long-lived npm token is ever stored. Use `just release-status` to check for version drift (package.json, manifest, latest tag) and `just pack-check` to locally validate the packaged distribution. See [docs/maintainers-release.md](./docs/maintainers-release.md) for setup and release runbook details.
+Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no long-lived npm token is ever stored. Use `just release-status` to check for version drift (package.json, manifest, latest tag) and `just pack-check` to locally validate the packaged distribution. See [docs/RELEASE.md](./docs/RELEASE.md) for setup and release runbook details and [docs/PROJECT_SETUP.md](./docs/PROJECT_SETUP.md) for the post-init repository checklist.
 
 ## Contributing
 

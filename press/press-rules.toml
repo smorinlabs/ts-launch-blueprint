@@ -19,6 +19,7 @@ extra_exclude_files = [
   "docs/about/index.md",
   "docs/about/philosophy.md",
   "docs/tutorials/full-project-setup.md",
+  "docs/POST_INIT.md",
 ]
 
 # Remove ignored build, coverage, and copied package artifacts before rebrand.
@@ -145,6 +146,10 @@ stub_file = "press/stubs/project-philosophy.md"
 [[reset]]
 file = "docs/tutorials/full-project-setup.md"
 stub_file = "press/stubs/application-setup.md"
+
+[[reset]]
+file = "docs/POST_INIT.md"
+stub_file = "press/stubs/post-init.md"
 
 # The template's security policy describes template maintenance; a child
 # repository carries its own reporting and CodeQL setup guidance.

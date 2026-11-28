@@ -46,16 +46,19 @@ ts-launch-blueprint/
 │   └── SECURITY.md
 ├── press/                           # template-press config (press-source.toml, press-rules.toml, stubs/)
 ├── docs/                            # Flattened CommonMark documentation tree (D-023)
-│   ├── about/                       # Project context and philosophy
+│   ├── about/                       # Project context, philosophy, architecture, design decisions
+│   ├── adr/                         # Retained Architecture Decision Records (ADRs)
 │   ├── contributing/                # Contribution guidelines, incl. cla/ (CLA docs)
 │   ├── port/                        # Port process records (D-006; see docs/port/README.md)
 │   ├── reference/                   # Technical references (this page's directory)
 │   ├── tasks/                       # Step-by-step workflows
 │   ├── tools/                       # Technical tooling reference (one page per tool)
 │   ├── tutorials/                   # Guided learning paths
+│   ├── POST_INIT.md                 # Post-initialization setup pointer
+│   ├── PROJECT_SETUP.md             # Post-press repository configuration checklist
+│   ├── RELEASE.md                   # Release runbook (one-time setup + routine flow)
 │   ├── docs.md                      # Docs-about-docs
-│   ├── github-templates.md          # GitHub issue/PR template reference
-│   └── maintainers-release.md       # Release runbook (one-time setup + routine flow)
+│   └── github-templates.md          # GitHub issue/PR template reference
 ├── packages/core/                   # @ts-launch-blueprint/core (private, no build step)
 │   ├── src/
 │   │   ├── schemas/                 # Zod schemas, converters, domain errors

@@ -7,10 +7,6 @@ truth; release-please bumps both together (the CLI's through
 `extra-files`), exclusively in its generated Release PRs — never
 hand-edited. A repo-hygiene test keeps the two and the manifest equal.
 
-> **Publishing is paused during the V1 restructure (D-045).** `publish.yml`
-> runs only on manual dispatch, and Release PRs are not merged until V1 is
-> complete.
-
 ## Key Features
 
 - **Automatic Versioning**: release-please scans Conventional Commits
@@ -62,7 +58,7 @@ just release-status
 just pack-check
 ```
 
-See [Release Runbook](../maintainers-release.md) for the one-time
+See [Release Process](../RELEASE.md) for the one-time
 GitHub Environment / npm Trusted Publisher setup and the full routine
 release flow.
 
@@ -147,7 +143,7 @@ build` — `apps/cli/src/version.ts` reads `package.json` at build time via the
 - **`publish` job never runs**: it waits for approval in the protected
   `npm` environment — configure required reviewers under this
   repository's Settings > Environments (see
-  [Release Runbook](../maintainers-release.md)).
+  [Release Process](../RELEASE.md)).
 - **`npm publish` fails with an auth error**: the npm Trusted Publisher
   must be configured on npmjs.com for this package (repository owner/
   name, workflow file path `.github/workflows/publish.yml`, environment

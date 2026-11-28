@@ -28,12 +28,13 @@ is documented in [API Reference](./docs/reference/api-reference.md).
 
 ## Documentation
 
-- [About](./docs/about/index.md) — philosophy, features, and architecture
+- [Project Setup](./docs/PROJECT_SETUP.md) — post-initialization checklist, GitHub settings, and environments
+- [About](./docs/about/index.md) — philosophy, features, architecture, and design decisions
 - [Tutorials](./docs/tutorials/index.md) — guided setup walkthrough
 - [Tasks](./docs/tasks/index.md) — development, dependencies, CI/CD, and contributing
 - [Tools](./docs/tools/index.md) — toolchain rationale and configuration
 - [Reference](./docs/reference/index.md) — CLI, API, boundaries, configuration, and versioning
-- [Release Runbook](./docs/maintainers-release.md) — npm Trusted Publishing setup and release flow
+- [Release Process](./docs/RELEASE.md) — npm Trusted Publishing setup, GHCR container publishing, and release flow
 - [Contributing](./.github/CONTRIBUTING.md) — workflow, CLA, and Code of Conduct
 
 ## License

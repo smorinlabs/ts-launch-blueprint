@@ -201,8 +201,8 @@ For **every** review comment (human or bot), complete all three steps:
 - **Publishing (`publish.yml`)**: `verify` runs `just pack-check`, then
   `publish` runs `npm publish` via OIDC Trusted Publishing (`id-token: write` in
   protected `npm` environment — never `NPM_TOKEN` and never `pnpm publish`).
-  Currently triggered via manual `workflow_dispatch` on a `v*` tag (D-045; see
-  `docs/maintainers-release.md`).
+  Triggered on `v*` tag pushes (plus `workflow_dispatch` on a `v*` tag) for
+  `apps/cli` (`Q2.A`, resolving `D-045`; see `docs/RELEASE.md`).
 
 ## Documentation & Link Policy
 

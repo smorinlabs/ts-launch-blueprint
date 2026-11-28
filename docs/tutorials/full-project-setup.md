@@ -187,9 +187,10 @@ just pack-check        # local-only: build, publint, attw, npm pack --dry-run,
                         # install the tarball, smoke-test the bin + ESM import
 ```
 
-See [docs/maintainers-release.md](../maintainers-release.md) for the
-full release runbook (one-time environment setup + routine release
-steps).
+See [docs/RELEASE.md](../RELEASE.md) for the full release runbook (one-time
+environment setup + routine release steps) and
+[docs/PROJECT_SETUP.md](../PROJECT_SETUP.md) for the post-initialization
+repository checklist.
 
 ## Additional Resources
 

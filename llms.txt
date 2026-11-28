@@ -31,5 +31,5 @@ importing only the `AppRouter` type from `@ts-launch-blueprint/api/router`.
 ## Optional
 
 - [Contributing](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/contributing/index.md): contribution guide and workflow conventions
-- [Release process](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/maintainers-release.md): release-please + npm OIDC Trusted Publishing
-- [Project setup](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/tutorials/full-project-setup.md): development setup and repository configuration after rebranding
+- [Release process](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/RELEASE.md): release-please + npm OIDC Trusted Publishing + GHCR container publishing
+- [Project setup](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/PROJECT_SETUP.md): post-initialization repository checklist, environments, and GitHub settings

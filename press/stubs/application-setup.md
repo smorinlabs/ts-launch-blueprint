@@ -54,6 +54,8 @@ The CLI command name is listed in `apps/cli/package.json` under `bin` (see
 
 ## 5. Configure Releases and Repository Services
 
-See [Release Runbook](../maintainers-release.md) to configure the `npm`
-environment, npm Trusted Publishing (OIDC), and `release-please` credentials
-before cutting your first release.
+See [Project Setup](../PROJECT_SETUP.md) to configure GitHub Environments,
+branch protection, and optional integrations, and
+[Release Process](../RELEASE.md) for npm Trusted Publishing (OIDC), GHCR
+container publishing, and `release-please` credentials before cutting your first
+release.

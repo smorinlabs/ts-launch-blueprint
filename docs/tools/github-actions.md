@@ -4,7 +4,7 @@
 
 GitHub Actions automates testing, security scanning, press verification, and releases. The TS Launch Blueprint project includes pre-configured workflows in [`.github/workflows/`](https://github.com/smorinlabs/ts-launch-blueprint/tree/main/.github/workflows): `ci.yml`, `codeql.yml`, `dependency-review.yml`, `difftree-pr-comment.yml`, `manual-pr-security-scan.yml`, `press-verify.yml`, `release-please.yml`, and `publish.yml` (plus blueprint-only maintenance workflows that `press rebrand` removes in stamped child repositories).
 
-For the trigger/job breakdown of each workflow, see [Using CI/CD](../tasks/using-ci-cd.md); for the release-tag → publish flow specifically, see [the release runbook](../maintainers-release.md). This page covers the workflows as a group: shape, pinning, and permissions conventions.
+For the trigger/job breakdown of each workflow, see [Using CI/CD](../tasks/using-ci-cd.md); for the release-tag → publish flow specifically, see [the release runbook](../RELEASE.md). This page covers the workflows as a group: shape, pinning, and permissions conventions.
 
 ## Workflow Configuration
 
@@ -95,6 +95,6 @@ Every workflow declares an explicit top-level `permissions:` block:
 - **Use Matrix Builds**: test across the Node.js Active-LTS floor and the next Current release (`['24.x', '26.x']`).
 - **Cache Dependencies**: `pnpm/action-setup` (pinned before `actions/setup-node`) with `actions/setup-node`'s `cache: 'pnpm'`, keyed to the committed `pnpm-lock.yaml`, needs no separate `actions/cache` step.
 - **Fail Fast, But Not Across the Matrix**: `fail-fast: false` so a failure on one Node version doesn't hide results from the other.
-- **Monitor Regularly**: `just release-status` and `just pack-check` (see [the release runbook](../maintainers-release.md)) surface drift between `package.json`, the release-please manifest, and the latest tag.
+- **Monitor Regularly**: `just release-status` and `just pack-check` (see [the release runbook](../RELEASE.md)) surface drift between `package.json`, the release-please manifest, and the latest tag.
 
 [GitHub Actions documentation](https://docs.github.com/en/actions) for more details.

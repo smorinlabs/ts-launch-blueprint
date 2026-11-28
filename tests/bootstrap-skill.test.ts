@@ -69,11 +69,21 @@ describe('new-ts-project bootstrap skill (P07)', () => {
     expect(skillText).toContain('scripts/smoke-api.sh');
   });
 
-  it('never references nonexistent P13 docs (PROJECT_SETUP.md / POST_INIT.md)', () => {
-    for (const filePath of [SKILL_MD, SKILL_README, SKILL_DOC]) {
-      const content = readFileSync(filePath, 'utf8');
-      expect(content).not.toContain('PROJECT_SETUP.md');
-      expect(content).not.toContain('POST_INIT.md');
+  it('references P13 setup and release docs (PROJECT_SETUP.md / POST_INIT.md / RELEASE.md) and never maintainers-release.md', () => {
+    const skillText = readFileSync(SKILL_MD, 'utf8');
+    const readmeText = readFileSync(SKILL_README, 'utf8');
+    const docText = readFileSync(SKILL_DOC, 'utf8');
+
+    expect(skillText).toContain('PROJECT_SETUP.md');
+    expect(skillText).toContain('POST_INIT.md');
+    expect(skillText).toContain('RELEASE.md');
+    expect(readmeText).toContain('PROJECT_SETUP.md');
+    expect(readmeText).toContain('RELEASE.md');
+    expect(docText).toContain('PROJECT_SETUP.md');
+    expect(docText).toContain('RELEASE.md');
+
+    for (const content of [skillText, readmeText, docText]) {
+      expect(content).not.toContain('maintainers-release.md');
     }
   });
 

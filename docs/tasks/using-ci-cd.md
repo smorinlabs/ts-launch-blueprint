@@ -15,7 +15,7 @@ The repository ships the following workflows under `.github/workflows/`:
 | Manual PR Security Review | `manual-pr-security-scan.yml` | `workflow_dispatch` (manual)                                  |
 | Press Verify              | `press-verify.yml`            | pull requests, `merge_group`, push to `main`                  |
 | Release Please            | `release-please.yml`          | push to `main`, `workflow_dispatch`                           |
-| Publish                   | `publish.yml`                 | `workflow_dispatch` (from a `v*` tag; D-045)                  |
+| Publish                   | `publish.yml`                 | `v*` tag push, `workflow_dispatch` (from a `v*` tag)          |
 
 ### CI (`ci.yml`)
 
@@ -60,11 +60,11 @@ A manually-triggered (`workflow_dispatch`), environment-gated deep scan, taking 
 
 ### Release Please (`release-please.yml`)
 
-Runs on every push to `main` (plus manual re-trigger). Watches Conventional Commits and maintains a "Release PR" that bumps `package.json` + `.release-please-manifest.json` and regenerates `CHANGELOG.md`. Merging that PR tags `vX.Y.Z`, which triggers `publish.yml`. See [the release runbook](../maintainers-release.md) for the one-time environment setup and the routine release flow.
+Runs on every push to `main` (plus manual re-trigger). Watches Conventional Commits and maintains a "Release PR" that bumps `package.json` + `.release-please-manifest.json` and regenerates `CHANGELOG.md`. Merging that PR tags `vX.Y.Z`, which triggers `publish.yml`. See [the release runbook](../RELEASE.md) for the one-time environment setup and the routine release flow.
 
 ### Publish (`publish.yml`)
 
-Normally triggered by a `v*` tag push; **paused during the V1 restructure (D-045)**, so it currently runs only on manual dispatch from a `v*` tag. Two jobs, both packing and publishing from `apps/cli` (the published package):
+Triggered by a `v*` tag push (or manual `workflow_dispatch` from a `v*` tag; `Q2.A` resolving `D-045`). Two jobs, both packing and publishing from `apps/cli` (the sole published npm package):
 
 - `verify` — cheap, unprivileged: asserts the tag descends from `main`, asserts `tag == package.json version == manifest version`, runs `just all`, and runs `just pack-check` (builds `apps/cli`, checks `publint` and `attw`, asserts the packed file list is `dist/**` plus the root whitelist, and smoke-tests installing the tarball).
 - `publish` — runs only inside the protected `npm` GitHub environment (human-approved), mints an OIDC token, and runs `npm publish` via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) — no long-lived `NPM_TOKEN` anywhere.
