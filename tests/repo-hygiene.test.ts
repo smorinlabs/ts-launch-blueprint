@@ -1700,9 +1700,25 @@ describe('P12-TS01: AI readiness hub and vendor rule retirement (P12)', () => {
     expect(agentsMd).not.toContain('72-char');
     expect(agentsMd).not.toContain('.cursor/rules');
     expect(agentsMd).not.toContain('.windsurf/rules');
-    expect(agentsMd).not.toMatch(/\bjust setup(?!-hooks)\b/);
     expect(agentsMd).not.toContain('new-ts-project');
     expect(agentsMd).not.toContain('make install-dev');
+
+    for (const p06Token of [
+      'make bootstrap',
+      'make hook-check',
+      'just setup',
+      'just dev',
+      'just cycle',
+      'just select-shell',
+      'just hooks-run',
+      'just verify-commits',
+      'just api-dev',
+      'mise.toml',
+      '.flox/env/manifest.toml',
+      '.devcontainer/devcontainer.json',
+    ]) {
+      expect(agentsMd).toContain(p06Token);
+    }
 
     const makefile = readFileSync(join(REPO_ROOT, 'Makefile'), 'utf8');
     const phonyLine = makefile.split(/\r?\n/).find((line) => line.startsWith('.PHONY:')) ?? '';
@@ -1786,6 +1802,7 @@ describe('P12-TS01: AI readiness hub and vendor rule retirement (P12)', () => {
     expect(Array.isArray(settings.companyAnnouncements)).toBe(true);
     const announcement = settings.companyAnnouncements?.[0] ?? '';
     expect(announcement).toContain('apps/web');
+    expect(announcement).toContain('just setup');
     expect(announcement).toContain('just api');
     expect(announcement).toContain('just web');
     expect(announcement).toContain('just coverage');

@@ -1,6 +1,6 @@
 {
   "companyAnnouncements": [
-    "ts-launch-blueprint: TypeScript workspace shipping the ts-projects CLI, shared core, HTTP API (apps/api), React web app (apps/web), and full quality gates. Commands: just all (format-check, lint, boundaries, shell/workflows, editorconfig, spelling, typecheck, test), just coverage, just api, just web, just docs-check, just pack-check, just pre-commit-run, just press-verify, just check-deps, just debug-info. See AGENTS.md for the project charter and the Justfile for all recipes."
+    "ts-launch-blueprint: TypeScript workspace shipping the ts-projects CLI, shared core, HTTP API (apps/api), React web app (apps/web), and full quality gates. Commands: just setup (after make bootstrap), just all (format-check, lint, boundaries, shell/workflows, editorconfig, spelling, typecheck, test), just coverage, just api, just web, just docs-check, just pack-check, just hooks-run, just press-verify, just check-deps, just debug-info. See AGENTS.md for the project charter and the Justfile for all recipes."
   ],
   "enabledPlugins": {
     "typescript-lsp@claude-plugins-official": true,

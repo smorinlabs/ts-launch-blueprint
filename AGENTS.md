@@ -10,8 +10,10 @@ retired per Q10.A / Py ADR 0014). For human-contributor flow see
 ## Base Rules
 
 - `Justfile` is the canonical task runner and holds all project automation.
-- `Makefile` is strictly for bootstrapping (`make check`, `make install-node`,
-  `make install-pnpm`, `make install-just`); add no new feature targets there.
+- `Makefile` is strictly for Level 1 bootstrapping (`make bootstrap`,
+  `make check`, `make hook-check`, `make install-node`, `make install-pnpm`,
+  `make install-just`, plus optional `make install-docker` /
+  `make install-flox`); add no new feature targets there.
 
 ### Justfile Editing Conventions
 
@@ -61,21 +63,29 @@ repo-hygiene scaffolding.
   enforced by `.npmrc`); `pnpm-lock.yaml` is committed.
 - **tsdown**: bundles `apps/cli` (`dist/` ESM-only + `.d.ts` + sourcemaps) and
   workspace builds.
-- **Fresh clone setup**: run `make check` on bare machines if base tools are
-  missing, then `just install` (installs shell analyzers, EditorConfig checker,
-  and dependencies) and `just setup-hooks` (wires lefthook + `.gitmessage`).
-  Optional secret scanner installer: `just install-gitleaks`. Put
-  `~/.local/bin` on `PATH` for ShellCheck 0.11.0, actionlint 1.7.12,
-  editorconfig-checker, and gitleaks.
+- **Fresh clone setup (two-level flow)**:
+  1. **Level 1 (`Makefile`)**: run `make bootstrap` (ensures Node >=24, pnpm 10,
+     and `just`), `make check`, and `make hook-check` (verifies external +
+     workspace hook tools).
+  2. **Level 2 (`just setup`)**: installs pinned analyzers (`shellcheck`
+     0.11.0, `actionlint` 1.7.12, `editorconfig-checker` 4.0.2, `gitleaks`
+     8.27.2), runs `pnpm install`, wires lefthook + `.gitmessage` (`just
+setup-hooks`), restores `projects/.gitkeep`, and runs `just check-deps`.
+     Put `~/.local/bin` on `PATH` for the installed analyzers.
+- **Optional turnkey toolchains**: `mise install` (`mise.toml`), `flox activate`
+  (`.flox/env/manifest.toml`), and VS Code Dev Containers
+  (`.devcontainer/devcontainer.json`, `.devcontainer/post-create.sh`, which runs
+  `make bootstrap && just setup`); then run `just setup` for `mise`/`flox`.
+  Workspace JS tools stay in `pnpm-lock.yaml`, not `mise`/`flox`.
 
 ## Canonical Commands
 
 | Task                      | Command                                                                                                                           |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| List all recipes          | `just`                                                                                                                            |
-| Install deps + analyzers  | `just install`                                                                                                                    |
-| Wire git hooks + template | `just setup-hooks`                                                                                                                |
+| List / choose recipes     | `just` / `just select-shell` (`just --choose`)                                                                                    |
+| Unified setup (Level 2)   | `just setup` (after `make bootstrap`; or `just install` + `just setup-hooks`)                                                     |
 | Full local quality gate   | `just all` (parallel: format-check, lint, boundaries, shell, workflows, editorconfig, spelling, typecheck, test)                  |
+| Dev cycle (fast loop)     | `just dev` / `just cycle` (format, lint, typecheck, test, build)                                                                  |
 | Format / check format     | `just format` / `just format-check` (`oxfmt`)                                                                                     |
 | Lint / autofix            | `just lint` / `just lint-fix` (`oxlint`)                                                                                          |
 | Architecture boundaries   | `just check-boundaries` (`depcruise`)                                                                                             |
@@ -85,20 +95,21 @@ repo-hygiene scaffolding.
 | Advisory Bun tests        | `just test-bun` (Vitest under Bun, excludes `e2e.test.ts`; never `bun install` or bare `bun test`)                                |
 | Coverage (95/95/90/95)    | `just coverage` (`just open-coverage-report` opens HTML)                                                                          |
 | Build all apps            | `just build` (`apps/*/dist`)                                                                                                      |
-| Run API / Web dev         | `just api` (port 8080) / `just web` (Vite proxies `/trpc` to `:8080`)                                                             |
+| Run API / Web dev         | `just api` (port 8080) / `just api-dev` (`tsx watch`) / `just web` (Vite proxies `/trpc` to `:8080`)                              |
 | Docker API + smoke        | `just docker-build`, `just docker-run`, `just smoke`                                                                              |
 | Run built CLI             | `just run <args>` / `just version`                                                                                                |
 | Packaging verification    | `just pack-check` (build, publint, attw, tarball dry-run, scratch install)                                                        |
 | Docs link check / TypeDoc | `just docs-check` / `just docs-api` (optional)                                                                                    |
-| Hook suite (CI mirror)    | `just pre-commit-run` (all files) / `just ci`                                                                                     |
+| Hook suite & commits      | `just hooks-run` (`just pre-commit-run`), `just verify-commits`, `just ci`                                                        |
 | Security & hygiene checks | `just check-gitleaks`, `just audit`, `just check-shell`, `just check-workflows`, `just check-editorconfig`, `just check-spelling` |
 | Press drift guard         | `just press-verify`                                                                                                               |
 | Toolchain / release info  | `just check-deps`, `just debug-info`, `just release-status`, `just contributors`, `just clean`                                    |
 
 ## Verification Flow Before Commit/PR
 
-1. **Setup (fresh clone / worktree)**: `just install` and `just setup-hooks`
-   (without `setup-hooks`, git hooks are silent no-ops).
+1. **Setup (fresh clone / worktree)**: `make bootstrap` (if base tools are
+   missing) and `just setup` (or `just install` + `just setup-hooks`; without
+   `setup-hooks`, git hooks are silent no-ops; verify with `make hook-check`).
 2. **Quality & packaging gates**: run `just all`, `just coverage`,
    `just pack-check`, and `just docs-check`.
 3. **Press conformance** (enforced by `.github/workflows/press-verify.yml`): any
@@ -106,7 +117,8 @@ repo-hygiene scaffolding.
    `ts_launch_blueprint`, `ts-projects`, `TS_PROJECTS`, author/owner names,
    `TS Launch Blueprint`) must press cleanly via default rewrites or
    `press/press-rules.toml`. Verify locally with `just press-verify`.
-4. **Stage + commit** (lefthook hooks in `lefthook.yml`):
+4. **Stage + commit** (lefthook hooks in `lefthook.yml`, or verify commits via
+   `just verify-commits`):
    - `commit-msg`: `commitlint`.
    - `pre-commit`: `shellcheck`, `actionlint`, `editorconfig-checker`, `cspell`,
      `pnpm-lock-check`, `format` (`stage_fixed`), `check-large-files` (1 MB
