@@ -37,7 +37,7 @@ To ensure consistency and maintainability, please follow these code style guidel
    ```bash
    just test
    ```
-7. **Commit Changes**: Commit your changes with a clear and descriptive commit message using [Conventional Commits](https://www.conventionalcommits.org/) format. The commit-msg hook (commitlint) enforces a 50-character subject line and 72-character body wrap — see `.gitmessage` for the template and allowed types (`feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`, `build`, `perf`, `revert`).
+7. **Commit Changes**: Commit your changes with a clear and descriptive commit message using [Conventional Commits](https://www.conventionalcommits.org/) format. The commit-msg hook (commitlint) enforces a 100-character subject line and 200-character body/footer line wrap — see `.gitmessage` for the template and allowed types (`feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`, `build`, `perf`, `revert`).
    ```bash
    git add .
    git commit -m "feat: add feature X"

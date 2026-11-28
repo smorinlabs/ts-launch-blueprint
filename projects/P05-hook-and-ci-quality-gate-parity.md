@@ -33,9 +33,9 @@ Mirror commitlint, large-file, codespell, EditorConfig, and lockfile/TOML gates
 
 ### Tests & Tasks
 
-- [ ] [P05-TS01] Update `tests/repo-hygiene.test.ts` for relaxed `commitlint.config.mjs` (`100/200/200` + synced `type-enum`), `commitlint.dependabot.config.mjs`, zero 18-line MIT headers in `.github/`, and permissions/SHA-pin invariants on `commitlint.yml`, `large-file-guard.yml`, and EditorConfig/`cspell` CI steps.
-- [ ] [P05-T01] Relax `commitlint.config.mjs` to `100/200/200`, add `commitlint.dependabot.config.mjs`, and add `.github/workflows/commitlint.yml` and `.github/workflows/large-file-guard.yml`.
-- [ ] [P05-T02] Add `.editorconfig`, `.editorconfig-checker.json`, and Node-native `cspell` (`pnpm` devDependency, `cspell.json`, `.vscode/extensions.json`), and wire both into `Justfile`, `lefthook.yml`, and CI.
-- [ ] [P05-T03] Add `pnpm-lock.yaml` pre-commit drift check, `press-verify` pre-push hook, `actionlint` missing-binary hint, and `oxfmt` `*.toml` glob in `lefthook.yml`, and fix `docs/tools/formatting.md`.
-- [ ] [P05-T04] Replace the 12 remaining 18-line MIT headers in `.github/` YAML files with `# SPDX-License-Identifier: MIT`.
-- [ ] [P05-T05] Run `just all`, `just coverage`, `just pack-check`, `just docs-check`, and `project-audit P05`; open PR, run `ci-fix --optimize` closeout on green CI, resolve review threads, mark `P05` `[x]`, and merge via `--merge`.
+- [x] [P05-TS01] Update `tests/repo-hygiene.test.ts` for relaxed `commitlint.config.mjs` (`100/200/200` + synced `type-enum`), `commitlint.dependabot.config.mjs`, zero 18-line MIT headers in `.github/`, and permissions/SHA-pin invariants on `commitlint.yml`, `large-file-guard.yml`, and EditorConfig/`cspell` CI steps.
+- [x] [P05-T01] Relax `commitlint.config.mjs` to `100/200/200`, add `commitlint.dependabot.config.mjs`, and add `.github/workflows/commitlint.yml` and `.github/workflows/large-file-guard.yml`.
+- [x] [P05-T02] Add `.editorconfig`, `.editorconfig-checker.json`, and Node-native `cspell` (`pnpm` devDependency, `cspell.json`, `.vscode/extensions.json`), and wire both into `Justfile`, `lefthook.yml`, and CI.
+- [x] [P05-T03] Add `pnpm-lock.yaml` pre-commit drift check, `press-verify` pre-push hook, `actionlint` missing-binary hint, and `oxfmt` `*.toml` glob in `lefthook.yml`, and fix `docs/tools/formatting.md`.
+- [x] [P05-T04] Replace the 12 remaining 18-line MIT headers in `.github/` YAML files with `# SPDX-License-Identifier: MIT`.
+- [x] [P05-T05] Run `just all`, `just coverage`, `just pack-check`, `just docs-check`, and `project-audit P05`; open PR, run `ci-fix --optimize` closeout on green CI, resolve review threads, mark `P05` `[x]`, and merge via `--merge`.

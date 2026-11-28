@@ -1,9 +1,18 @@
 // Repo-hygiene meta-tests (plan S2 field 7): the quality-gate configs must
 // stay internally consistent, and the formatter gate must actually bite.
-import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 import type { ViteUserConfig } from 'vitest/config';
@@ -45,38 +54,96 @@ describe('commit-message contract (D-020(2,4))', () => {
     expect(gitmessageTypes).toEqual(commitlintTypes);
   });
 
-  it('keeps the source 50/72 subject/body discipline', () => {
-    expect(commitlintConfig.rules['header-max-length']).toEqual([2, 'always', 50]);
-    expect(commitlintConfig.rules['body-max-line-length']).toEqual([2, 'always', 72]);
+  it('enforces relaxed 100/200/200 header/body/footer line-length limits (Q9.A)', () => {
+    const rules = commitlintConfig.rules as Record<string, unknown>;
+    expect(rules['header-max-length']).toEqual([2, 'always', 100]);
+    expect(rules['body-max-line-length']).toEqual([2, 'always', 200]);
+    expect(rules['footer-max-line-length']).toEqual([2, 'always', 200]);
+  });
+
+  it('commitlint.dependabot.config.mjs extends config-conventional and disables body/footer line-length limits', async () => {
+    const dependabotConfigPath = join(REPO_ROOT, 'commitlint.dependabot.config.mjs');
+    expect(existsSync(dependabotConfigPath)).toBe(true);
+    const mod = (await import(pathToFileURL(dependabotConfigPath).href)) as {
+      default: { extends: string[]; rules: Record<string, unknown> };
+    };
+    expect(mod.default.extends).toEqual(['@commitlint/config-conventional']);
+    expect(mod.default.rules['body-max-line-length']).toEqual([0, 'always']);
+    expect(mod.default.rules['footer-max-line-length']).toEqual([0, 'always']);
   });
 });
 
-describe('lefthook configuration (D-020(6))', () => {
+describe('lefthook configuration (D-020(6), P05)', () => {
   const lefthook = parse(readFileSync(join(REPO_ROOT, 'lefthook.yml'), 'utf8'));
 
-  it('parses as YAML with pre-commit and commit-msg hooks', () => {
+  it('parses as YAML with pre-commit, commit-msg, and pre-push hooks', () => {
     expect(lefthook).toBeTypeOf('object');
     expect(lefthook['pre-commit']).toBeDefined();
     expect(lefthook['commit-msg']).toBeDefined();
+    expect(lefthook['pre-push']).toBeDefined();
   });
 
-  it('pre-commit runs format (stage_fixed), lint, and full typecheck', () => {
-    const jobs = lefthook['pre-commit'].jobs;
-    const names = jobs.map((job: { name: string }) => job.name);
+  it('pre-commit runs format (stage_fixed + toml), lint, typecheck, editorconfig-checker, cspell, and pnpm-lock-check', () => {
+    const jobs = lefthook['pre-commit'].jobs as Array<{
+      name: string;
+      glob?: string;
+      run: string;
+      stage_fixed?: boolean;
+    }>;
+    const names = jobs.map((job) => job.name);
     expect(names).toContain('format');
     expect(names).toContain('lint');
     expect(names).toContain('typecheck');
-    const format = jobs.find((job: { name: string }) => job.name === 'format');
+    expect(names).toContain('editorconfig-checker');
+    expect(names).toContain('cspell');
+    expect(names).toContain('pnpm-lock-check');
+
+    const format = jobs.find((job) => job.name === 'format')!;
     expect(format.stage_fixed).toBe(true);
+    expect(format.glob).toContain('toml');
+
+    const ecJob = jobs.find((job) => job.name === 'editorconfig-checker')!;
+    expect(ecJob.run).toContain('editorconfig-checker');
+    expect(ecJob.run).toContain('.editorconfig-checker.json');
+    expect(ecJob.run).toContain('{staged_files}');
+
+    const cspellJob = jobs.find((job) => job.name === 'cspell')!;
+    expect(cspellJob.run).toContain('cspell lint');
+    expect(cspellJob.run).toContain('--no-must-find-files');
+    expect(cspellJob.run).toContain('--files {staged_files}');
+
+    const lockJob = jobs.find((job) => job.name === 'pnpm-lock-check')!;
+    expect(lockJob.glob).toContain('**/package.json');
+    expect(lockJob.glob).toContain('pnpm-lock.yaml');
+    expect(lockJob.run).toContain(
+      'pnpm install --frozen-lockfile --lockfile-only --ignore-scripts'
+    );
   });
 
-  it('pre-commit includes the large-file hygiene check (D-020(6))', () => {
+  it('actionlint pre-commit job includes missing-binary hints for actionlint and shellcheck', () => {
+    const jobs = lefthook['pre-commit'].jobs as Array<{ name: string; run: string }>;
+    const actionlintJob = jobs.find((job) => job.name === 'actionlint')!;
+    expect(actionlintJob).toBeDefined();
+    expect(actionlintJob.run).toContain('command -v actionlint');
+    expect(actionlintJob.run).toContain('command -v shellcheck');
+    expect(actionlintJob.run).toContain('just install-shell-tools');
+  });
+
+  it('pre-commit includes the 1MB large-file hygiene check with docs/assets/ allowlist (P05)', () => {
     const jobs = lefthook['pre-commit'].jobs;
     const largeFiles = jobs.find((job: { name: string }) => job.name === 'check-large-files');
     expect(largeFiles).toBeDefined();
-    // Runs over staged files and enforces the 500KB (512000-byte) ceiling.
+    // Runs over staged files and enforces the 1MB (1048576-byte) ceiling outside docs/assets/.
     expect(largeFiles.run).toContain('{staged_files}');
-    expect(largeFiles.run).toContain('512000');
+    expect(largeFiles.run).toContain('1048576');
+    expect(largeFiles.run).toContain('docs/assets/');
+  });
+
+  it('pre-push includes press-verify', () => {
+    const jobs = lefthook['pre-push'].jobs as Array<{ name: string; run: string }>;
+    const pressVerify = jobs.find((job) => job.name === 'press-verify');
+    expect(pressVerify).toBeDefined();
+    expect(pressVerify!.run).toContain('just press-verify');
   });
 
   it('commit-msg runs commitlint', () => {
@@ -186,7 +253,9 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
     expect(workflowFiles.length).toBeGreaterThanOrEqual(4);
     expect(workflowFiles).toContain('ci.yml');
     expect(workflowFiles).toContain('codeql.yml');
+    expect(workflowFiles).toContain('commitlint.yml');
     expect(workflowFiles).toContain('dependency-review.yml');
+    expect(workflowFiles).toContain('large-file-guard.yml');
     expect(workflowFiles).toContain('manual-pr-security-scan.yml');
   });
 
@@ -377,6 +446,179 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
     expect(ecosystems).toContain('github-actions');
     expect(ecosystems).toContain('npm');
   });
+
+  it('commitlint.yml enforces Conventional Commits on PRs and merge_group with dependabot split (P05)', () => {
+    const raw = readFileSync(join(WORKFLOW_DIR, 'commitlint.yml'), 'utf8');
+    const parsed = parse(raw) as {
+      on: { push?: { branches?: string[] }; pull_request?: unknown; merge_group?: unknown };
+      permissions: Record<string, unknown>;
+      concurrency: { group: string; 'cancel-in-progress': string };
+      jobs: Record<
+        string,
+        {
+          if?: string;
+          permissions?: Record<string, string>;
+          steps?: Array<{
+            if?: string;
+            uses?: string;
+            with?: Record<string, unknown>;
+          }>;
+        }
+      >;
+    };
+
+    expect(parsed.on.push?.branches).toEqual(['main']);
+    expect(Object.prototype.hasOwnProperty.call(parsed.on, 'pull_request')).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(parsed.on, 'merge_group')).toBe(true);
+    expect(parsed.permissions).toEqual({});
+    expect(parsed.concurrency['cancel-in-progress']).toContain(
+      "github.event_name == 'pull_request'"
+    );
+
+    const humans = parsed.jobs['commitlint-humans'];
+    const dependabot = parsed.jobs['commitlint-dependabot'];
+    expect(humans).toBeDefined();
+    expect(dependabot).toBeDefined();
+    expect(humans?.if).toContain('dependabot[bot]');
+    expect(dependabot?.if).toContain('dependabot[bot]');
+    expect(humans?.permissions).toEqual({ contents: 'read', 'pull-requests': 'read' });
+    expect(dependabot?.permissions).toEqual({ contents: 'read', 'pull-requests': 'read' });
+
+    const humanCheckout = humans?.steps?.find((s) => s.uses?.startsWith('actions/checkout@'));
+    expect(humanCheckout?.with?.['fetch-depth']).toBe(0);
+    expect(humanCheckout?.with?.['persist-credentials']).toBe(false);
+
+    const humanLint = humans?.steps?.find((s) =>
+      s.uses?.startsWith('wagoid/commitlint-github-action@')
+    );
+    expect(humanLint).toBeDefined();
+    expect(humanLint?.if).toContain("github.event_name != 'merge_group'");
+    expect(humanLint?.with?.configFile).toBe('commitlint.config.mjs');
+
+    const botLint = dependabot?.steps?.find((s) =>
+      s.uses?.startsWith('wagoid/commitlint-github-action@')
+    );
+    expect(botLint).toBeDefined();
+    expect(botLint?.with?.configFile).toBe('commitlint.dependabot.config.mjs');
+    expect(raw).toMatch(/wagoid\/commitlint-github-action@[0-9a-f]{40}\s*#\s*v\d/);
+  });
+
+  it('large-file-guard.yml enforces 1MB limit outside docs/assets/ on push, PR, and merge_group (P05)', () => {
+    const raw = readFileSync(join(WORKFLOW_DIR, 'large-file-guard.yml'), 'utf8');
+    const parsed = parse(raw) as {
+      on: { push?: { branches?: string[] }; pull_request?: unknown; merge_group?: unknown };
+      permissions: Record<string, unknown>;
+      concurrency: { group: string; 'cancel-in-progress': string };
+      jobs: Record<
+        string,
+        {
+          permissions?: Record<string, string>;
+          steps?: Array<{
+            uses?: string;
+            with?: Record<string, unknown>;
+            env?: Record<string, unknown>;
+            run?: string;
+          }>;
+        }
+      >;
+    };
+
+    expect(parsed.on.push?.branches).toEqual(['main']);
+    expect(Object.prototype.hasOwnProperty.call(parsed.on, 'pull_request')).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(parsed.on, 'merge_group')).toBe(true);
+    expect(parsed.permissions).toEqual({});
+    expect(parsed.concurrency['cancel-in-progress']).toContain(
+      "github.event_name == 'pull_request'"
+    );
+    expect(raw).toContain('1048576');
+    expect(raw).toContain('docs/assets/');
+  });
+
+  it('ci.yml installs editorconfig-checker before pre-commit hooks and runs check-editorconfig + check-spelling (P05)', () => {
+    const ci = parse(readFileSync(join(WORKFLOW_DIR, 'ci.yml'), 'utf8')) as {
+      jobs: { lint: { steps: Array<{ run?: string }> } };
+    };
+    const steps = ci.jobs.lint.steps;
+    const installEcIdx = steps.findIndex((s) =>
+      s.run?.includes('just install-editorconfig-checker')
+    );
+    const lefthookIdx = steps.findIndex((s) =>
+      s.run?.includes('lefthook run pre-commit --all-files')
+    );
+    const checkEcIdx = steps.findIndex((s) => s.run?.includes('just check-editorconfig'));
+    const checkSpellingIdx = steps.findIndex((s) => s.run?.includes('just check-spelling'));
+
+    expect(installEcIdx).toBeGreaterThanOrEqual(0);
+    expect(lefthookIdx).toBeGreaterThan(installEcIdx);
+    expect(checkEcIdx).toBeGreaterThanOrEqual(0);
+    expect(checkSpellingIdx).toBeGreaterThanOrEqual(0);
+  });
+
+  it('zero files under .github/ carry the 18-line MIT header and updated/new YAML files use SPDX (D-024(7), P05)', () => {
+    const githubYamlFiles: string[] = [];
+    const walkGithub = (dir: string, relBase: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const rel = `${relBase}/${entry.name}`;
+        if (entry.isDirectory()) {
+          walkGithub(join(dir, entry.name), rel);
+        } else if (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml')) {
+          githubYamlFiles.push(rel);
+        }
+      }
+    };
+    walkGithub(join(REPO_ROOT, '.github'), '.github');
+
+    const mitMatches = githubYamlFiles.filter((rel) =>
+      readFileSync(join(REPO_ROOT, rel), 'utf8').includes(
+        'Permission is hereby granted, free of charge'
+      )
+    );
+    expect(mitMatches).toEqual([]);
+
+    const spdxRequired = [
+      '.github/codeql/codeql-config.yml',
+      '.github/dependabot.yml',
+      '.github/ISSUE_TEMPLATE/01-feature-request.yml',
+      '.github/ISSUE_TEMPLATE/02-documentation-request.yml',
+      '.github/ISSUE_TEMPLATE/03-bug-report.yml',
+      '.github/ISSUE_TEMPLATE/config.yml',
+      '.github/workflows/audit-triage.yml',
+      '.github/workflows/canary.yml',
+      '.github/workflows/ci.yml',
+      '.github/workflows/codeql.yml',
+      '.github/workflows/commitlint.yml',
+      '.github/workflows/dep-audit.yml',
+      '.github/workflows/dependency-review.yml',
+      '.github/workflows/large-file-guard.yml',
+      '.github/workflows/manual-pr-security-scan.yml',
+      '.github/workflows/publish.yml',
+      '.github/workflows/release-please.yml',
+      '.github/workflows/secret-scan.yml',
+    ];
+    for (const rel of spdxRequired) {
+      const firstLine = readFileSync(join(REPO_ROOT, rel), 'utf8').split(/\r?\n/)[0];
+      expect({ file: rel, firstLine }).toEqual({
+        file: rel,
+        firstLine: '# SPDX-License-Identifier: MIT',
+      });
+    }
+
+    // difftree-pr-comment.yml must stay byte-for-byte canonical without an SPDX rewrite.
+    const difftreeFirstLine = readFileSync(
+      join(WORKFLOW_DIR, 'difftree-pr-comment.yml'),
+      'utf8'
+    ).split(/\r?\n/)[0];
+    expect(difftreeFirstLine).toBe('# Canonical consumer workflow for smorinlabs/difftree-action.');
+  });
+
+  const UPDATE_CONTRIBUTORS_PATH = join(WORKFLOW_DIR, 'update-contributors.yml');
+  it.skipIf(!existsSync(UPDATE_CONTRIBUTORS_PATH))(
+    'update-contributors.yml carries the SPDX one-liner header (D-024(7), P05)',
+    () => {
+      const firstLine = readFileSync(UPDATE_CONTRIBUTORS_PATH, 'utf8').split(/\r?\n/)[0];
+      expect(firstLine).toBe('# SPDX-License-Identifier: MIT');
+    }
+  );
 });
 
 describe('Bun advisory dev/test lane (D-036)', () => {
@@ -1029,5 +1271,90 @@ describe('slim PR CI, merge_group, concurrency, and parallel Justfile (P03)', ()
   it('Justfile marks @all with [parallel]', () => {
     const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8').replaceAll('\r\n', '\n');
     expect(justfile).toMatch(/\[parallel\]\n@all:/);
+  });
+});
+
+describe('EditorConfig, cspell, and Justfile quality gates (P05)', () => {
+  it('.editorconfig and .editorconfig-checker.json exist with expected rules and exclusions', () => {
+    const editorconfigPath = join(REPO_ROOT, '.editorconfig');
+    const ecCheckerPath = join(REPO_ROOT, '.editorconfig-checker.json');
+    expect(existsSync(editorconfigPath)).toBe(true);
+    expect(existsSync(ecCheckerPath)).toBe(true);
+
+    const ec = readFileSync(editorconfigPath, 'utf8');
+    expect(ec).toMatch(/^root\s*=\s*true$/m);
+    expect(ec).toContain('charset = utf-8');
+    expect(ec).toContain('end_of_line = lf');
+    expect(ec).toContain('insert_final_newline = true');
+    expect(ec).toContain('trim_trailing_whitespace = false');
+    expect(ec).toContain('indent_style = tab');
+
+    const ecConfig = JSON.parse(readFileSync(ecCheckerPath, 'utf8')) as {
+      Exclude: string[];
+      Disable: Record<string, boolean>;
+    };
+    expect(ecConfig.Disable.Indentation).toBe(true);
+    expect(ecConfig.Disable.IndentSize).toBe(true);
+    expect(ecConfig.Exclude).toContain('docs/port/');
+    expect(ecConfig.Exclude).toContain('pnpm-lock\\.yaml');
+    expect(ecConfig.Exclude).toContain('node_modules');
+  });
+
+  it('scripts/install-editorconfig-checker.sh is executable and checksum-verified', () => {
+    const installerRelPath = 'scripts/install-editorconfig-checker.sh';
+    const installerPath = join(REPO_ROOT, installerRelPath);
+    expect(existsSync(installerPath)).toBe(true);
+    const gitStageLine = execFileSync('git', ['ls-files', '--stage', installerRelPath], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    }).trim();
+    expect(gitStageLine).toMatch(/^100755\s/);
+    // NTFS does not store POSIX execute bits, so check working-tree mode on POSIX only.
+    const workingTreeExecMode =
+      process.platform === 'win32' ? 0o111 : statSync(installerPath).mode & 0o111;
+    expect(workingTreeExecMode).not.toBe(0);
+    const script = readFileSync(installerPath, 'utf8');
+    expect(script).toContain('EC_VERSION');
+    expect(script).toContain('checksums.txt');
+  });
+
+  it('package.json devDependencies, cspell.json, and .vscode/extensions.json configure Node-native cspell (Q9.A)', () => {
+    const devDeps = packageJson.devDependencies as Record<string, string>;
+    expect(devDeps.cspell).toBeDefined();
+
+    const extensions = JSON.parse(
+      readFileSync(join(REPO_ROOT, '.vscode', 'extensions.json'), 'utf8')
+    ) as { recommendations: string[] };
+    expect(extensions.recommendations).toContain('streetsidesoftware.code-spell-checker');
+
+    const cspellPath = join(REPO_ROOT, 'cspell.json');
+    expect(existsSync(cspellPath)).toBe(true);
+    const cspell = JSON.parse(readFileSync(cspellPath, 'utf8')) as {
+      enableGlobDot?: boolean;
+      words?: string[];
+      ignoreRegExpList?: string[];
+    };
+    expect(cspell.enableGlobDot).toBe(true);
+    expect(cspell.words).toContain('smorinlabs');
+    const regexList = cspell.ignoreRegExpList ?? [];
+    const matchesAction = (target: string): boolean =>
+      regexList.some((pattern) => new RegExp(pattern.replace(/^\/|\/[a-z]*$/g, '')).test(target));
+    expect(matchesAction('smorinlabs/difftree-action')).toBe(true);
+    expect(matchesAction('smorinlabs/template-press')).toBe(true);
+  });
+
+  it('Justfile provides install-editorconfig-checker, check-editorconfig, and check-spelling wired into all and pre-commit-run', () => {
+    const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8');
+    expect(justfile).toMatch(/^@?install-editorconfig-checker:/m);
+    expect(justfile).toMatch(/^@?check-editorconfig:/m);
+    expect(justfile).toMatch(/^@?check-spelling:/m);
+
+    const allLine = justfile.split(/\r?\n/).find((l) => l.startsWith('@all:')) ?? '';
+    const preCommitLine =
+      justfile.split(/\r?\n/).find((l) => l.startsWith('@pre-commit-run:')) ?? '';
+    expect(allLine).toContain('check-editorconfig');
+    expect(allLine).toContain('check-spelling');
+    expect(preCommitLine).toContain('check-editorconfig');
+    expect(preCommitLine).toContain('check-spelling');
   });
 });

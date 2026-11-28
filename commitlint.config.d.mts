@@ -6,6 +6,7 @@ export interface CommitlintConfig {
     'type-enum': [number, string, string[]];
     'header-max-length': [number, string, number];
     'body-max-line-length': [number, string, number];
+    'footer-max-line-length': [number, string, number];
   };
 }
 

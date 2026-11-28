@@ -1,0 +1,27 @@
+{
+  "_comment": "P05: Indent rules disabled — oxfmt owns indentation. Honors *.md trim_trailing_whitespace=false from .editorconfig.",
+  "Verbose": false,
+  "Debug": false,
+  "IgnoreDefaults": false,
+  "SpacesAfterTabs": false,
+  "NoColor": false,
+  "Exclude": [
+    "\\.git",
+    "dist",
+    "build",
+    "coverage",
+    "node_modules",
+    "pnpm-lock\\.yaml",
+    "\\.lock$",
+    "CHANGELOG\\.md",
+    "docs/port/"
+  ],
+  "Disable": {
+    "EndOfLine": false,
+    "Indentation": true,
+    "IndentSize": true,
+    "InsertFinalNewline": false,
+    "TrimTrailingWhitespace": false,
+    "MaxLineLength": false
+  }
+}

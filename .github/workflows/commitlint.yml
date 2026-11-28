@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: MIT
+
+# Commitlint CI (P05 / Q9.A).
+# Validates PR commits against Conventional Commits using
+# wagoid/commitlint-github-action.
+#
+# Per-author split: humans get 100/200/200 header/body/footer caps; dependabot
+# gets body/footer line-length rules disabled (it embeds long release-notes URLs
+# that cannot be wrapped — see commitlint.dependabot.config.mjs).
+# Selection is on github.event.pull_request.user.login (the PR author),
+# NOT github.actor (which changes per-push and would mis-route after a
+# human pushes a merge commit into a bot-opened PR).
+
+name: commitlint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group: # job must report inside the merge queue; lint step no-ops there
+
+permissions: {}
+
+concurrency:
+  group: commitlint-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  commitlint-humans:
+    name: commitlint (humans)
+    if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # range scan needs full history
+          persist-credentials: false
+
+      # On merge_group there are no PR commits to lint (they were already
+      # linted on the PR) — skip the step so the required check reports green.
+      - name: commitlint
+        if: github.event_name != 'merge_group'
+        uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed # v6.2.1
+        with:
+          configFile: commitlint.config.mjs
+
+  commitlint-dependabot:
+    name: commitlint (dependabot)
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: commitlint (lax)
+        uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed # v6.2.1
+        with:
+          configFile: commitlint.dependabot.config.mjs
