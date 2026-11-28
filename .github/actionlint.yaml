@@ -25,3 +25,14 @@ paths:
       - >-
         input "client-id" is not defined in action
         "actions/create-github-app-token@v3"
+
+self-hosted-runner:
+  labels:
+    - blacksmith-4vcpu-ubuntu-2404
+    - blacksmith-4vcpu-windows-2025
+    - blacksmith-6vcpu-macos-latest
+
+config-variables:
+  - RUNNER_UBUNTU
+  - RUNNER_MACOS
+  - RUNNER_WINDOWS

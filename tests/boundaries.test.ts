@@ -1,12 +1,27 @@
 // Proof that the architecture boundary rules (D-042) are enforced: each case
-// writes a small probe file into the real folder, runs the real tool on the
-// real config, checks the result, and always removes the probe. Rules and
-// tags: docs/reference/boundary-rules.md.
+// writes a small probe file into an isolated temporary workspace copy, runs the
+// real tool on the real config, checks the result, and always removes the probe.
+// Isolating probes in tmpdir() prevents races when `just all` runs in parallel.
+// Rules and tags: docs/reference/boundary-rules.md.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const BIN = join(REPO_ROOT, 'node_modules', '.bin');
@@ -17,11 +32,103 @@ const WEB = 'apps/web/src';
 const PROBE_APP = 'apps/__boundary-probe-app';
 const TIMEOUT_MS = 30_000;
 
+let probeRoot = '';
+
+function linkNodeModulesDir(srcDir: string, dstDir: string, tempRoot: string): void {
+  mkdirSync(dstDir, { recursive: true });
+  for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
+    if (entry.name === '.bin') continue;
+    const srcPath = join(srcDir, entry.name);
+    const dstPath = join(dstDir, entry.name);
+    const stat = lstatSync(srcPath);
+    if (stat.isSymbolicLink()) {
+      const realTarget = realpathSync(srcPath);
+      const relToRepo = relative(REPO_ROOT, realTarget);
+      const relPosix = relToRepo.replaceAll('\\', '/');
+      const isWorkspaceTarget =
+        !relPosix.startsWith('..') &&
+        (relPosix.startsWith('packages/') || relPosix.startsWith('apps/'));
+      const target = isWorkspaceTarget ? join(tempRoot, relToRepo) : realTarget;
+      symlinkSync(target, dstPath, 'junction');
+    } else if (stat.isDirectory()) {
+      linkNodeModulesDir(srcPath, dstPath, tempRoot);
+    }
+  }
+}
+
+function createProbeWorkspace(): string {
+  const root = mkdtempSync(join(tmpdir(), 'ts-boundaries-probe-'));
+  for (const configFile of [
+    '.oxlintrc.json',
+    '.dependency-cruiser.cjs',
+    'tsconfig.json',
+    'tsconfig.base.json',
+    'package.json',
+    'pnpm-workspace.yaml',
+  ]) {
+    const src = join(REPO_ROOT, configFile);
+    if (existsSync(src)) {
+      copyFileSync(src, join(root, configFile));
+    }
+  }
+
+  symlinkSync(join(REPO_ROOT, 'node_modules'), join(root, 'node_modules'), 'junction');
+
+  for (const group of ['packages', 'apps']) {
+    const groupSrc = join(REPO_ROOT, group);
+    if (!existsSync(groupSrc)) continue;
+    for (const pkg of readdirSync(groupSrc, { withFileTypes: true })) {
+      if (!pkg.isDirectory() || pkg.name.startsWith('__boundary-probe-')) continue;
+      const pkgSrc = join(groupSrc, pkg.name);
+      const pkgDst = join(root, group, pkg.name);
+      cpSync(pkgSrc, pkgDst, {
+        recursive: true,
+        filter: (src) => {
+          const rel = relative(pkgSrc, src).replaceAll('\\', '/');
+          if (!rel) return true;
+          const top = rel.split('/')[0] ?? '';
+          return (
+            top !== 'node_modules' &&
+            top !== 'dist' &&
+            top !== 'coverage' &&
+            !top.startsWith('__boundary-probe-')
+          );
+        },
+      });
+    }
+  }
+
+  for (const group of ['packages', 'apps']) {
+    const groupSrc = join(REPO_ROOT, group);
+    if (!existsSync(groupSrc)) continue;
+    for (const pkg of readdirSync(groupSrc, { withFileTypes: true })) {
+      if (!pkg.isDirectory() || pkg.name.startsWith('__boundary-probe-')) continue;
+      const nmSrc = join(groupSrc, pkg.name, 'node_modules');
+      if (existsSync(nmSrc)) {
+        linkNodeModulesDir(nmSrc, join(root, group, pkg.name, 'node_modules'), root);
+      }
+    }
+  }
+
+  return root;
+}
+
+beforeAll(() => {
+  probeRoot = createProbeWorkspace();
+});
+
+afterAll(() => {
+  if (probeRoot) {
+    rmSync(probeRoot, { recursive: true, force: true });
+    probeRoot = '';
+  }
+});
+
 /** Files (and the probe app folder) written by the current case. */
 const written: string[] = [];
 
 function probe(path: string, content: string): string {
-  const absolute = join(REPO_ROOT, path);
+  const absolute = join(probeRoot, path);
   mkdirSync(dirname(absolute), { recursive: true });
   writeFileSync(absolute, content);
   written.push(absolute);
@@ -32,7 +139,9 @@ function removeProbes(): void {
   for (const path of written.splice(0)) {
     rmSync(path, { force: true });
   }
-  rmSync(join(REPO_ROOT, PROBE_APP), { recursive: true, force: true });
+  if (probeRoot) {
+    rmSync(join(probeRoot, PROBE_APP), { recursive: true, force: true });
+  }
 }
 
 afterEach(removeProbes);
@@ -42,14 +151,20 @@ interface RunResult {
   output: string;
 }
 
-function run(bin: string, args: string[]): RunResult {
-  const result = spawnSync(join(BIN, bin), args, { cwd: REPO_ROOT, encoding: 'utf8' });
+function run(bin: string, args: string[], cwd: string): RunResult {
+  const binPath = join(BIN, process.platform === 'win32' ? `${bin}.cmd` : bin);
+  const result = spawnSync(binPath, args, {
+    cwd,
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  });
   return { status: result.status, output: `${result.stdout}${result.stderr}` };
 }
 
 // Pinned: in GitHub Actions oxlint switches to its `github` format, which
 // drops the `help:` text that carries our rule tags.
-const oxlint = (files: string[]): RunResult => run('oxlint', ['--format', 'default', ...files]);
+const oxlint = (files: string[], cwd = probeRoot): RunResult =>
+  run('oxlint', ['--format', 'default', ...files], cwd);
 
 /** A result shape whose comparison shows the tool output on failure. */
 const outcome = (result: RunResult): { passed: boolean; output: string } => ({
@@ -57,15 +172,12 @@ const outcome = (result: RunResult): { passed: boolean; output: string } => ({
   output: result.output,
 });
 const PASSED = { passed: true, output: expect.any(String) };
-const depcruise = (outputType = 'err-long'): RunResult =>
-  run('depcruise', [
-    'packages',
-    'apps',
-    '--config',
-    '.dependency-cruiser.cjs',
-    '--output-type',
-    outputType,
-  ]);
+const depcruise = (outputType = 'err-long', cwd = probeRoot): RunResult =>
+  run(
+    'depcruise',
+    ['packages', 'apps', '--config', '.dependency-cruiser.cjs', '--output-type', outputType],
+    cwd
+  );
 
 /** Probe files whose `export … from` would make them a barrel. */
 const ENTRY_FILES = new Set([`${CORE}/index.ts`, `${CLI}/lib.ts`, `${CLI}/api.ts`]);
@@ -77,22 +189,20 @@ function walk(dir: string): string[] {
   );
 }
 
-function reexportViolations(): string[] {
+function reexportViolations(root = REPO_ROOT): string[] {
   const roots = ['packages', 'apps'].flatMap((group) =>
-    readdirSync(join(REPO_ROOT, group), { withFileTypes: true })
+    readdirSync(join(root, group), { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
-      .map((entry) => join(REPO_ROOT, group, entry.name, 'src'))
+      .map((entry) => join(root, group, entry.name, 'src'))
       .filter((src) => existsSync(src))
   );
   return roots
     .flatMap(walk)
     .filter((file) => file.endsWith('.ts'))
-    .map((file) => relative(REPO_ROOT, file))
+    .map((file) => relative(root, file).replaceAll('\\', '/'))
     .filter((file) => !ENTRY_FILES.has(file))
     .filter((file) =>
-      /export\s+(type\s+)?(\*|\{[^}]*\})\s*from\s/s.test(
-        readFileSync(join(REPO_ROOT, file), 'utf8')
-      )
+      /export\s+(type\s+)?(\*|\{[^}]*\})\s*from\s/s.test(readFileSync(join(root, file), 'utf8'))
     );
 }
 
@@ -335,9 +445,9 @@ describe.sequential('architecture boundaries (D-042)', () => {
   it(
     'sanity: the untouched repo passes oxlint and dependency-cruiser',
     () => {
-      expect(outcome(oxlint([]))).toEqual(PASSED);
-      expect(outcome(depcruise())).toEqual(PASSED);
-      expect(reexportViolations()).toEqual([]);
+      expect(outcome(oxlint([], REPO_ROOT))).toEqual(PASSED);
+      expect(outcome(depcruise('err-long', REPO_ROOT))).toEqual(PASSED);
+      expect(reexportViolations(REPO_ROOT)).toEqual([]);
     },
     TIMEOUT_MS
   );
@@ -347,7 +457,7 @@ describe.sequential('architecture boundaries (D-042)', () => {
     () => {
       // With TypeScript 7 the default parser sees no .ts files yet exits 0;
       // the swc parser must find the whole graph and the type-only edges.
-      const result = depcruise('json');
+      const result = depcruise('json', REPO_ROOT);
       expect(result.status).toBe(0);
       const graph = JSON.parse(result.output.slice(result.output.indexOf('{'))) as {
         modules: {
@@ -432,7 +542,7 @@ describe.sequential('architecture boundaries (D-042)', () => {
           `${CORE}/services/__boundary-probe-barrel.ts`,
           "export { createProjectsService } from './projects.service.js';\n"
         );
-        expect(reexportViolations()).toEqual([barrel]);
+        expect(reexportViolations(probeRoot)).toEqual([barrel]);
       } finally {
         removeProbes();
       }

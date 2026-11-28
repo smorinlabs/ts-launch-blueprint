@@ -54,7 +54,11 @@ function buildIfStale(): void {
     statSync(join(ROOT, 'tsdown.config.ts')).mtimeMs
   );
   if (sourcesMtime > distMtime) {
-    execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'ignore' });
+    execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build'], {
+      cwd: ROOT,
+      stdio: 'ignore',
+      shell: process.platform === 'win32',
+    });
   }
 }
 
@@ -145,6 +149,7 @@ beforeAll(async () => {
   baseEnv = {
     PATH: process.env['PATH'] ?? '',
     HOME: home,
+    USERPROFILE: home,
     NO_COLOR: '1',
     TS_PROJECTS_TOKEN: 'good-token',
     TS_PROJECTS_API_URL: `${api.url}/api/1.0`,
@@ -261,16 +266,19 @@ async function signalMidFetch(signal: NodeJS.Signals): Promise<CliResult> {
   }
 }
 
-describe('signal contract (S3a deferred verification: SIGINT/SIGTERM)', () => {
-  it('SIGINT after connect -> exit 130', async () => {
-    const result = await signalMidFetch('SIGINT');
-    expect(result.code).toBe(130);
-    expect(result.signal).toBeNull();
-  }, 15_000);
+describe.skipIf(process.platform === 'win32')(
+  'signal contract (S3a deferred verification: SIGINT/SIGTERM)',
+  () => {
+    it('SIGINT after connect -> exit 130', async () => {
+      const result = await signalMidFetch('SIGINT');
+      expect(result.code).toBe(130);
+      expect(result.signal).toBeNull();
+    }, 15_000);
 
-  it('SIGTERM after connect -> exit 143', async () => {
-    const result = await signalMidFetch('SIGTERM');
-    expect(result.code).toBe(143);
-    expect(result.signal).toBeNull();
-  }, 15_000);
-});
+    it('SIGTERM after connect -> exit 143', async () => {
+      const result = await signalMidFetch('SIGTERM');
+      expect(result.code).toBe(143);
+      expect(result.signal).toBeNull();
+    }, 15_000);
+  }
+);

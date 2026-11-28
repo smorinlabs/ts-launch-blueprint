@@ -46,10 +46,14 @@ permissions:
   # option below; comment out if you disable that option (D-022(10)).
   pull-requests: write
 
+concurrency:
+  group: dependency-review-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   dependency-review:
     if: ${{ github.event.repository.visibility == 'public' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
     steps:
       - name: 'Checkout repository'
         uses: actions/checkout@v7
