@@ -943,7 +943,7 @@ describe('coverage & pack-check CI contract (P02)', () => {
     expect(packCheckStep).toBeDefined();
   });
 
-  it('publish.yml verify job runs just pack-check', () => {
+  it('publish.yml verify job installs shell tools + editorconfig-checker before just all and runs just pack-check', () => {
     const publish = parse(readFileSync(join(WORKFLOW_DIR, 'publish.yml'), 'utf8')) as {
       jobs: {
         verify: {
@@ -951,10 +951,29 @@ describe('coverage & pack-check CI contract (P02)', () => {
         };
       };
     };
-    const packCheckStep = publish.jobs.verify.steps.find(
-      (step) => step.run?.trim() === 'just pack-check'
+    const steps = publish.jobs.verify.steps;
+    const shellToolsIdx = steps.findIndex((step) => step.run?.includes('just install-shell-tools'));
+    const ecToolsIdx = steps.findIndex((step) =>
+      step.run?.includes('just install-editorconfig-checker')
     );
+    const justAllIdx = steps.findIndex((step) => step.run?.trim() === 'just all');
+    const packCheckStep = steps.find((step) => step.run?.trim() === 'just pack-check');
+    expect(shellToolsIdx).toBeGreaterThanOrEqual(0);
+    expect(ecToolsIdx).toBeGreaterThanOrEqual(0);
+    expect(justAllIdx).toBeGreaterThan(shellToolsIdx);
+    expect(justAllIdx).toBeGreaterThan(ecToolsIdx);
     expect(packCheckStep).toBeDefined();
+  });
+
+  it('generated CHANGELOG.md and CONTRIBUTORS.md are excluded from oxfmt and editorconfig-checker', () => {
+    const oxfmtIgnore = readJsonc('.oxfmtrc.json').ignorePatterns;
+    expect(oxfmtIgnore).toContain('CHANGELOG.md');
+    expect(oxfmtIgnore).toContain('CONTRIBUTORS.md');
+    const ecConfig = JSON.parse(
+      readFileSync(join(REPO_ROOT, '.editorconfig-checker.json'), 'utf8')
+    ) as { Exclude: string[] };
+    expect(ecConfig.Exclude).toContain('CHANGELOG\\.md');
+    expect(ecConfig.Exclude).toContain('CONTRIBUTORS\\.md');
   });
 });
 

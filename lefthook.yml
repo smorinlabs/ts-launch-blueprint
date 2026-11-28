@@ -50,6 +50,7 @@ pre-commit:
         - 'docs/port/typescript_port_process_prompt.md'
         - '.claude/settings.local.json'
         - 'CHANGELOG.md'
+        - 'CONTRIBUTORS.md'
       env:
         pnpm_config_verify_deps_before_run: ''
         npm_config_verify_deps_before_run: ''
