@@ -56,6 +56,12 @@ describe('resolveApiConfig', () => {
     expect(() => resolveApiConfig({ TS_PROJECTS_SOURCE: 'http' })).toThrow(
       'TS_PROJECTS_SOURCE=http needs TS_PROJECTS_TOKEN'
     );
+    expect(() =>
+      resolveApiConfig({ TS_PROJECTS_SOURCE: 'http', TS_PROJECTS_TOKEN: '   ' })
+    ).toThrow(ConfigError);
+    expect(() =>
+      resolveApiConfig({ TS_PROJECTS_SOURCE: 'http', TS_PROJECTS_TOKEN: '   ' })
+    ).toThrow('TS_PROJECTS_SOURCE=http needs TS_PROJECTS_TOKEN');
   });
 
   it('http with a token (and an optional API URL) is accepted', () => {
@@ -211,6 +217,8 @@ describe('resolveApiConfig', () => {
       'ftp://a.example',
       'https://a.example/path',
       'https://a.example/',
+      'https://a.example?',
+      'https://a.example#',
       'https://a.example?x=1',
       'https://user:pass@a.example',
     ])('rejects invalid CORS_ORIGINS=%s', (value) => {

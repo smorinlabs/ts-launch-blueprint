@@ -45,7 +45,12 @@ export declare function stripRedirectCredentials(
 export declare function validateRedirectTarget(newUrl: string): URL;
 export declare function fetchWithSafeRedirects(
   url: string,
-  init?: { method?: string; headers?: Record<string, string>; body?: string | Buffer },
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string | Buffer;
+    signal?: AbortSignal;
+  },
   fetchImpl?: typeof globalThis.fetch
 ): Promise<{ raw: Buffer; headers: Record<string, string> }>;
 

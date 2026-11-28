@@ -11,7 +11,11 @@ interface NodeIncomingEnv {
   };
 }
 
-/** Extract the client key (IP) from forwarded headers or the Node socket. */
+/**
+ * Extract the client key (IP) from forwarded headers or the Node socket.
+ * Assumes a trusted normalizing proxy in front of the API strips or overwrites
+ * client-supplied `x-forwarded-for` / `x-real-ip` headers.
+ */
 export function clientKeyFrom(c: Context): string {
   const forwarded = c.req.header('x-forwarded-for');
   if (forwarded !== undefined) {
@@ -51,17 +55,26 @@ export function rateLimit(options: {
 
   return async (c, next) => {
     const currentTime = now();
-    if (windows.size > maxEntries) {
-      for (const [entryKey, entryValue] of windows.entries()) {
-        if (currentTime >= entryValue.resetAt) {
-          windows.delete(entryKey);
-        }
-      }
-    }
-
     const key = keyGenerator(c);
     let entry = windows.get(key);
     if (entry === undefined || currentTime >= entry.resetAt) {
+      if (entry !== undefined) {
+        // Refresh insertion order so renewed keys are not evicted ahead of newer arrivals.
+        windows.delete(key);
+      } else if (windows.size >= maxEntries) {
+        for (const [entryKey, entryValue] of windows.entries()) {
+          if (currentTime >= entryValue.resetAt) {
+            windows.delete(entryKey);
+          }
+        }
+        while (windows.size >= maxEntries) {
+          const oldestKey = windows.keys().next().value;
+          if (oldestKey === undefined) {
+            break;
+          }
+          windows.delete(oldestKey);
+        }
+      }
       entry = { count: 0, resetAt: currentTime + options.windowMs };
       windows.set(key, entry);
     }

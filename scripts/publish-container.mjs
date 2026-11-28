@@ -97,6 +97,7 @@ export async function fetchWithSafeRedirects(url, init = {}, fetchImpl = globalT
   let method = init.method ?? 'GET';
   let headers = { ...init.headers };
   let body = init.body;
+  const signal = init.signal ?? AbortSignal.timeout(30_000);
 
   for (let hop = 0; hop <= 5; hop += 1) {
     const response = await fetchImpl(currentUrl, {
@@ -104,6 +105,7 @@ export async function fetchWithSafeRedirects(url, init = {}, fetchImpl = globalT
       headers,
       body,
       redirect: 'manual',
+      signal,
     });
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
@@ -225,7 +227,7 @@ export class Registry {
       throw new Error('Registry manifest digest does not match its bytes');
     }
     const doc = JSON.parse(raw.toString('utf8'));
-    const mediaType = doc.mediaType;
+    const mediaType = doc.mediaType ?? headers['content-type']?.split(';')[0]?.trim();
     if (!MEDIA_TYPES.includes(mediaType)) {
       throw new Error('Expected a single-platform image manifest');
     }

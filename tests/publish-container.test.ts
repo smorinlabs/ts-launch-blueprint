@@ -404,6 +404,29 @@ describe('publish-container behavioral guards', () => {
     await expect(registry.manifest('2.10.0')).rejects.toThrow(/digest does not match/);
   });
 
+  it('manifest falls back to Content-Type header when optional OCI doc.mediaType is omitted', async () => {
+    const raw = Buffer.from(
+      JSON.stringify({ schemaVersion: 2, config: { digest: CONFIG_DIGEST } }),
+      'utf8'
+    );
+    const digest = `sha256:${createHash('sha256').update(raw).digest('hex')}`;
+    const registry = new Registry(REPOSITORY, 'tok');
+    registry.request = vi.fn<RequestFn>().mockResolvedValueOnce({
+      raw,
+      headers: {
+        'docker-content-digest': digest,
+        'content-type': 'application/vnd.oci.image.manifest.v1+json; charset=utf-8',
+      },
+    });
+
+    await expect(registry.manifest('2.10.0')).resolves.toEqual({
+      raw,
+      digest,
+      config: CONFIG_DIGEST,
+      mediaType: 'application/vnd.oci.image.manifest.v1+json',
+    });
+  });
+
   it('existing index is detected and refused, not mistaken for absence', async () => {
     const raw = Buffer.from(
       JSON.stringify({ mediaType: INDEX_MEDIA_TYPES[0], manifests: [] }),
@@ -483,6 +506,25 @@ describe('publish-container behavioral guards', () => {
         insecureRedirectFetch
       )
     ).rejects.toThrow(/requires HTTPS/);
+  });
+
+  it('fetchWithSafeRedirects attaches a default timeout signal and preserves a caller signal', async () => {
+    const signals: (AbortSignal | undefined)[] = [];
+    const fetchImpl: typeof globalThis.fetch = async (_url, init) => {
+      signals.push(init?.signal ?? undefined);
+      return new Response('ok', { status: 200 });
+    };
+
+    await fetchWithSafeRedirects(`https://ghcr.io/v2/${REPOSITORY}/tags/list`, {}, fetchImpl);
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+
+    const controller = new AbortController();
+    await fetchWithSafeRedirects(
+      `https://ghcr.io/v2/${REPOSITORY}/tags/list`,
+      { signal: controller.signal },
+      fetchImpl
+    );
+    expect(signals[1]).toBe(controller.signal);
   });
 
   it('old promotion selects the highest published version', async () => {

@@ -104,15 +104,7 @@ function isValidHttpOrigin(entry: string): boolean {
   }
   try {
     const url = new URL(entry);
-    return (
-      (url.protocol === 'http:' || url.protocol === 'https:') &&
-      url.username === '' &&
-      url.password === '' &&
-      url.search === '' &&
-      url.hash === '' &&
-      url.pathname === '/' &&
-      !entry.endsWith('/')
-    );
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === entry;
   } catch {
     return false;
   }
@@ -356,7 +348,9 @@ const ApiEnvSchema = z
     [RATE_LIMIT_ENV_VAR]: rateLimitSchema,
     [SHUTDOWN_TIMEOUT_ENV_VAR]: shutdownTimeoutMsSchema,
     [SOURCE_ENV_VAR]: sourceSchema,
-    [TOKEN_ENV_VAR]: emptyOrString.transform((v) => (v === '' ? undefined : v)),
+    [TOKEN_ENV_VAR]: emptyOrString.transform((v) =>
+      v === undefined || v.trim() === '' ? undefined : v
+    ),
     [API_URL_ENV_VAR]: emptyOrString.transform((v) => (v === '' ? undefined : v)),
   })
   .transform((parsed, ctx): ApiConfig => {

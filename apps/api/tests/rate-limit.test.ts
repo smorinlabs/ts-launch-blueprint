@@ -93,4 +93,29 @@ describe('rateLimit middleware', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('x-ratelimit-remaining')).toBe('0');
   });
+
+  it('evicts oldest active entries via FIFO so map size never exceeds maxEntries under active-window floods', async () => {
+    const clock = 1_000;
+    const app = new Hono();
+    app.use('*', rateLimit({ limit: 1, windowMs: 60_000, now: () => clock, maxEntries: 2 }));
+    app.get('/ping', (c) => c.text('ok'));
+
+    expect((await app.request('/ping', { headers: { 'x-real-ip': '1.1.1.1' } })).status).toBe(200);
+    expect((await app.request('/ping', { headers: { 'x-real-ip': '2.2.2.2' } })).status).toBe(200);
+
+    // Within the active window, inserting a 3rd key must evict the oldest (1.1.1.1) while keeping 2.2.2.2.
+    expect((await app.request('/ping', { headers: { 'x-real-ip': '3.3.3.3' } })).status).toBe(200);
+
+    // 2.2.2.2 is still tracked and hits the limit (429).
+    expect((await app.request('/ping', { headers: { 'x-real-ip': '2.2.2.2' } })).status).toBe(429);
+
+    // 1.1.1.1 was evicted, so it starts fresh (200) and evicts 2.2.2.2 (the oldest in FIFO order).
+    const r1 = await app.request('/ping', { headers: { 'x-real-ip': '1.1.1.1' } });
+    expect(r1.status).toBe(200);
+    expect(r1.headers.get('x-ratelimit-remaining')).toBe('0');
+
+    // 3.3.3.3 is still tracked (429), while 2.2.2.2 was evicted and starts fresh (200).
+    expect((await app.request('/ping', { headers: { 'x-real-ip': '3.3.3.3' } })).status).toBe(429);
+    expect((await app.request('/ping', { headers: { 'x-real-ip': '2.2.2.2' } })).status).toBe(200);
+  });
 });
