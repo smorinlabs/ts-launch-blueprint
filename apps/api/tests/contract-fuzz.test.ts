@@ -9,8 +9,27 @@ import { captureLogger } from './log-capture.js';
 const { logger } = captureLogger();
 const app = createApp({ core: createCore({ source: 'memory' }), logger });
 
+function hasStackKey(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some(hasStackKey);
+  }
+  const record = value as Record<string, unknown>;
+  if (Object.hasOwn(record, 'stack') && record.stack !== undefined) {
+    return true;
+  }
+  return Object.values(record).some(hasStackKey);
+}
+
 function hasStackTraceLeak(bodyText: string): boolean {
-  return bodyText.includes('"stack"') || /\bat\s+\S+\s+\(/.test(bodyText);
+  try {
+    const parsed: unknown = JSON.parse(bodyText);
+    return hasStackKey(parsed);
+  } catch {
+    return /\bat\s+\S+\s+\(/.test(bodyText);
+  }
 }
 
 describe('GET /trpc/projects.list contract fuzzing', () => {
@@ -75,5 +94,19 @@ describe('GET /trpc/projects.list contract fuzzing', () => {
       }),
       { numRuns: 75 }
     );
+  });
+
+  it('does not misclassify echoed workspaceName text like "at f (" as a stack trace', async () => {
+    const query = encodeURIComponent(JSON.stringify({ workspaceName: 'at f (' }));
+    const response = await app.request(`/trpc/projects.list?input=${query}`);
+    expect(response.status).toBe(404);
+    const bodyText = await response.text();
+    expect(hasStackTraceLeak(bodyText)).toBe(false);
+
+    expect(
+      hasStackTraceLeak(JSON.stringify({ error: { data: { stack: 'Error\n at f (a.ts:1)' } } }))
+    ).toBe(true);
+    expect(hasStackTraceLeak(JSON.stringify([{ stack: 'Error' }]))).toBe(true);
+    expect(hasStackTraceLeak('Error: boom\n    at f (a.ts:1)')).toBe(true);
   });
 });
