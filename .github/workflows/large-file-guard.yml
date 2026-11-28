@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: MIT
+
+# Large-file CI guard (P05). Mirrors local lefthook check-large-files.
+# Threshold: 1 MB (1048576 bytes). Allowlist: docs/assets/ only.
+
+name: large-file-guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: large-file-guard-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  guard:
+    name: reject-files-over-1mb
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # Need full diff range to inspect added files.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Reject new files over 1 MB outside docs/assets/
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          THRESHOLD_BYTES: 1048576 # 1 MB
+          ALLOWLIST_PREFIX: docs/assets/
+        run: |
+          set -euo pipefail
+          # Skip if BASE_SHA is empty (first push to branch) or all-zeros.
+          if [ -z "${BASE_SHA}" ] || [ "${BASE_SHA}" = "0000000000000000000000000000000000000000" ]; then
+            echo "INFO: no base sha; skipping large-file guard"
+            exit 0
+          fi
+          FAILED=0
+          while IFS= read -r FILE; do
+            # Skip if missing (e.g., deleted later in same PR).
+            [ -f "${FILE}" ] || continue
+            # Skip files under the allowlist prefix.
+            case "${FILE}" in
+              "${ALLOWLIST_PREFIX}"*) continue ;;
+            esac
+            SIZE=$(wc -c <"${FILE}" | tr -d ' ')
+            if [ "${SIZE}" -gt "${THRESHOLD_BYTES}" ]; then
+              echo "FAIL: ${FILE} is ${SIZE} bytes (>${THRESHOLD_BYTES}); not under ${ALLOWLIST_PREFIX}"
+              FAILED=1
+            fi
+          done < <(git diff --name-only --diff-filter=A "${BASE_SHA}...${HEAD_SHA}" || true)
+          if [ "${FAILED}" -ne 0 ]; then
+            echo ""
+            echo "Add the file under ${ALLOWLIST_PREFIX} if it's intentional, or remove it from the PR."
+            exit 1
+          fi
+          echo "PASS: no new files over 1 MB outside ${ALLOWLIST_PREFIX}"

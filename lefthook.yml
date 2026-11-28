@@ -14,7 +14,19 @@ pre-commit:
       run: bash scripts/check-shell.sh {staged_files}
     - name: actionlint
       glob: '.github/workflows/*.{yml,yaml}'
-      run: command -v shellcheck >/dev/null && actionlint {staged_files}
+      run: |
+        command -v actionlint >/dev/null 2>&1 || { echo "FAIL: actionlint missing — run just install-shell-tools" >&2; exit 1; }
+        command -v shellcheck >/dev/null 2>&1 || { echo "FAIL: shellcheck missing — run just install-shell-tools" >&2; exit 1; }
+        actionlint {staged_files}
+    - name: editorconfig-checker
+      run: |
+        command -v editorconfig-checker >/dev/null 2>&1 || { echo "FAIL: editorconfig-checker missing — run just install-editorconfig-checker" >&2; exit 1; }
+        editorconfig-checker -config .editorconfig-checker.json {staged_files}
+    - name: cspell
+      run: pnpm exec cspell lint --no-progress --no-must-find-files --files {staged_files}
+    - name: pnpm-lock-check
+      glob: '{package.json,**/package.json,pnpm-workspace.yaml,pnpm-lock.yaml}'
+      run: pnpm install --frozen-lockfile --lockfile-only --ignore-scripts
     # Formatter on staged files; auto-fixes are re-staged (stage_fixed).
     # Source pre-commit hygiene hooks, mapped (D-020(6)):
     #   delegated to oxfmt (D-014(7)): end-of-file-fixer, trailing-whitespace,
@@ -27,7 +39,7 @@ pre-commit:
     # staged files remain. --no-error-on-unmatched-pattern is drift insurance
     # for ignorePatterns entries added without a matching exclude here.
     - name: format
-      glob: '*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,md}'
+      glob: '*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,toml,md}'
       exclude:
         - 'docs/port/TS_PORT_*.md'
         - 'docs/port/TS_EXISTING_REPO_REVIEW.md'
@@ -37,16 +49,17 @@ pre-commit:
         - 'CHANGELOG.md'
       run: pnpm exec oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
-    # Reject staged files larger than 500KB (pre-commit's
-    # check-added-large-files intent; dependency-free POSIX shell).
+    # Reject staged files larger than 1MB outside docs/assets/ (mirrors
+    # .github/workflows/large-file-guard.yml).
     - name: check-large-files
       run: |
         status=0
         for file in {staged_files}; do
+          case "$file" in docs/assets/*) continue ;; esac
           if [ -f "$file" ]; then
-            size=$(wc -c < "$file")
-            if [ "$size" -gt 512000 ]; then
-              echo "File too large (> 500KB): $file ($size bytes)"
+            size=$(wc -c < "$file" | tr -d ' ')
+            if [ "$size" -gt 1048576 ]; then
+              echo "File too large (> 1MB): $file ($size bytes); use docs/assets/ or remove it" >&2
               status=1
             fi
           fi
@@ -73,8 +86,8 @@ pre-commit:
 
 commit-msg:
   jobs:
-    # Conventional Commits with the source 50/72/type contract
-    # (commitlint.config.mjs; replaces gitlint + cog install-hook, D-020(2,5)).
+    # Conventional Commits with the 100/200/200/type contract
+    # (commitlint.config.mjs; Q9.A).
     - name: commitlint
       run: pnpm exec commitlint --edit {1}
 
@@ -82,7 +95,10 @@ commit-msg:
 # suites tax contributor DX and train --no-verify; CI is the backstop.
 # Opt-in: export TS_PROJECTS_PREPUSH_TESTS=1 to enable locally.
 pre-push:
+  parallel: true
   jobs:
+    - name: press-verify
+      run: just press-verify
     - name: test
       run: |
         if [ "${TS_PROJECTS_PREPUSH_TESTS:-0}" = "1" ]; then

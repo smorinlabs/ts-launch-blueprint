@@ -67,8 +67,8 @@ With hooks installed:
 - **pre-commit** runs oxfmt (auto-fixing staged files), oxlint, a
   large-file check, and a full-program `tsc --noEmit` — in parallel.
 - **commit-msg** runs commitlint against your commit message
-  ([Conventional Commits](https://www.conventionalcommits.org/), 50/72
-  line-length limits).
+  ([Conventional Commits](https://www.conventionalcommits.org/), 100/200/200
+  header/body/footer line-length limits).
 - **pre-push** runs the test suite only if you opt in:
   `export TS_PROJECTS_PREPUSH_TESTS=1`. By default, tests are left to
   CI so local pushes stay fast.

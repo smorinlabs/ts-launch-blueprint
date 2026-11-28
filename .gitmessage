@@ -1,5 +1,5 @@
 # <type>: <description>
-# |<----  Using a maximum of 50 characters  ---->|
+# |<-------------------------------  Using a maximum of 100 characters  ------------------------------->|
 #
 # Types: feat, fix, docs, style, refactor, test, chore, ci, build, perf, revert
 #
@@ -8,8 +8,8 @@
 # fix(auth): resolve login timeout issue
 #
 # - Separate subject from body with a blank line
-# - Limit the subject line to 50 characters
+# - Limit the subject line to 100 characters
 # - Use a lower-case subject line (commitlint rejects sentence-case)
 # - Do not end the subject line with a period
 # - Use the imperative mood in the subject line
-# - Wrap the body at 72 characters
+# - Wrap body and footer lines at 200 characters

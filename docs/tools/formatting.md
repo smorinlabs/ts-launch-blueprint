@@ -11,7 +11,7 @@ everything — code, JSON, YAML, _and_ Markdown.
 **Key benefits**:
 
 - **Single tool**: one formatter for `.ts`/`.tsx`/`.js`/`.mjs`/`.cjs`, JSON/JSONC,
-  YAML, and Markdown — no conflicting tools fighting over the same files.
+  YAML, TOML, and Markdown — no conflicting tools fighting over the same files.
 - **Fast**: Oxfmt is built on the [oxc](https://oxc.rs) Rust toolchain.
 - **Pre-commit integration**: runs automatically on staged files via
   [lefthook](lefthook.md), with auto-fixes re-staged.
@@ -52,7 +52,7 @@ Oxfmt is configured in [`.oxfmtrc.json`](../../.oxfmtrc.json):
 | `sortImports`    | `true`   | Enables Oxfmt's built-in perfectionist-like import sorter — the equivalent of `ruff`'s `I` (isort) rules, kept as a formatting concern rather than a separate lint plugin.                                                                                                                                                                                                   |
 | `ignorePatterns` | see file | Excludes port-process artifacts (`docs/port/TS_PORT_*.md`, `docs/port/TS_EXISTING_REPO_REVIEW.md`, `docs/port/goal.md`, `docs/port/typescript_port_process_prompt.md`) that cross-reference each other by line number — reformatting would corrupt those references — plus `.claude/settings.local.json`, an untracked local-session file that must never fail format-check. |
 
-Oxfmt also formats JSON/JSONC, YAML, and Markdown using these same repo-wide
+Oxfmt also formats JSON/JSONC, YAML, TOML, and Markdown using these same repo-wide
 settings — there is no separate config file for those formats.
 
 ## Pre-commit integration
@@ -60,7 +60,7 @@ settings — there is no separate config file for those formats.
 Formatting runs automatically on every commit via
 [lefthook](lefthook.md#pre-commit-parallel-jobs-staged-files-only): the
 `format` job runs `oxfmt` on staged files matching
-`*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,md}` and re-stages any fixes
+`*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,toml,md}` and re-stages any fixes
 (`stage_fixed: true`).
 
 ## Why no yamlfmt or taplo
@@ -73,10 +73,9 @@ over 1:1:
   output), so a second Go binary and its `just install-go` /
   `just install-yamlfmt` bootstrap step are unnecessary. The intent — every
   YAML file is machine-formatted — is preserved; the tool is not.
-- **TOML** (`taplo`): this repo ships no TOML files that need a dedicated
-  formatter (`.taplo.toml` and `cog.toml` were dropped along with the
-  Python-specific release tooling they belonged to). If a TOML file is ever
-  added, Oxfmt formats TOML as well, so no new dependency would be needed.
+- **TOML** (`taplo`): Oxfmt formats TOML natively (`press/*.toml` and any
+  other TOML files in the repo), so no separate `taplo` binary or `.taplo.toml`
+  is needed.
 
 ## Skipping formatting
 

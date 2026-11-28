@@ -1,5 +1,6 @@
 // In-process CLI core tests (D-016(1), D-019(4) tier 1): runCli(argv,
 // deps) with injected writers/env — no subprocess, no process.exit.
+// cspell:ignore verbos projcts envtokenvalue flagtokenvalue filetoken
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

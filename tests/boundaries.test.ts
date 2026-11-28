@@ -350,6 +350,7 @@ const FORBIDDEN: [string, ForbiddenCase][] = [
       tag: 'api-core-via-create-core',
       tools: ['oxlint'],
       files: () => [
+        // cspell:ignore createservice
         probe(
           `${API}/__boundary-probe-createservice.ts`,
           "import { createProjectsService } from '@ts-launch-blueprint/core';\nexport const probe: unknown = createProjectsService;\n"

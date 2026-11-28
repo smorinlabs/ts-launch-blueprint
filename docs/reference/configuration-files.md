@@ -147,7 +147,7 @@ and [Oxlint](../tools/oxlint.md).
 ### `.oxfmtrc.json`
 
 Configures Oxfmt, the formatter (also used for import sorting via
-`sortImports`, and for formatting JSON/YAML/Markdown). `printWidth:
+`sortImports`, and for formatting JSON/YAML/TOML/Markdown). `printWidth:
 100`, `singleQuote: true`, `trailingComma: "es5"`. An
 `ignorePatterns` list excludes the port's own process-log documents,
 which cross-reference each other by line number. See
@@ -156,23 +156,34 @@ which cross-reference each other by line number. See
 ### `lefthook.yml`
 
 Configures lefthook, the git-hooks runner (installed via the
-package.json `prepare` script). Runs `format` + `check-large-files` +
-`lint` + `typecheck` in parallel on `pre-commit`, `commitlint` on
-`commit-msg`, and an opt-in test run on `pre-push`
-(`TS_PROJECTS_PREPUSH_TESTS=1`). See
+package.json `prepare` script). Runs `shellcheck` + `actionlint` +
+`editorconfig-checker` + `cspell` + `pnpm-lock-check` + `format` +
+`check-large-files` + `lint` + `boundaries` + `typecheck` in parallel on
+`pre-commit`, `commitlint` on `commit-msg`, and `press-verify` + an
+opt-in test run on `pre-push` (`TS_PROJECTS_PREPUSH_TESTS=1`). See
 [lefthook.yml](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/lefthook.yml)
 and [Lefthook](../tools/lefthook.md).
 
-### `commitlint.config.mjs`
+### `commitlint.config.mjs` and `commitlint.dependabot.config.mjs`
 
 Configures commitlint, which enforces Conventional Commits on every
-commit message (`commit-msg` hook, above). Extends
+commit message (`commit-msg` hook and CI `commitlint.yml`). Extends
 `@commitlint/config-conventional` with a fixed `type-enum` list
 (`feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`,
-`build`, `perf`, `revert`) and 50/72 header/body line-length limits.
-`commitlint.config.d.mts` declares its shape for the repo-hygiene meta
-test. See
+`build`, `perf`, `revert`) and 100/200/200 header/body/footer
+line-length limits (`commitlint.dependabot.config.mjs` disables body/footer
+line-length checks for Dependabot PRs). `commitlint.config.d.mts`
+declares its shape for the repo-hygiene meta-test. See
 [commitlint.config.mjs](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/commitlint.config.mjs).
+
+### `.editorconfig`, `.editorconfig-checker.json`, and `cspell.json`
+
+`.editorconfig` defines cross-editor encoding, line endings, final
+newlines, and indentation defaults; `.editorconfig-checker.json`
+configures `editorconfig-checker` (installed via `just install-editorconfig-checker`)
+with `Indentation`/`IndentSize` delegated to Oxfmt. `cspell.json`
+configures Node-native spell-checking across `just check-spelling`,
+lefthook, CI, and the recommended VS Code extension.
 
 ### `vitest.config.ts`
 

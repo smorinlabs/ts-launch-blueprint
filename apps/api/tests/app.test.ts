@@ -203,6 +203,7 @@ describe('logging and edge cases', () => {
   });
 
   it('malformed ?input= -> 400 without data.issues (not a schema error)', async () => {
+    // cspell:ignore Bnot
     const response = await app.request('/trpc/projects.list?input=%7Bnot-json');
     expect(response.status).toBe(400);
     const body = (await response.json()) as TrpcError;

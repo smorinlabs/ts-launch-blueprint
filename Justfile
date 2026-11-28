@@ -79,6 +79,7 @@ check-deps:
     if ! command -v just >/dev/null 2>&1; then printf "{{YELLOW}}just is not installed{{NC}}\n RUN {{BLUE}}make install-just{{NC}}\n"; exit 1; fi
     if ! command -v git >/dev/null 2>&1; then printf "{{YELLOW}}git is not installed{{NC}}\n Install: {{BLUE}}xcode-select --install{{NC}} (macOS) or {{BLUE}}sudo apt install git{{NC}} (Debian/Ubuntu)\n"; exit 1; fi
     if ! command -v actionlint >/dev/null 2>&1 || ! command -v shellcheck >/dev/null 2>&1; then printf "Shell lint tools missing: run just install-shell-tools\n" >&2; exit 1; fi
+    if ! command -v editorconfig-checker >/dev/null 2>&1; then printf "EditorConfig checker missing: run just install-editorconfig-checker\n" >&2; exit 1; fi
     echo "All required tools are installed"
     # Optional tools (advisory only; not required to build/test the project):
     if ! command -v bun >/dev/null 2>&1; then printf "{{YELLOW}}(optional) bun not installed{{NC}} — advisory dev/test lane only (D-036), runs 'just test-bun'; install: {{BLUE}}curl -fsSL https://bun.sh/install | bash{{NC}} or {{BLUE}}brew install oven-sh/bun/bun{{NC}}. Do NOT run 'bun install' (keeps the lockfile pnpm-only)\n"; fi
@@ -87,7 +88,7 @@ alias c := check-deps
 
 # Install project dependencies (generates/updates pnpm-lock.yaml)
 [group('install'), group('quick start')]
-@install: install-shell-tools
+@install: install-shell-tools install-editorconfig-checker
     #!/usr/bin/env sh
     export PATH="$HOME/.local/bin:$PATH"
     just check-deps
@@ -205,17 +206,17 @@ test-bun:
     if [ ! -f coverage/index.html ]; then printf "{{YELLOW}}No coverage report found — run 'just coverage' first{{NC}}\n" >&2; exit 1; fi
     if command -v open >/dev/null 2>&1; then open coverage/index.html; elif command -v xdg-open >/dev/null 2>&1; then xdg-open coverage/index.html; else printf "Open coverage/index.html in your browser\n" >&2; fi
 
-# Run all quality gates, including shell scripts and workflow commands.
+# Run all quality gates, including shell scripts, workflows, EditorConfig, and spelling.
 [group('test'), group('dev'), group('quick start')]
 [parallel]
-@all: format-check lint check-boundaries check-shell check-workflows typecheck test
+@all: format-check lint check-boundaries check-shell check-workflows check-editorconfig check-spelling typecheck test
 
 alias a := all
 
 # Run the full hook-suite gates on ALL files (CI mirror of the
 # pre-commit/commit-time discipline; source pre-commit-run intent)
 [group('pre-commit')]
-@pre-commit-run: format-check lint check-boundaries check-shell check-workflows typecheck test
+@pre-commit-run: format-check lint check-boundaries check-shell check-workflows check-editorconfig check-spelling typecheck test
 
 alias pc := pre-commit-run
 
@@ -446,6 +447,11 @@ install-shell-tools:
     bash scripts/install-shellcheck.sh
     bash scripts/install-actionlint.sh
 
+# Install the pinned, checksum-verified EditorConfig checker.
+[group('install')]
+install-editorconfig-checker:
+    bash scripts/install-editorconfig-checker.sh
+
 # Check all tracked shell scripts.
 [group('dev'), group('pre-commit')]
 check-shell:
@@ -454,8 +460,23 @@ check-shell:
 # Validate workflows and their Bash/sh commands with ShellCheck enabled.
 [group('dev'), group('pre-commit')]
 check-workflows:
-    command -v shellcheck >/dev/null
+    #!/usr/bin/env sh
+    command -v shellcheck >/dev/null 2>&1 || { echo "FAIL: shellcheck missing — run just install-shell-tools" >&2; exit 1; }
+    command -v actionlint >/dev/null 2>&1 || { echo "FAIL: actionlint missing — run just install-shell-tools" >&2; exit 1; }
     actionlint
+
+# Check EditorConfig compliance across all tracked non-excluded files.
+[group('dev'), group('pre-commit')]
+@check-editorconfig:
+    echo "Checking EditorConfig rules..."
+    command -v editorconfig-checker >/dev/null 2>&1 || { echo "FAIL: editorconfig-checker missing — run just install-editorconfig-checker" >&2; exit 1; }
+    editorconfig-checker -config .editorconfig-checker.json
+
+# Check spelling across the repository (cspell).
+[group('dev'), group('pre-commit')]
+@check-spelling:
+    echo "Checking spelling..."
+    pnpm exec cspell lint --no-progress .
 
 # Run template-press hermetic self-press verification (requires press or uvx).
 [group('dev'), group('workflow')]
