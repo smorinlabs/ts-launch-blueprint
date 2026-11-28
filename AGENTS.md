@@ -11,8 +11,7 @@ retired per Q10.A / Py ADR 0014). For human-contributor flow see
 
 - `Justfile` is the canonical task runner and holds all project automation.
 - `Makefile` is strictly for bootstrapping (`make check`, `make install-node`,
-  `make install-pnpm`, `make install-just`, `make install-dev`); add no new
-  feature targets there.
+  `make install-pnpm`, `make install-just`); add no new feature targets there.
 
 ### Justfile Editing Conventions
 

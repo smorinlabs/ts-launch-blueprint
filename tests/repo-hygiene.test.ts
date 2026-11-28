@@ -1702,6 +1702,18 @@ describe('P12-TS01: AI readiness hub and vendor rule retirement (P12)', () => {
     expect(agentsMd).not.toContain('.windsurf/rules');
     expect(agentsMd).not.toMatch(/\bjust setup(?!-hooks)\b/);
     expect(agentsMd).not.toContain('new-ts-project');
+    expect(agentsMd).not.toContain('make install-dev');
+
+    const makefile = readFileSync(join(REPO_ROOT, 'Makefile'), 'utf8');
+    const phonyLine = makefile.split(/\r?\n/).find((line) => line.startsWith('.PHONY:')) ?? '';
+    const phonyTargets = new Set(
+      phonyLine.replace('.PHONY:', '').trim().split(/\s+/).filter(Boolean)
+    );
+    const citedMakeTargets = [...agentsMd.matchAll(/`make\s+([a-zA-Z0-9_-]+)`/g)].map((m) => m[1]!);
+    expect(citedMakeTargets.length).toBeGreaterThan(0);
+    for (const target of citedMakeTargets) {
+      expect(phonyTargets.has(target)).toBe(true);
+    }
   });
 
   it('AGENTS.md documents all 4 workspace packages and accurate per-package runtime deps', () => {
@@ -1993,6 +2005,43 @@ describe('P12-TS02: AI review configs, CODEOWNERS, PR template, llms.txt, and Cl
   );
 
   it.skipIf(process.platform === 'win32')(
+    'claude-code-review.yml configuration step skips cleanly when CLAUDE_CODE_OAUTH_TOKEN is whitespace-only',
+    () => {
+      const wf = parse(readFileSync(join(WORKFLOW_DIR, 'claude-code-review.yml'), 'utf8')) as {
+        jobs: { 'claude-review': { steps: Array<{ run?: string }> } };
+      };
+      const runScript = wf.jobs['claude-review'].steps[0]?.run ?? '';
+      const dir = mkdtempSync(join(tmpdir(), 'claude-review-ws-'));
+      try {
+        const output = join(dir, 'output');
+        const summary = join(dir, 'summary');
+        writeFileSync(output, '');
+        writeFileSync(summary, '');
+        const res = spawnSync(
+          'bash',
+          ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', runScript],
+          {
+            cwd: dir,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              CLAUDE_CODE_OAUTH_TOKEN: '   \t\n  ',
+              GITHUB_OUTPUT: output,
+              GITHUB_STEP_SUMMARY: summary,
+            },
+          }
+        );
+        expect(res.status).toBe(0);
+        expect(readFileSync(output, 'utf8')).toBe('configured=false\n');
+        expect(res.stdout).toBe('Claude review is not configured; skipping.\n');
+        expect(readFileSync(summary, 'utf8')).toBe('Claude review is not configured; skipping.\n');
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.skipIf(process.platform === 'win32')(
     'claude-code-review.yml configuration step sets configured=true without leaking synthetic token',
     () => {
       const wf = parse(readFileSync(join(WORKFLOW_DIR, 'claude-code-review.yml'), 'utf8')) as {
@@ -2105,6 +2154,43 @@ describe('P12-TS02: AI review configs, CODEOWNERS, PR template, llms.txt, and Cl
             env: {
               ...process.env,
               CLAUDE_CODE_OAUTH_TOKEN: '',
+              GITHUB_OUTPUT: output,
+              GITHUB_STEP_SUMMARY: summary,
+            },
+          }
+        );
+        expect(res.status).toBe(0);
+        expect(readFileSync(output, 'utf8')).toBe('configured=false\n');
+        expect(res.stdout).toBe('Claude is not configured; skipping.\n');
+        expect(readFileSync(summary, 'utf8')).toBe('Claude is not configured; skipping.\n');
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'claude.yml configuration step skips cleanly when CLAUDE_CODE_OAUTH_TOKEN is whitespace-only',
+    () => {
+      const wf = parse(readFileSync(join(WORKFLOW_DIR, 'claude.yml'), 'utf8')) as {
+        jobs: { claude: { steps: Array<{ run?: string }> } };
+      };
+      const runScript = wf.jobs.claude.steps[0]?.run ?? '';
+      const dir = mkdtempSync(join(tmpdir(), 'claude-ws-'));
+      try {
+        const output = join(dir, 'output');
+        const summary = join(dir, 'summary');
+        writeFileSync(output, '');
+        writeFileSync(summary, '');
+        const res = spawnSync(
+          'bash',
+          ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', runScript],
+          {
+            cwd: dir,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              CLAUDE_CODE_OAUTH_TOKEN: '   \t\n  ',
               GITHUB_OUTPUT: output,
               GITHUB_STEP_SUMMARY: summary,
             },
