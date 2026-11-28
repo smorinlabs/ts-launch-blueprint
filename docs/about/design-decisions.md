@@ -435,14 +435,13 @@ CI (`tests/press-acceptance.test.ts`).
 **What** — `AGENTS.md` is the sole canonical agent instruction file, imported by
 `CLAUDE.md` (`@AGENTS.md`); `llms.txt` indexes packages and docs; `.coderabbit.yaml`,
 `.greptile/`, `claude-code-review.yml`, `claude.yml`, and `.github/CODEOWNERS`
-provide review integration; `.claude/skills/new-ts-project/` + `docs/PROJECT_SETUP.md`
-
-- `docs/POST_INIT.md` guide project instantiation and post-init setup.
-  **Why** — one source of truth prevents contradictory instructions across AI
-  tools.
-  **Value** — fast, accurate onboarding for both human contributors and AI
-  agents.
-  **Refs** — `AGENTS.md`, `CLAUDE.md`, `llms.txt`, [ADR 0016](../adr/0016-canonical-agents-md-and-plain-markdown-docs.md).
+provide review integration; `.claude/skills/new-ts-project/`, `docs/PROJECT_SETUP.md`,
+and `docs/POST_INIT.md` guide project instantiation and post-init setup.
+**Why** — one source of truth prevents contradictory instructions across AI
+tools.
+**Value** — fast, accurate onboarding for both human contributors and AI
+agents.
+**Refs** — `AGENTS.md`, `CLAUDE.md`, `llms.txt`, [ADR 0016](../adr/0016-canonical-agents-md-and-plain-markdown-docs.md).
 
 ---
 

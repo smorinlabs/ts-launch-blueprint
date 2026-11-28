@@ -173,8 +173,9 @@ fi`
       expect(res.stdout).toContain('Target repo: example-org/example-cli');
 
       const calls = readFileSync(logFile, 'utf8').split('\n').filter(Boolean);
+      expect(calls.join('\n')).not.toContain('reviewers=[]');
       expect(calls).toContain(
-        'api --method PUT repos/example-org/example-cli/environments/npm -F wait_timer=0 -F prevent_self_review=false -F reviewers=[] -F deployment_branch_policy[protected_branches]=false -F deployment_branch_policy[custom_branch_policies]=true'
+        'api --method PUT repos/example-org/example-cli/environments/npm -F wait_timer=0 -F prevent_self_review=false -F reviewers[] -F deployment_branch_policy[protected_branches]=false -F deployment_branch_policy[custom_branch_policies]=true'
       );
       expect(calls).toContain(
         'api --method DELETE repos/example-org/example-cli/environments/npm/deployment-branch-policies/101'
@@ -191,7 +192,7 @@ fi`
       ).toBe(false);
 
       expect(calls).toContain(
-        'api --method PUT repos/example-org/example-cli/environments/security-review -F wait_timer=0 -F prevent_self_review=false -F reviewers=[] -F deployment_branch_policy[protected_branches]=false -F deployment_branch_policy[custom_branch_policies]=true'
+        'api --method PUT repos/example-org/example-cli/environments/security-review -F wait_timer=0 -F prevent_self_review=false -F reviewers[] -F deployment_branch_policy[protected_branches]=false -F deployment_branch_policy[custom_branch_policies]=true'
       );
       expect(calls).toContain(
         'api --method POST repos/example-org/example-cli/environments/security-review/deployment-branch-policies -f name=main -f type=branch'
@@ -301,6 +302,42 @@ describe.skipIf(process.platform === 'win32')('scripts/setup-npm-publishing.sh',
       expect(noWorkflow.stdout).toContain('fallback-org');
       expect(noWorkflow.stdout).toContain('fallback-repo');
       expect(noWorkflow.stderr).toContain('warning:');
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('strips ssh://git@host/ remote URLs cleanly to owner/repo', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'setup-npm-ssh-url-'));
+    try {
+      initGitRepo(scratch, 'ssh://git@github.com/ssh-proto-org/ssh-proto-cli.git');
+      mkdirSync(join(scratch, 'apps', 'cli'), { recursive: true });
+      mkdirSync(join(scratch, '.github', 'workflows'), { recursive: true });
+      writeFileSync(
+        join(scratch, 'apps', 'cli', 'package.json'),
+        JSON.stringify({ name: '@ssh-proto-org/ssh-proto-cli', version: '0.1.0' }),
+        'utf8'
+      );
+      writeFileSync(
+        join(scratch, '.github', 'workflows', 'publish.yml'),
+        'on:\n  push:\n    tags:\n      - "v*"\njobs:\n  publish:\n    environment: npm\n    permissions:\n      id-token: write\n    steps:\n      - run: npm publish\n',
+        'utf8'
+      );
+
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        PATH: `${join(process.execPath, '..')}:/usr/bin:/bin`,
+        GH_CONFIG_DIR: join(scratch, 'empty-gh'),
+      };
+      delete env['GH_TOKEN'];
+      delete env['GITHUB_TOKEN'];
+
+      const res = runScript(NPM_SCRIPT, [], { cwd: scratch, env });
+      expect(res.stderr).toBe('');
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain('ssh-proto-org/ssh-proto-cli');
+      expect(res.stdout).toContain('ssh-proto-org');
+      expect(res.stdout).toContain('ssh-proto-cli');
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }

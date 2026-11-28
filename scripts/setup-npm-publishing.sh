@@ -75,7 +75,7 @@ else
         remote_url="$(git config --get remote.origin.url 2>/dev/null || true)"
         [[ -n "$remote_url" ]] || die "could not detect repo (no gh match or origin remote); pass owner/repo as the first arg"
         repo="$(printf '%s' "$remote_url" \
-            | sed -E 's#^(https?://[^/]+/|git@[^:]+:)##; s#\.git$##')"
+            | sed -E 's#^(https?://[^/]+/|ssh://git@[^/]+/|git@[^:]+:)##; s#\.git$##')"
     fi
 fi
 

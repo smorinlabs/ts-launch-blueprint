@@ -85,7 +85,7 @@ upsert_environment() {
     gh api --method PUT "repos/$repo/environments/$env" \
         -F "wait_timer=0" \
         -F "prevent_self_review=false" \
-        -F "reviewers=[]" \
+        -F "reviewers[]" \
         -F "deployment_branch_policy[protected_branches]=false" \
         -F "deployment_branch_policy[custom_branch_policies]=true" \
         >/dev/null
