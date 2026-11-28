@@ -22,7 +22,7 @@ import { createColors } from '../src/cli/colors.js';
 import { CONFIG_FILE_NAME, TOKEN_ENV_VAR } from '../src/cli/config.js';
 import type { CliDeps } from '../src/cli/deps.js';
 import { realDeps, runCli } from '../src/cli/router.js';
-import { TOOL_DIR_NAME } from '../src/cli/xdg-paths.js';
+import { configDir, configFile, TOOL_DIR_NAME } from '../src/cli/xdg-paths.js';
 import { VERSION } from '../src/version.js';
 
 const tempDirs: string[] = [];
@@ -175,7 +175,7 @@ describe('version, bare help, and did-you-mean (Q3.A)', () => {
 describe('config path', () => {
   it('shows resolved path and exists status in text and JSON', async () => {
     const home = makeTempDir();
-    const expectedPath = join(home, '.config', 'ts-projects', CONFIG_FILE_NAME);
+    const expectedPath = configFile({}, () => home);
 
     const hText = makeHarness({ homedir: () => home });
     expect(await runCli(['config', 'path'], hText.deps)).toBe(0);
@@ -325,7 +325,7 @@ describe('config init', () => {
     writeFileSync(target, '[output\nbroken\n', 'utf8');
     // Note: explicit --config already fails at resolveConfig with ConfigError (exit 1);
     // also verify user-config target refusal without --config.
-    const userDir = join(dir, '.config', 'ts-projects');
+    const userDir = configDir({}, () => dir);
     mkdirSync(userDir, { recursive: true });
     const userTarget = join(userDir, CONFIG_FILE_NAME);
     writeFileSync(userTarget, '[output\nbroken\n', 'utf8');
@@ -435,7 +435,7 @@ describe('config set', () => {
 
   it('refuses corrupt target file on config set', async () => {
     const dir = makeTempDir();
-    const userDir = join(dir, '.config', 'ts-projects');
+    const userDir = configDir({}, () => dir);
     mkdirSync(userDir, { recursive: true });
     const userTarget = join(userDir, CONFIG_FILE_NAME);
     writeFileSync(userTarget, '[logging\nbroken\n', 'utf8');
@@ -546,7 +546,7 @@ describe('completion {bash,zsh,fish}', () => {
 describe('single-emission config warnings & suppression in json mode', () => {
   it('emits discovered-config degradation warning ONCE on stderr even with -q, suppressed in json mode', async () => {
     const home = makeTempDir();
-    const dir = join(home, '.config', 'ts-projects');
+    const dir = configDir({}, () => home);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, CONFIG_FILE_NAME), '[output]\ncolor = "yes"\n', { mode: 0o600 });
 

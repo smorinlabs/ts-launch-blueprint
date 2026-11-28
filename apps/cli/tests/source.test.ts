@@ -12,6 +12,7 @@ import type { CliDeps } from '../src/cli/deps.js';
 import { UsageError } from '../src/cli/exit-codes.js';
 import { runCli } from '../src/cli/router.js';
 import { resolveSource, SOURCE_ENV_VAR } from '../src/cli/source.js';
+import { configDir } from '../src/cli/xdg-paths.js';
 
 const tempDirs: string[] = [];
 
@@ -182,7 +183,7 @@ describe('projects list and get in memory mode (no token, no server)', () => {
 
   it('still applies the config file workspace/limit defaults (resolveConfig kept)', async () => {
     const home = makeTempDir();
-    const dir = join(home, '.config', 'ts-projects');
+    const dir = configDir({}, () => home);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, CONFIG_FILE_NAME), 'workspace = "Engineering"\nlimit = 1\n', {
       mode: 0o600,

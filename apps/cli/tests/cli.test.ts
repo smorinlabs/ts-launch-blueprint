@@ -11,6 +11,7 @@ import type { ClipboardWriter, Prompter, SpinnerFactory } from '../src/cli/adapt
 import { TOKEN_ENV_VAR } from '../src/cli/config.js';
 import type { CliDeps } from '../src/cli/deps.js';
 import { runCli } from '../src/cli/router.js';
+import { configDir } from '../src/cli/xdg-paths.js';
 
 const tempDirs: string[] = [];
 
@@ -343,7 +344,7 @@ describe('limit and workspace forwarding', () => {
   it('config-file workspace and limit act as defaults; flags win', async () => {
     const home = makeTempDir();
     const { mkdirSync, writeFileSync } = await import('node:fs');
-    const dir = join(home, '.config', 'ts-projects');
+    const dir = configDir({}, () => home);
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, 'ts-projects_config.toml'),

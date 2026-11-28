@@ -3,7 +3,7 @@
 //   levels: debug | info | warning | error | critical (default: warning)
 //   file sink: rotating 10MB x 5 backups, text (no ANSI) or json (JSONL),
 //   key-based redaction of sensitive fields across both sinks.
-import { appendFileSync, existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import { appendFileSync, closeSync, mkdirSync, openSync, renameSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { ConfigError } from '@ts-launch-blueprint/core';
@@ -199,9 +199,6 @@ export function resolveLogFormat(
 
 function rotateIfNeeded(targetPath: string): void {
   try {
-    if (!existsSync(targetPath)) {
-      return;
-    }
     const size = statSync(targetPath).size;
     if (size < ROTATE_MAX_BYTES) {
       return;
@@ -209,8 +206,12 @@ function rotateIfNeeded(targetPath: string): void {
     for (let i = ROTATE_BACKUP_COUNT - 1; i >= 1; i -= 1) {
       const src = `${targetPath}.${i}`;
       const dst = `${targetPath}.${i + 1}`;
-      if (existsSync(src)) {
+      try {
         renameSync(src, dst);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw err;
+        }
       }
     }
     renameSync(targetPath, `${targetPath}.1`);
@@ -271,8 +272,12 @@ export function createLogger(options: CreateLoggerOptions): Logger {
 
   if (filePath !== undefined) {
     ensureDir(dirname(filePath), mkdirSync, options.platform);
-    if (!existsSync(filePath)) {
-      appendFileSync(filePath, '', 'utf8');
+    try {
+      closeSync(openSync(filePath, 'wx', 0o600));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
+        throw err;
+      }
     }
   }
 

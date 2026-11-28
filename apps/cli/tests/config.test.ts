@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, win32 } from 'node:path';
+import { delimiter, join, win32 } from 'node:path';
 
 import {
   AuthError,
@@ -48,7 +48,7 @@ import {
   writeUserConfig,
 } from '../src/cli/config.js';
 import { CliError, EXIT_CODES, exitCodeFor, UsageError } from '../src/cli/exit-codes.js';
-import { configDir } from '../src/cli/xdg-paths.js';
+import { configDir, configFile } from '../src/cli/xdg-paths.js';
 
 const tempDirs: string[] = [];
 
@@ -64,10 +64,10 @@ afterEach(() => {
   }
 });
 
-/** Write a user config file under <home>/.config/ts-projects and return home + path. */
+/** Write a user config file under the platform user config dir and return home + path. */
 function makeHomeWithConfig(contents: string, mode = 0o600): { home: string; path: string } {
   const home = makeTempDir();
-  const dir = join(home, '.config', 'ts-projects');
+  const dir = configDir({}, () => home);
   mkdirSync(dir, { recursive: true });
   const path = join(dir, CONFIG_FILE_NAME);
   writeFileSync(path, contents, { mode });
@@ -84,7 +84,6 @@ function baseOptions(
     env,
     homedir: () => home,
     cwd: cwd ?? (() => join(home, 'no-project-here')),
-    platform: 'linux' as const,
   };
 }
 
@@ -195,7 +194,7 @@ describe('schema, 3-layer discovery & warning degradation (ADR 0004)', () => {
     expect(config.setFields.size).toBe(0);
     expect(config.loadedPaths).toEqual([]);
     expect(config.configPath).toBeUndefined();
-    expect(config.targetPath).toBe(defaultConfigPath({}, () => home, 'linux'));
+    expect(config.targetPath).toBe(defaultConfigPath({}, () => home));
     expect(config.warnings).toEqual([]);
   });
 
@@ -261,14 +260,15 @@ describe('schema, 3-layer discovery & warning degradation (ADR 0004)', () => {
     const sys2 = join(root, 'sys2');
     const home = join(root, 'home');
     const project = join(root, 'project');
+    const userDir = configDir({}, () => home);
     mkdirSync(join(sys1, 'ts-projects'), { recursive: true });
     mkdirSync(join(sys2, 'ts-projects'), { recursive: true });
-    mkdirSync(join(home, '.config', 'ts-projects'), { recursive: true });
+    mkdirSync(userDir, { recursive: true });
     mkdirSync(project, { recursive: true });
 
     const sys2Path = join(sys2, 'ts-projects', CONFIG_FILE_NAME);
     const sys1Path = join(sys1, 'ts-projects', CONFIG_FILE_NAME);
-    const userPath = join(home, '.config', 'ts-projects', CONFIG_FILE_NAME);
+    const userPath = configFile({}, () => home);
     const nonDotProject = join(project, CONFIG_FILE_NAME);
     const dotProject = join(project, `.${CONFIG_FILE_NAME}`);
 
@@ -286,10 +286,9 @@ describe('schema, 3-layer discovery & warning degradation (ADR 0004)', () => {
     writeFileSync(dotProject, '[logging]\nlevel = "warning"\n');
 
     const config = resolveConfig({
-      env: { XDG_CONFIG_DIRS: `${sys1}:${sys2}` },
+      env: { XDG_CONFIG_DIRS: `${sys1}${delimiter}${sys2}` },
       homedir: () => home,
       cwd: () => project,
-      platform: 'linux',
     });
 
     expect(config.loadedPaths).toEqual([sys2Path, sys1Path, userPath, dotProject]);
@@ -347,12 +346,13 @@ describe('schema, 3-layer discovery & warning degradation (ADR 0004)', () => {
     const sysDir = join(root, 'sys');
     const home = join(root, 'home');
     const project = join(root, 'project');
+    const userDir = configDir({}, () => home);
     mkdirSync(join(sysDir, 'ts-projects'), { recursive: true });
-    mkdirSync(join(home, '.config', 'ts-projects'), { recursive: true });
+    mkdirSync(userDir, { recursive: true });
     mkdirSync(project, { recursive: true });
 
     const sysPath = join(sysDir, 'ts-projects', CONFIG_FILE_NAME);
-    const userPath = join(home, '.config', 'ts-projects', CONFIG_FILE_NAME);
+    const userPath = configFile({}, () => home);
     const projPath = join(project, CONFIG_FILE_NAME);
 
     writeFileSync(sysPath, '[output]\nformat = "csv"\n');
@@ -364,7 +364,6 @@ describe('schema, 3-layer discovery & warning degradation (ADR 0004)', () => {
       env: { XDG_CONFIG_DIRS: sysDir },
       homedir: () => home,
       cwd: () => project,
-      platform: 'linux',
       warn: (msg) => warnings.push(msg),
     });
 
@@ -597,13 +596,13 @@ describe('typed config key/value helpers and atomic writes', () => {
         { workspace: 'Acme', limit: 25, output: { format: 'json' } },
         baseOptions(home)
       );
-      expect(target).toBe(defaultConfigPath({}, () => home, 'linux'));
+      expect(target).toBe(defaultConfigPath({}, () => home));
       expect(statSync(target).mode & 0o777).toBe(0o600);
 
       chmodSync(target, 0o644);
       writeUserConfig({ workspace: 'Beta', output: { color: 'never' } }, baseOptions(home));
       expect(statSync(target).mode & 0o777).toBe(0o600);
-      expect(readdirSync(configDir({}, () => home, 'linux'))).toEqual([CONFIG_FILE_NAME]);
+      expect(readdirSync(configDir({}, () => home))).toEqual([CONFIG_FILE_NAME]);
 
       const resolved = resolveConfig(baseOptions(home));
       expect(resolved.workspace).toBe('Beta');
@@ -645,7 +644,7 @@ describe('typed config key/value helpers and atomic writes', () => {
     };
 
     expect(() =>
-      writeConfigData(target, { output: { format: 'json' } }, { fs: failingFs, platform: 'linux' })
+      writeConfigData(target, { output: { format: 'json' } }, { fs: failingFs })
     ).toThrow('EIO: disk failure');
     expect(closeCount).toBe(1);
     expect(readFileSync(target, 'utf8')).toBe(original);

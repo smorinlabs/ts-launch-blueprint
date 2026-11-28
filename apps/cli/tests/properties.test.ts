@@ -181,13 +181,11 @@ describe('CLI formatting and config properties', () => {
         const writtenPath = writeUserConfig(values, {
           env,
           homedir: () => home,
-          platform: 'linux',
         });
         const resolved = resolveConfig({
           env,
           homedir: () => home,
           cwd: () => home,
-          platform: 'linux',
         });
 
         expect(resolved.configPath).toBe(writtenPath);

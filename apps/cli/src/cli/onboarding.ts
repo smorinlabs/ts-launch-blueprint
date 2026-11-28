@@ -1,6 +1,6 @@
 // First-run onboarding hint (ADR 0009): prints a one-time stderr hint on
 // interactive TTY runs when no config file was loaded and not `config init`.
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import type { CliContext, CliDeps } from './deps.js';
@@ -25,12 +25,9 @@ export function maybeShowFirstRunHint(
     return;
   }
   const marker = stateFile('first_run', deps.env, deps.homedir, 'marker', deps.platform);
-  if (existsSync(marker)) {
-    return;
-  }
   try {
     ensureDir(dirname(marker), mkdirSync, deps.platform);
-    writeFileSync(marker, '', { encoding: 'utf8' });
+    closeSync(openSync(marker, 'wx', 0o600));
   } catch {
     return;
   }

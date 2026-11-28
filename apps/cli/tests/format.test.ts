@@ -28,6 +28,7 @@ import {
 } from '../src/cli/logger.js';
 import { DEFAULT_PAGER, parsePagerArgv, resolvePagerCommand } from '../src/cli/pager.js';
 import { runCli } from '../src/cli/router.js';
+import { configDir } from '../src/cli/xdg-paths.js';
 
 const tempDirs: string[] = [];
 
@@ -129,7 +130,7 @@ describe('OUTPUT_FORMATS and pure formatters', () => {
 describe('global output precedence & --output-file across subcommands', () => {
   it('precedence: --json > -o > TS_PROJECTS_OUTPUT > [output].format > text', async () => {
     const home = makeTempDir();
-    const cfgDir = join(home, '.config', 'ts-projects');
+    const cfgDir = configDir({}, () => home);
     mkdirSync(cfgDir, { recursive: true });
     writeFileSync(join(cfgDir, CONFIG_FILE_NAME), '[output]\nformat = "markdown"\n', {
       mode: 0o600,
@@ -304,7 +305,7 @@ describe('interactive pager (ADR 0008)', () => {
     // 2. Skipped when not stdoutIsTTY even if color=always
     const pagerNever = vi.fn<PagerRunner>(() => true);
     const home = makeTempDir();
-    const cfgDir = join(home, '.config', 'ts-projects');
+    const cfgDir = configDir({}, () => home);
     mkdirSync(cfgDir, { recursive: true });
     writeFileSync(join(cfgDir, CONFIG_FILE_NAME), '[output]\ncolor = "always"\n', { mode: 0o600 });
     const hPipe = makeHarness({
@@ -551,6 +552,54 @@ describe('dual-sink logging (--log-level, --log-file, TS_PROJECTS_LOG_*)', () =>
       true
     );
     expect(colorEnabled({ noColorFlag: false, env: {}, isTTY: false })).toBe(false);
+  });
+
+  it('createLogger preserves existing log file (EEXIST), rethrows non-EEXIST (EISDIR), and rotates >= 10 MiB logs', () => {
+    const home = makeTempDir();
+
+    // 1. Existing log file (EEXIST) preserves prior bytes and appends
+    const existingLog = join(home, 'existing.log');
+    writeFileSync(existingLog, 'prior-entry\n', 'utf8');
+    const existingLogger = createLogger({
+      stderr: () => undefined,
+      level: 'info',
+      colors: createColors(false),
+      filePath: existingLog,
+      fileLevel: 'info',
+      fileFormat: 'text',
+    });
+    existingLogger.info('new-entry');
+    const combined = readFileSync(existingLog, 'utf8');
+    expect(combined.startsWith('prior-entry\n')).toBe(true);
+    expect(combined).toContain('[info] new-entry');
+
+    // 2. Non-EEXIST openSync error (e.g., ENOENT on empty path) is rethrown instead of swallowed
+    expect(() =>
+      createLogger({
+        stderr: () => undefined,
+        level: 'info',
+        colors: createColors(false),
+        filePath: '',
+      })
+    ).toThrow(/ENOENT/);
+
+    // 3. >= 10 MiB log file rotates to .1 and shifts .1 -> .2 while tolerating absent .2-.4
+    const rotatePath = join(home, 'rotate.log');
+    writeFileSync(rotatePath, Buffer.alloc(10 * 1024 * 1024, 0x61));
+    writeFileSync(`${rotatePath}.1`, 'older-backup-1\n', 'utf8');
+    const rotatingLogger = createLogger({
+      stderr: () => undefined,
+      level: 'info',
+      colors: createColors(false),
+      filePath: rotatePath,
+      fileLevel: 'info',
+      fileFormat: 'text',
+    });
+    rotatingLogger.info('after-rotate');
+    expect(readFileSync(rotatePath, 'utf8')).toContain('[info] after-rotate');
+    expect(readFileSync(`${rotatePath}.1`).byteLength).toBe(10 * 1024 * 1024);
+    expect(readFileSync(`${rotatePath}.2`, 'utf8')).toBe('older-backup-1\n');
+    expect(existsSync(`${rotatePath}.3`)).toBe(false);
   });
 
   it('pager tokenization handles quotes, backslash escapes, and empty command', () => {
