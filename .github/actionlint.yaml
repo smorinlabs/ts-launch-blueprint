@@ -8,10 +8,6 @@
 # bypass them), and while stale the "missing app-id" ignore also masks a
 # mint step missing its id input entirely (a `client_id` typo still
 # surfaces).
-config-variables:
-  # Kill-switch for the audit-triage bot (audit-triage.yml); unset = inert.
-  - MUSE_CI_ENABLED
-
 paths:
   .github/workflows/release-please.yml:
     ignore:
@@ -29,3 +25,16 @@ paths:
       - >-
         input "client-id" is not defined in action
         "actions/create-github-app-token@v3"
+
+self-hosted-runner:
+  labels:
+    - blacksmith-4vcpu-ubuntu-2404
+    - blacksmith-4vcpu-windows-2025
+    - blacksmith-6vcpu-macos-latest
+
+config-variables:
+  # Kill-switch for the audit-triage bot (audit-triage.yml); unset = inert.
+  - MUSE_CI_ENABLED
+  - RUNNER_UBUNTU
+  - RUNNER_MACOS
+  - RUNNER_WINDOWS

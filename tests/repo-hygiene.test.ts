@@ -129,7 +129,7 @@ describe('package manager: pnpm 10 (D-035)', () => {
   });
 
   it('.npmrc turns on pnpm strict package-manager enforcement', () => {
-    const npmrc = readFileSync(join(REPO_ROOT, '.npmrc'), 'utf8');
+    const npmrc = readFileSync(join(REPO_ROOT, '.npmrc'), 'utf8').replaceAll('\r\n', '\n');
     expect(npmrc).toMatch(/^managePackageManagerVersions\s*=\s*true$/m);
     expect(npmrc).toMatch(/^packageManagerStrict\s*=\s*true$/m);
     expect(npmrc).toMatch(/^packageManagerStrictVersion\s*=\s*true$/m);
@@ -137,7 +137,12 @@ describe('package manager: pnpm 10 (D-035)', () => {
 });
 
 describe('formatter gate is real (D-014)', () => {
-  const oxfmtBin = join(REPO_ROOT, 'node_modules', '.bin', 'oxfmt');
+  const oxfmtBin = join(
+    REPO_ROOT,
+    'node_modules',
+    '.bin',
+    process.platform === 'win32' ? 'oxfmt.cmd' : 'oxfmt'
+  );
   const configPath = join(REPO_ROOT, '.oxfmtrc.json');
 
   const checkSnippet = (source: string): number | null => {
@@ -148,6 +153,7 @@ describe('formatter gate is real (D-014)', () => {
       const result = spawnSync(oxfmtBin, ['-c', configPath, '--check', file], {
         cwd: dir,
         encoding: 'utf8',
+        shell: process.platform === 'win32',
       });
       return result.status;
     } finally {
@@ -236,11 +242,30 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
     }
   );
 
-  it('ci.yml Node matrix equals the D-027 values ["24.x","26.x"]', () => {
+  it('ci.yml test matrix covers ubuntu/macos/windows on 24.x and ubuntu on 26.x with runner overrides', () => {
     const ci = parse(readFileSync(join(WORKFLOW_DIR, 'ci.yml'), 'utf8')) as {
-      jobs: { ci: { strategy: { matrix: { 'node-version': string[] } } } };
+      jobs: {
+        test: {
+          'runs-on': string;
+          strategy: {
+            'fail-fast': boolean;
+            matrix: {
+              os: string[];
+              'node-version': string[];
+              include: Array<{ os: string; 'node-version': string }>;
+            };
+          };
+        };
+      };
     };
-    expect(ci.jobs.ci.strategy.matrix['node-version']).toEqual(['24.x', '26.x']);
+    const testJob = ci.jobs.test;
+    expect(testJob.strategy['fail-fast']).toBe(false);
+    expect(testJob.strategy.matrix.os).toEqual(['ubuntu', 'macos', 'windows']);
+    expect(testJob.strategy.matrix['node-version']).toEqual(['24.x']);
+    expect(testJob.strategy.matrix.include).toEqual([{ os: 'ubuntu', 'node-version': '26.x' }]);
+    expect(testJob['runs-on']).toContain("vars.RUNNER_UBUNTU || 'ubuntu-latest'");
+    expect(testJob['runs-on']).toContain("vars.RUNNER_MACOS || 'macos-latest'");
+    expect(testJob['runs-on']).toContain("vars.RUNNER_WINDOWS || 'windows-latest'");
   });
 
   // D-035: the CI + publish workflows install with pnpm — pnpm/action-setup
@@ -271,13 +296,22 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
     }
   );
 
-  // S6b field 9: docs-check must run in CI, not just locally.
-  it('ci.yml runs `just docs-check` as a step (S6b: docs link check in CI)', () => {
+  // S6b field 9: docs-check must run in CI on every PR (including docs-only PRs).
+  it('ci.yml runs `just docs-check` inside the always-running lint job', () => {
     const ci = parse(readFileSync(join(WORKFLOW_DIR, 'ci.yml'), 'utf8')) as {
-      jobs: { ci: { steps: { name?: string; run?: string }[] } };
+      jobs: {
+        lint: {
+          if?: string;
+          'runs-on'?: string;
+          steps: { name?: string; run?: string }[];
+        };
+      };
     };
-    const steps = ci.jobs.ci.steps;
-    const docsCheckStep = steps.find((step) => step.run?.trim() === 'just docs-check');
+    const lintJob = ci.jobs.lint;
+    expect(lintJob).toBeDefined();
+    expect(lintJob.if).toBeUndefined();
+    expect(lintJob['runs-on']).toContain('RUNNER_UBUNTU');
+    const docsCheckStep = lintJob.steps.find((step) => step.run?.trim() === 'just docs-check');
     expect(docsCheckStep).toBeDefined();
   });
 
@@ -540,11 +574,11 @@ describe('coverage & pack-check CI contract (P02)', () => {
     expect(codecov.flags?.unittests?.paths).toEqual(['packages/', 'apps/']);
   });
 
-  it('ci.yml wires just coverage, Node 24.x Codecov v7 OIDC upload, and just pack-check', () => {
+  it('ci.yml wires just coverage, ubuntu/24.x Codecov v7 OIDC upload, and Linux-only pack-check', () => {
     const ciRaw = readFileSync(join(WORKFLOW_DIR, 'ci.yml'), 'utf8');
     const ci = parse(ciRaw) as {
       jobs: {
-        ci: {
+        test: {
           permissions?: Record<string, string>;
           steps: Array<{
             name?: string;
@@ -554,26 +588,33 @@ describe('coverage & pack-check CI contract (P02)', () => {
             with?: Record<string, unknown>;
           }>;
         };
+        'pack-check': {
+          'runs-on'?: string;
+          needs?: string | string[];
+          if?: string;
+          steps: Array<{ name?: string; run?: string }>;
+        };
       };
     };
 
-    expect(ci.jobs.ci.permissions).toEqual({
+    expect(ci.jobs.test.permissions).toEqual({
       contents: 'read',
       'id-token': 'write',
     });
 
-    const steps = ci.jobs.ci.steps;
+    const ubuntu24Cond = "matrix.os == 'ubuntu' && matrix.node-version == '24.x'";
+    const steps = ci.jobs.test.steps;
     const coverageStep = steps.find((step) => step.run?.trim() === 'just coverage');
     expect(coverageStep).toBeDefined();
-    expect(coverageStep?.if).toContain("matrix.node-version == '24.x'");
+    expect(coverageStep?.if).toContain(ubuntu24Cond);
 
     const testFallbackStep = steps.find((step) => step.run?.trim() === 'just test');
     expect(testFallbackStep).toBeDefined();
-    expect(testFallbackStep?.if).toContain("matrix.node-version != '24.x'");
+    expect(testFallbackStep?.if).toContain(`!(${ubuntu24Cond})`);
 
     const codecovStep = steps.find((step) => step.uses?.startsWith('codecov/codecov-action@'));
     expect(codecovStep).toBeDefined();
-    expect(codecovStep?.if).toContain("matrix.node-version == '24.x'");
+    expect(codecovStep?.if).toContain(ubuntu24Cond);
     expect(codecovStep?.with).toEqual({
       use_oidc: true,
       files: './coverage/lcov.info',
@@ -587,9 +628,13 @@ describe('coverage & pack-check CI contract (P02)', () => {
     expect(codecovLine).toBeDefined();
     expect(codecovLine).toMatch(/codecov\/codecov-action@[0-9a-f]{40}\s*#\s*v7\./);
 
-    const packCheckStep = steps.find((step) => step.run?.trim() === 'just pack-check');
+    const packJob = ci.jobs['pack-check'];
+    expect(packJob).toBeDefined();
+    expect(packJob['runs-on']).toContain('RUNNER_UBUNTU');
+    expect(packJob.if).toContain("needs.changes.outputs.code == 'true'");
+    expect(packJob.if).toContain("needs.changes.outputs.release == 'true'");
+    const packCheckStep = packJob.steps.find((step) => step.run?.trim() === 'just pack-check');
     expect(packCheckStep).toBeDefined();
-    expect(packCheckStep?.if).toContain("matrix.node-version == '24.x'");
   });
 
   it('publish.yml verify job runs just pack-check', () => {
@@ -867,5 +912,122 @@ describe('P04 secret scanning, audits, canary, CodeQL & Dependabot', () => {
       readFileSync(join(REPO_ROOT, '.github', 'actionlint.yaml'), 'utf8')
     ) as { 'config-variables'?: string[] };
     expect(actionlint['config-variables']).toContain('MUSE_CI_ENABLED');
+  });
+});
+
+describe('slim PR CI, merge_group, concurrency, and parallel Justfile (P03)', () => {
+  const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
+  const PR_ONLY_CANCEL = "${{ github.event_name == 'pull_request' }}";
+  const isPressedChild = existsSync(join(REPO_ROOT, 'press', 'press-receipt.toml'));
+
+  const mergeGroupWorkflows = [
+    'ci.yml',
+    'codeql.yml',
+    'press-verify.yml',
+    ...(isPressedChild ? [] : ['template-receipt-guard.yml']),
+  ];
+
+  const prConcurrencyWorkflows = [
+    'ci.yml',
+    'codeql.yml',
+    'dependency-review.yml',
+    'press-verify.yml',
+    ...(isPressedChild ? [] : ['template-receipt-guard.yml']),
+  ];
+
+  it.each(mergeGroupWorkflows)('%s subscribes to merge_group events', (file) => {
+    const parsed = parse(readFileSync(join(WORKFLOW_DIR, file), 'utf8')) as {
+      on: Record<string, unknown>;
+    };
+    expect(Object.prototype.hasOwnProperty.call(parsed.on, 'merge_group')).toBe(true);
+  });
+
+  it.each(prConcurrencyWorkflows)(
+    '%s cancels superseded pull_request runs without cancelling main or merge_group',
+    (file) => {
+      const parsed = parse(readFileSync(join(WORKFLOW_DIR, file), 'utf8')) as {
+        concurrency?: { group?: string; 'cancel-in-progress'?: unknown };
+      };
+      expect(parsed.concurrency).toBeDefined();
+      expect(parsed.concurrency?.group).toContain('github.event.pull_request.number || github.sha');
+      expect(parsed.concurrency?.['cancel-in-progress']).toBe(PR_ONLY_CANCEL);
+    }
+  );
+
+  it.each(['publish.yml', 'release-please.yml'])(
+    '%s serializes runs without cancelling in-progress releases',
+    (file) => {
+      const parsed = parse(readFileSync(join(WORKFLOW_DIR, file), 'utf8')) as {
+        concurrency?: { group?: string; 'cancel-in-progress'?: unknown };
+      };
+      expect(parsed.concurrency?.group).toBeTruthy();
+      expect(parsed.concurrency?.['cancel-in-progress']).toBe(false);
+    }
+  );
+
+  it('ci.yml ci-ok aggregate gate depends on every other job and always runs', () => {
+    const ci = parse(readFileSync(join(WORKFLOW_DIR, 'ci.yml'), 'utf8')) as {
+      jobs: Record<
+        string,
+        {
+          needs?: string[];
+          if?: string;
+          permissions?: Record<string, unknown>;
+          'runs-on'?: string;
+        }
+      >;
+    };
+    const allOtherJobs = Object.keys(ci.jobs).filter((name) => name !== 'ci-ok');
+    const ciOk = ci.jobs['ci-ok'];
+    expect(ciOk).toBeDefined();
+    expect(ciOk?.['runs-on']).toContain('RUNNER_UBUNTU');
+    expect(ciOk?.if).toBe('always()');
+    expect(ciOk?.permissions).toEqual({});
+    expect(new Set(ciOk?.needs)).toEqual(new Set(allOtherJobs));
+  });
+
+  it('ci.yml gates heavy code jobs on changes.outputs.code and keeps lint always-on', () => {
+    const ci = parse(readFileSync(join(WORKFLOW_DIR, 'ci.yml'), 'utf8')) as {
+      jobs: Record<
+        string,
+        {
+          if?: string;
+          needs?: string | string[];
+          'runs-on'?: string;
+          outputs?: Record<string, string>;
+        }
+      >;
+    };
+    expect(ci.jobs['changes']?.outputs).toEqual({
+      code: '${{ steps.detect.outputs.code }}',
+      release: '${{ steps.detect.outputs.release }}',
+    });
+    expect(ci.jobs['lint']?.if).toBeUndefined();
+    expect(ci.jobs['lint']?.['runs-on']).toContain('RUNNER_UBUNTU');
+
+    const codeCond = "needs.changes.outputs.code == 'true'";
+    for (const jobName of ['typecheck', 'test', 'check-removable', 'api-image', 'bun-lane']) {
+      expect(ci.jobs[jobName]?.needs).toBe('changes');
+      expect(ci.jobs[jobName]?.if).toBe(codeCond);
+    }
+    for (const linuxJob of ['typecheck', 'check-removable', 'api-image', 'bun-lane']) {
+      expect(ci.jobs[linuxJob]?.['runs-on']).toContain('RUNNER_UBUNTU');
+    }
+  });
+
+  it('.github/actionlint.yaml declares RUNNER_UBUNTU, RUNNER_MACOS, and RUNNER_WINDOWS', () => {
+    const actionlint = parse(
+      readFileSync(join(REPO_ROOT, '.github', 'actionlint.yaml'), 'utf8')
+    ) as {
+      'config-variables'?: string[];
+    };
+    expect(actionlint['config-variables']).toEqual(
+      expect.arrayContaining(['RUNNER_UBUNTU', 'RUNNER_MACOS', 'RUNNER_WINDOWS'])
+    );
+  });
+
+  it('Justfile marks @all with [parallel]', () => {
+    const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8').replaceAll('\r\n', '\n');
+    expect(justfile).toMatch(/\[parallel\]\n@all:/);
   });
 });

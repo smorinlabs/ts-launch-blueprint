@@ -36,6 +36,10 @@ on:
 # Deny-all baseline (D-022(10)); each job re-grants only what it needs.
 permissions: {}
 
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # --- Cheap, un-privileged integrity gate: never contacts the registry. -----
   verify:

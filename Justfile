@@ -207,6 +207,7 @@ test-bun:
 
 # Run all quality gates, including shell scripts and workflow commands.
 [group('test'), group('dev'), group('quick start')]
+[parallel]
 @all: format-check lint check-boundaries check-shell check-workflows typecheck test
 
 alias a := all

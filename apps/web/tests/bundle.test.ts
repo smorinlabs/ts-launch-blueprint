@@ -41,7 +41,11 @@ function buildIfStale(): void {
     )
   );
   if (sourcesMtime > distMtime) {
-    execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'ignore' });
+    execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build'], {
+      cwd: ROOT,
+      stdio: 'ignore',
+      shell: process.platform === 'win32',
+    });
   }
 }
 
