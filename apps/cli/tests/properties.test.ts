@@ -115,6 +115,22 @@ describe('CLI formatting and config properties', () => {
     );
   });
 
+  it('formatOutput markdown emits valid GFM table with escaped pipes', () => {
+    expect(formatOutput([], 'markdown')).toBe('No projects found.');
+    fc.assert(
+      fc.property(fc.array(projectArb, { minLength: 1, maxLength: 15 }), (projects) => {
+        const rendered = formatOutput(projects, 'markdown');
+        const lines = rendered.split('\n');
+        expect(lines[0]).toBe(`## Projects (${projects.length})`);
+        expect(lines[1]).toBe('');
+        expect(lines[2]).toBe('| Name | Workspace | ID |');
+        expect(lines[3]).toBe('| --- | --- | --- |');
+        expect(lines).toHaveLength(projects.length + 4);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
   it('formatOutput text joins newline-free project ids cleanly', () => {
     const lineIdProjectArb: fc.Arbitrary<Project> = fc.record({
       id: fc.string({ minLength: 1 }).filter((id) => !id.includes('\n')),

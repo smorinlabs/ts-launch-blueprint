@@ -154,8 +154,8 @@ export const configFileSchema: z.ZodObject<{
 /** Values a config file may carry (tokens are never stored in config files). */
 export type ConfigFileValues = z.infer<typeof configFileSchema>;
 
-/** Where the effective token came from (`'file'` retained in union until M3). */
-export type TokenSource = 'flag' | 'env' | 'file' | 'none';
+/** Where the effective token came from (env/flag-only per ADR 0002). */
+export type TokenSource = 'flag' | 'env' | 'none';
 
 /** Effective merged configuration. */
 export interface ResolvedConfig {

@@ -39,8 +39,20 @@ export {
   AuthError,
   ConfigError,
   ConflictError,
+  type DomainErrorOptions,
+  ERROR_CODES,
+  type ErrorCode,
+  InterruptError,
   NotFoundError,
+  ProjectNotFoundError,
+  WorkspaceNotFoundError,
 } from '@ts-launch-blueprint/core';
 export type { Project, Workspace } from '@ts-launch-blueprint/core';
-export { formatOutput, type OutputFormat, OUTPUT_FORMATS } from './cli/format.js';
+export {
+  formatOutput,
+  type OutputFormat,
+  OUTPUT_FORMATS,
+  relativeTime,
+  richLink,
+} from './cli/format.js';
 export { VERSION } from './version.js';

@@ -1,6 +1,5 @@
 // CLI demo mode: --source / TS_PROJECTS_SOURCE selects the HTTP API or the
-// core's in-memory demo seed (no token, no server). resolveSource unit
-// tests, then in-process runs via runCli with every boundary faked.
+// core's in-memory demo seed (no token, no server).
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -28,7 +27,6 @@ afterEach(() => {
   }
 });
 
-/** A fetch that fails the test if memory mode ever touches the network. */
 const failingFetch = ((input: Parameters<typeof fetch>[0]) => {
   throw new Error(`memory mode must not fetch: ${String(input)}`);
 }) as typeof fetch;
@@ -39,7 +37,6 @@ interface Harness {
   stderr: () => string;
 }
 
-/** No token anywhere: empty env, an empty temp home, a failing fetch. */
 function makeHarness(overrides: Partial<CliDeps> = {}): Harness {
   const out: string[] = [];
   const err: string[] = [];
@@ -69,7 +66,6 @@ const ENGINEERING: Project[] = DEFAULT_IN_MEMORY_SEED.projects.filter(
   (project) => project.workspace?.name === 'Engineering'
 );
 
-/** Parse the JSON document the command writes to stdout. */
 function projectsOf(stdout: string): Project[] {
   return (JSON.parse(stdout) as { projects: Project[] }).projects;
 }
@@ -106,10 +102,10 @@ describe('resolveSource', () => {
   });
 });
 
-describe('projects in memory mode (no token, no server)', () => {
+describe('projects list and get in memory mode (no token, no server)', () => {
   it('TS_PROJECTS_SOURCE=memory lists all 4 demo projects with no token anywhere', async () => {
     const h = makeHarness({ env: MEMORY_ENV });
-    const code = await runCli(['projects', '--no-input', '--format', 'json'], h.deps);
+    const code = await runCli(['projects', 'list', '--no-input', '--json'], h.deps);
     expect(code).toBe(0);
     expect(projectsOf(h.stdout())).toEqual(DEFAULT_IN_MEMORY_SEED.projects);
   });
@@ -117,7 +113,7 @@ describe('projects in memory mode (no token, no server)', () => {
   it('--source memory works the same, and beats TS_PROJECTS_SOURCE=http', async () => {
     const h = makeHarness({ env: { [SOURCE_ENV_VAR]: 'http' } });
     const code = await runCli(
-      ['projects', '--source', 'memory', '--no-input', '--format', 'json'],
+      ['projects', 'list', '--source', 'memory', '--no-input', '-o', 'json'],
       h.deps
     );
     expect(code).toBe(0);
@@ -127,7 +123,7 @@ describe('projects in memory mode (no token, no server)', () => {
 
   it('--source http beats TS_PROJECTS_SOURCE=memory (and still needs a token: exit 4)', async () => {
     const h = makeHarness({ env: MEMORY_ENV });
-    const code = await runCli(['projects', '--source', 'http', '--no-input'], h.deps);
+    const code = await runCli(['projects', 'list', '--source', 'http', '--no-input'], h.deps);
     expect(code).toBe(4);
     expect(h.stderr()).toContain(`No ${TOKEN_ENV_VAR} found`);
   });
@@ -135,7 +131,7 @@ describe('projects in memory mode (no token, no server)', () => {
   it('--workspace engineering (any case) lists only the Engineering projects', async () => {
     const h = makeHarness({ env: MEMORY_ENV });
     const code = await runCli(
-      ['projects', '--workspace', 'engineering', '--no-input', '--format', 'json'],
+      ['projects', 'list', '--workspace', 'engineering', '--no-input', '--json'],
       h.deps
     );
     expect(code).toBe(0);
@@ -144,14 +140,21 @@ describe('projects in memory mode (no token, no server)', () => {
 
   it('--workspace nope exits 3 with the service message', async () => {
     const h = makeHarness({ env: MEMORY_ENV });
-    const code = await runCli(['projects', '--workspace', 'nope', '--no-input'], h.deps);
+    const code = await runCli(['projects', 'list', '--workspace', 'nope', '--no-input'], h.deps);
     expect(code).toBe(3);
     expect(h.stderr()).toContain('Workspace not found: nope');
   });
 
+  it('projects get p-1 in memory mode returns the demo project', async () => {
+    const h = makeHarness({ env: MEMORY_ENV });
+    const code = await runCli(['projects', 'get', 'p-1', '--json'], h.deps);
+    expect(code).toBe(0);
+    expect(projectsOf(h.stdout())).toEqual([DEFAULT_IN_MEMORY_SEED.projects[0]]);
+  });
+
   it('keeps stdout pure JSON and puts the notice on stderr only', async () => {
     const h = makeHarness({ env: MEMORY_ENV });
-    await runCli(['projects', '--no-input', '--format', 'json'], h.deps);
+    await runCli(['projects', 'list', '--no-input', '--json'], h.deps);
     expect(() => JSON.parse(h.stdout()) as unknown).not.toThrow();
     expect(h.stdout()).not.toContain('Using in-memory demo data');
     expect(h.stderr()).toContain(`Using in-memory demo data (${SOURCE_ENV_VAR}=memory)`);
@@ -159,7 +162,7 @@ describe('projects in memory mode (no token, no server)', () => {
 
   it('-q hides the notice', async () => {
     const h = makeHarness({ env: MEMORY_ENV });
-    const code = await runCli(['-q', 'projects', '--no-input', '--format', 'json'], h.deps);
+    const code = await runCli(['-q', 'projects', 'list', '--no-input', '--json'], h.deps);
     expect(code).toBe(0);
     expect(h.stderr()).not.toContain('Using in-memory demo data');
   });
@@ -172,8 +175,7 @@ describe('projects in memory mode (no token, no server)', () => {
         TS_PROJECTS_API_URL: 'http://127.0.0.1:1/api/1.0',
       },
     });
-    const code = await runCli(['projects', '--no-input', '--format', 'json'], h.deps);
-    // failingFetch would throw (exit 1) if either were used.
+    const code = await runCli(['projects', 'list', '--no-input', '--json'], h.deps);
     expect(code).toBe(0);
     expect(projectsOf(h.stdout())).toEqual(DEFAULT_IN_MEMORY_SEED.projects);
   });
@@ -186,40 +188,34 @@ describe('projects in memory mode (no token, no server)', () => {
       mode: 0o600,
     });
     const h = makeHarness({ env: MEMORY_ENV, homedir: () => home });
-    const code = await runCli(['projects', '--no-input', '--format', 'json'], h.deps);
+    const code = await runCli(['projects', 'list', '--no-input', '--json'], h.deps);
     expect(code).toBe(0);
     expect(projectsOf(h.stdout())).toEqual(ENGINEERING.slice(0, 1));
   });
 
   it('--source foo exits 2 with the exact message', async () => {
     const h = makeHarness();
-    const code = await runCli(['projects', '--source', 'foo', '--no-input'], h.deps);
+    const code = await runCli(['projects', 'list', '--source', 'foo', '--no-input'], h.deps);
     expect(code).toBe(2);
     expect(h.stderr()).toContain('Invalid source "foo": expected "http" or "memory"');
   });
 });
 
-describe('config --show and the data source', () => {
-  it('memory with no token -> exit 0, source and token lines', async () => {
-    const h = makeHarness({ env: MEMORY_ENV });
-    const code = await runCli(['config', '--show'], h.deps);
-    expect(code).toBe(0);
-    expect(h.stdout()).toContain('source = memory (source: env)');
-    expect(h.stdout()).toContain('token = (not needed: memory source)');
-  });
+describe('doctor and config get token vs source env', () => {
+  it('doctor reports missing token as warn (exit 0) and present token as ok', async () => {
+    const hNoTok = makeHarness({ env: MEMORY_ENV });
+    expect(await runCli(['doctor', '--json'], hNoTok.deps)).toBe(0);
+    const noTokPayload = JSON.parse(hNoTok.stdout()) as {
+      checks: Array<{ name: string; status: string }>;
+    };
+    expect(noTokPayload.checks.find((c) => c.name === 'token')?.status).toBe('warn');
 
-  it('http with no token -> still exit 4', async () => {
-    const h = makeHarness();
-    const code = await runCli(['config', '--show'], h.deps);
-    expect(code).toBe(4);
-    expect(h.stderr()).toContain(`No ${TOKEN_ENV_VAR} found`);
-  });
-
-  it('http with a token shows the default source', async () => {
-    const h = makeHarness({ env: { [TOKEN_ENV_VAR]: 'supersecret1234' } });
-    const code = await runCli(['config', '--show'], h.deps);
-    expect(code).toBe(0);
-    expect(h.stdout()).toContain('source = http (source: default)');
-    expect(h.stdout()).toContain('token = "****1234" (source: env)');
+    const hTok = makeHarness({ env: { [TOKEN_ENV_VAR]: 'supersecret1234' } });
+    expect(await runCli(['config', 'get', 'token', '--json'], hTok.deps)).toBe(0);
+    expect(JSON.parse(hTok.stdout())).toEqual({
+      key: 'token',
+      value: '****1234',
+      source: 'env',
+    });
   });
 });

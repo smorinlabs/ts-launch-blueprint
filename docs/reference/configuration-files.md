@@ -8,74 +8,79 @@ customize and extend the project.
 
 ## User Configuration (TOML + XDG)
 
-`ts-projects` reads an optional TOML config file for the token,
-default workspace, and default limit (`apps/cli/src/cli/config.ts`,
-`apps/cli/src/cli/xdg-paths.ts`).
+`ts-projects` resolves configuration from a 3-layer TOML hierarchy
+(`system` → `user` → `project`) plus env/flag-only secrets
+(`apps/cli/src/cli/config.ts`, `apps/cli/src/cli/xdg-paths.ts`).
 
-### File location
+### File locations (ADR 0011)
 
-By XDG base-directory convention, the file lives at:
+`XDG_CONFIG_HOME`, `XDG_CONFIG_DIRS`, `XDG_DATA_HOME`, `XDG_STATE_HOME`,
+and `XDG_CACHE_HOME` win on **all** platforms whenever set, non-empty, and
+absolute. When unset:
 
-- `$XDG_CONFIG_HOME/ts-projects/ts-projects_config.toml`, if
-  `XDG_CONFIG_HOME` is set and non-empty; otherwise
-- `<home>/.config/ts-projects/ts-projects_config.toml` — on **all**
-  platforms, including Windows (`%USERPROFILE%\.config\ts-projects\`).
+- **POSIX**:
+  - System: `/etc/xdg/ts-projects/ts-projects_config.toml`
+  - User: `~/.config/ts-projects/ts-projects_config.toml`
+  - Data / State / Cache: `~/.local/share/ts-projects`, `~/.local/state/ts-projects`, `~/.cache/ts-projects`
+- **Windows**:
+  - System: `%PROGRAMDATA%\ts-projects\ts-projects_config.toml` (`XDG_CONFIG_DIRS` splits on `;`)
+  - User: `%APPDATA%\ts-projects\ts-projects_config.toml`
+  - Data / State / Cache: `%LOCALAPPDATA%\ts-projects`, `%LOCALAPPDATA%\ts-projects`, `%LOCALAPPDATA%\ts-projects\Cache`
+- **Project layer** (all platforms): `./.ts-projects_config.toml` if present,
+  else `./ts-projects_config.toml`.
 
-`--config <path>` points the CLI at an explicit file instead. That path
-must exist (a missing path is a usage error, exit 2) and it _replaces_
-discovery entirely — the default user config is not merged in.
+`--config <path>` (or `TS_PROJECTS_CONFIG`) replaces 3-layer discovery:
+a missing explicit file is tolerated, while unreadable or invalid TOML
+raises `ConfigError` (`TS001`, exit `1`).
 
-### Keys
+### Keys and Schema
 
 ```toml
-token = "your_token_here"   # personal access token
-workspace = "My Workspace"  # default workspace filter
-limit = 200                 # default maximum number of projects
+workspace = "My Workspace"  # optional default workspace filter
+limit = 200                 # optional default maximum number of projects
+
+[output]
+format = "text"             # text | json | csv | markdown
+color = "auto"              # auto | always | never
+
+[logging]
+level = "warning"           # debug | info | warning | error | critical
+file = ""                   # optional log file path
+file_level = "debug"        # debug | info | warning | error | critical
+format = "text"             # text | json
 ```
 
-All keys are optional and validated with a zod schema
-(`configFileSchema` in `apps/cli/src/cli/config.ts`): `token`/`workspace` are
-strings, `limit` is a positive integer. An invalid file (bad TOML, or
-a value that fails schema validation) is a configuration error, exit 1.
+All keys are optional and validated with Zod (`configFileSchema` in
+`apps/cli/src/cli/config.ts`). Invalid discovered files or invalid keys
+emit a single `warning:` on stderr and degrade to valid defaults (ADR 0004).
 
-### Precedence
+### Token & Setting Precedence (ADR 0002)
 
-Token resolution, highest precedence first:
+Tokens are **never** read from or written to TOML config files:
 
 1. `--token <token>` flag
 2. `TS_PROJECTS_TOKEN` environment variable
-3. `token` key in the config file
 
-`workspace` and `limit` follow the same shape: the config file supplies
-a default, and an explicit `--workspace`/`--limit` flag always wins.
-An empty-string environment variable is treated as unset, matching the
-flag/file behavior.
+`workspace`, `limit`, `[output]`, and `[logging]` merge across
+`system` → `user` → `project`, and explicit CLI flags/env vars always win.
 
-### Permissions
+### Atomic Writes & Permissions
 
-The CLI's own config writer (used by tooling, not by an interactive
-`ts-projects` command) sets file mode `0600` on POSIX. When a
-token-bearing config file is readable by group or others, `ts-projects`
-prints a non-fatal warning suggesting `chmod 600`. Windows file modes
-cannot express user/group/other access, so this check — and the
-`chmod` remediation — apply to POSIX only; on Windows, the
-`%USERPROFILE%` directory's default ACLs already scope the file to
-your account.
+`ts-projects config init` and `ts-projects config set` write via atomic
+`temp + fsync + rename` (`0o600` on POSIX, user profile ACLs on Windows)
+and refuse to overwrite corrupt existing TOML files (`ConfigError`, exit `1`).
 
-### Inspecting the effective configuration
+### Managing Configuration
 
 ```bash
-ts-projects config --show
+ts-projects config init --yes
+ts-projects config path
+ts-projects config get output.color
+ts-projects config set logging.level info
 ```
 
 See [CLI Reference: `config`](./cli-reference.md#config) and
-[`EXAMPLECLI.md`](../../EXAMPLECLI.md) for the full walkthrough,
-including the Windows `icacls` hardening example.
-
-> **Migration note (Python source)**: the source stored its token in a
-> dotenv file (`~/.config/py-cli/.env`, key `PY_TOKEN`). The port
-> replaces that tier with the TOML file described above; there is no
-> `.env` config tier and no dotenv dependency.
+[`EXAMPLECLI.md`](../../EXAMPLECLI.md) for the full walkthrough.
 
 ---
 

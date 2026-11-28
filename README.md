@@ -37,10 +37,11 @@ project.
 - **Open Source Ready**: a Code of Conduct, issue/PR templates, a
   Contributor License Agreement flow, and an automated `CONTRIBUTORS.md`
   are included out of the box.
-- **A Worked Example**: `ts-projects`, a full CLI (interactive multi-select,
-  text/JSON/CSV output, clipboard integration) with its own UX spec
-  ([EXAMPLECLI.md](./EXAMPLECLI.md)), showing every tool choice applied to
-  real code rather than an empty scaffold.
+- **A Worked Example**: `ts-projects`, a full noun-verb CLI (`projects list|get`,
+  `config init|path|get|set`, `doctor [--bundle]`, `completion {bash,zsh,fish}`,
+  text/JSON/CSV/Markdown output, interactive multi-select, clipboard integration)
+  with its own UX spec ([EXAMPLECLI.md](./EXAMPLECLI.md)), showing every tool
+  choice applied to real code rather than an empty scaffold.
 
 See [docs/about/features.md](./docs/about/features.md) for the complete
 feature list and [docs/about/philosophy.md](./docs/about/philosophy.md) for
@@ -87,7 +88,7 @@ Try the example CLI without a token or a server, on the built-in demo data:
 
 ```bash
 just build
-TS_PROJECTS_SOURCE=memory node apps/cli/dist/cli.js projects
+TS_PROJECTS_SOURCE=memory node apps/cli/dist/cli.js projects list
 ```
 
 Run the API (Hono + tRPC) the same way, on the demo data by default:
@@ -114,18 +115,21 @@ and the published package is unchanged; see
 
 ## Using the example CLI
 
-`ts-projects` fetches projects from the (placeholder) API, lets you
-interactively multi-select, and emits the selection as text, JSON, or
-CSV — results on stdout, everything else on stderr:
+`ts-projects` uses a noun-verb command tree (`projects`, `config`, `doctor`,
+`completion`) and emits results in text, JSON, CSV, or Markdown — results on
+stdout (or `--output-file`), everything else on stderr:
 
 ```bash
 export TS_PROJECTS_TOKEN=your_token_here
 
-ts-projects                                   # fetch, preview, select
-ts-projects --workspace "My Workspace"        # filter by workspace
-ts-projects --no-input --format json | jq .   # pipe-safe, no prompt
-ts-projects --format csv --output out.csv     # write to a file
-ts-projects --copy                            # copy result to clipboard
+ts-projects projects list                          # fetch, preview, select
+ts-projects projects list --workspace "My Workspace"
+ts-projects projects get 12345 --json              # fetch single project
+ts-projects projects list --no-input --json | jq . # pipe-safe, no prompt
+ts-projects projects list -o csv --output-file out.csv
+ts-projects projects list -o markdown --copy       # Markdown table + clipboard
+ts-projects config init                            # guided config setup
+ts-projects doctor --bundle                        # redacted diagnostics
 ```
 
 See [EXAMPLECLI.md](./EXAMPLECLI.md) for the full UX spec (configuration
