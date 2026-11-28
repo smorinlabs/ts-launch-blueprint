@@ -159,6 +159,30 @@ describe('HTTP repository: getProject', () => {
       repositoryReturning({ data: ['not-an-object'] }).repository.listProjects({ limit: 5 })
     ).rejects.toThrow(/unexpected \/projects item at index 0/);
   });
+
+  it.each(['.', '..'])(
+    'rejects dot-segment id %s with ApiError without calling fetch',
+    async (badId) => {
+      const { repository, urls } = repositoryReturning({
+        data: { gid: badId, name: 'Should not fetch', workspace: null },
+      });
+      await expect(repository.getProject(badId)).rejects.toBeInstanceOf(ApiError);
+      expect(urls).toHaveLength(0);
+    }
+  );
+
+  it.each([
+    ['a/b?c=1', '/api/1.0/projects/a%2Fb%3Fc%3D1'],
+    ['proj.1', '/api/1.0/projects/proj.1'],
+  ])('continues to accept valid id %s and requests %s', async (id, expectedPathname) => {
+    const { repository, urls } = repositoryReturning({
+      data: { gid: id, name: 'Valid', workspace: null },
+    });
+    const project = await repository.getProject(id);
+    expect(project).toEqual({ id, name: 'Valid', workspace: null });
+    expect(urls).toHaveLength(1);
+    expect(urls[0]!.pathname).toBe(expectedPathname);
+  });
 });
 
 describe('HTTP repository: pagination and request params', () => {

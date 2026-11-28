@@ -90,8 +90,14 @@ describe('projects.get (tRPC caller)', () => {
     });
   });
 
-  it('rejects empty id with BAD_REQUEST', async () => {
+  it('rejects empty id and dot-segment ids with BAD_REQUEST', async () => {
     await expect(caller.projects.get({ id: '' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(caller.projects.get({ id: '.' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(caller.projects.get({ id: '..' })).rejects.toMatchObject({
       code: 'BAD_REQUEST',
     });
   });

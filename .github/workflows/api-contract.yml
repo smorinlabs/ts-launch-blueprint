@@ -27,6 +27,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Install pnpm
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
@@ -43,7 +44,9 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch origin "$BASE_REF" --depth=1
+          if ! git rev-parse --verify "origin/$BASE_REF" >/dev/null 2>&1; then
+            git fetch origin "$BASE_REF" --depth=1
+          fi
           snapshot="origin/$BASE_REF:docs/api/contract.snapshot.json"
           if git show "$snapshot" > "$RUNNER_TEMP/base-contract.snapshot.json" 2>/dev/null; then
             echo "base snapshot extracted"

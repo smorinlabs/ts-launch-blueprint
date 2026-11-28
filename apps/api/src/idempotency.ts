@@ -9,6 +9,11 @@ export const DEFAULT_IDEMPOTENCY_TTL_MS = 86_400_000;
 export const DEFAULT_IDEMPOTENCY_MAX_ENTRIES = 1024;
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH']);
+const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
+
+function responseBodyFor(status: number, body: ArrayBuffer): ArrayBuffer | null {
+  return NULL_BODY_STATUSES.has(status) ? null : body.slice(0);
+}
 
 export interface IdempotencyOptions {
   ttlMs?: number | undefined;
@@ -57,7 +62,8 @@ export function idempotency(options: IdempotencyOptions = {}): MiddlewareHandler
         store.set(cacheKey, cached);
         const replayHeaders = buildHeaders(cached.headers);
         replayHeaders.set(REPLAYED_HEADER, 'true');
-        c.res = new Response(cached.body.slice(0), {
+        c.header(REPLAYED_HEADER, undefined);
+        c.res = new Response(responseBodyFor(cached.status, cached.body), {
           status: cached.status,
           headers: replayHeaders,
         });
@@ -69,15 +75,19 @@ export function idempotency(options: IdempotencyOptions = {}): MiddlewareHandler
     await next();
 
     const original = c.res;
-    const body = await original.arrayBuffer();
+    const body = NULL_BODY_STATUSES.has(original.status)
+      ? new ArrayBuffer(0)
+      : await original.arrayBuffer();
     const headerPairs = [...original.headers.entries()].filter(
       ([name]) => name.toLowerCase() !== REPLAYED_HEADER.toLowerCase()
     );
     const rebuiltHeaders = buildHeaders(headerPairs);
-    c.res = new Response(body.slice(0), {
+    c.header(REPLAYED_HEADER, undefined);
+    c.res = new Response(responseBodyFor(original.status, body), {
       status: original.status,
       headers: rebuiltHeaders,
     });
+    c.res.headers.delete(REPLAYED_HEADER);
 
     if (original.status >= 200 && original.status < 300 && maxEntries > 0) {
       store.delete(cacheKey);

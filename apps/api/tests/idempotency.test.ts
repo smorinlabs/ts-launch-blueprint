@@ -46,6 +46,15 @@ function makeFixtureApp(options?: IdempotencyOptions): {
     c.header('Set-Cookie', 'b=2; Path=/', { append: true });
     return c.json({ count }, 201);
   });
+  app.post('/empty', (c) => {
+    count += 1;
+    return c.body(null, 204);
+  });
+  app.post('/spoof', (c) => {
+    count += 1;
+    c.header('Idempotency-Replayed', 'spoofed');
+    return c.json({ count }, 201);
+  });
 
   return {
     app,
@@ -210,6 +219,46 @@ describe('idempotency middleware (standalone fixture routes)', () => {
     await app.request('/things', { method: 'POST', headers: { 'Idempotency-Key': 'k0' } });
     await app.request('/things', { method: 'POST', headers: { 'Idempotency-Key': 'k0' } });
     expect(calls()).toBe(2);
+  });
+
+  it('handles 204 No Content initial response and replay with empty body', async () => {
+    const { app, calls } = makeFixtureApp();
+    const first = await app.request('/empty', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'k-204' },
+    });
+    expect(first.status).toBe(204);
+    expect(first.headers.get('Idempotency-Replayed')).toBeNull();
+    expect(await first.text()).toBe('');
+
+    const replay = await app.request('/empty', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'k-204' },
+    });
+    expect(replay.status).toBe(204);
+    expect(replay.headers.get('Idempotency-Replayed')).toBe('true');
+    expect(await replay.text()).toBe('');
+    expect(calls()).toBe(1);
+  });
+
+  it('strips handler-injected Idempotency-Replayed header on initial response', async () => {
+    const { app, calls } = makeFixtureApp();
+    const first = await app.request('/spoof', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'k-spoof' },
+    });
+    expect(first.status).toBe(201);
+    expect(first.headers.get('Idempotency-Replayed')).toBeNull();
+    expect(await first.json()).toEqual({ count: 1 });
+
+    const replay = await app.request('/spoof', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'k-spoof' },
+    });
+    expect(replay.status).toBe(201);
+    expect(replay.headers.get('Idempotency-Replayed')).toBe('true');
+    expect(await replay.json()).toEqual({ count: 1 });
+    expect(calls()).toBe(1);
   });
 });
 

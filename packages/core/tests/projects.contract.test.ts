@@ -85,9 +85,13 @@ describe('ListProjectsOutputSchema', () => {
 });
 
 describe('GetProjectInputSchema and GetProjectOutputSchema', () => {
-  it('accepts a non-empty id and rejects empty/missing id', () => {
+  it('accepts a non-empty id and rejects empty/missing id and dot segments', () => {
     expect(GetProjectInputSchema.safeParse({ id: 'p-1' }).success).toBe(true);
+    expect(GetProjectInputSchema.safeParse({ id: 'a/b?c=1' }).success).toBe(true);
+    expect(GetProjectInputSchema.safeParse({ id: 'proj.1' }).success).toBe(true);
     expect(GetProjectInputSchema.safeParse({ id: '' }).success).toBe(false);
+    expect(GetProjectInputSchema.safeParse({ id: '.' }).success).toBe(false);
+    expect(GetProjectInputSchema.safeParse({ id: '..' }).success).toBe(false);
     expect(GetProjectInputSchema.safeParse({}).success).toBe(false);
   });
 

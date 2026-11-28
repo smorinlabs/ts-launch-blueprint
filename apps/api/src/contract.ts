@@ -82,6 +82,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true;
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, index) => deepEqual(item, b[index]));
+  }
+  if (isRecord(a) && isRecord(b)) {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    return (
+      keysA.length === keysB.length &&
+      keysA.every((k) => Object.hasOwn(b, k) && deepEqual(a[k], b[k]))
+    );
+  }
+  return false;
+}
+
 function isNullableSchema(schema: JsonSchemaObject): boolean {
   if (schema['type'] === 'null') {
     return true;
@@ -106,6 +124,9 @@ function unwrapNullableSchema(schema: JsonSchemaObject): JsonSchemaObject {
       if (nonNull.length === 1 && isRecord(nonNull[0])) {
         return nonNull[0];
       }
+      if (nonNull.length > 1 && nonNull.length < branches.length) {
+        return { ...schema, [unionKey]: nonNull };
+      }
     }
   }
   if (Array.isArray(schema['type'])) {
@@ -113,8 +134,34 @@ function unwrapNullableSchema(schema: JsonSchemaObject): JsonSchemaObject {
     if (nonNull.length === 1) {
       return { ...schema, type: nonNull[0] };
     }
+    if (nonNull.length > 1 && nonNull.length < schema['type'].length) {
+      return { ...schema, type: nonNull };
+    }
   }
   return schema;
+}
+
+function unionBranchesOf(schema: JsonSchemaObject): JsonSchemaObject[] | null {
+  for (const unionKey of ['anyOf', 'oneOf'] as const) {
+    const branches = schema[unionKey];
+    if (Array.isArray(branches)) {
+      const nonNull = branches.filter(
+        (b): b is JsonSchemaObject => isRecord(b) && b['type'] !== 'null'
+      );
+      if (nonNull.length > 0) {
+        return nonNull;
+      }
+    }
+  }
+  if (Array.isArray(schema['type'])) {
+    const nonNull = schema['type'].filter(
+      (t): t is string => typeof t === 'string' && t !== 'null'
+    );
+    if (nonNull.length > 1) {
+      return nonNull.map((t) => ({ type: t }));
+    }
+  }
+  return null;
 }
 
 function stringList(value: unknown): string[] {
@@ -154,6 +201,30 @@ function compareInputSchema(
   }
   const base = unwrapNullableSchema(baseRaw);
   const head = unwrapNullableSchema(headRaw);
+
+  const baseBranches = unionBranchesOf(base);
+  const headBranches = unionBranchesOf(head);
+  if (baseBranches !== null || headBranches !== null) {
+    const bList = baseBranches ?? [base];
+    const hList = headBranches ?? [head];
+    const allBaseAccepted = bList.every((bBranch) =>
+      hList.some((hBranch) => {
+        const probeBreaking: BreakingChange[] = [];
+        compareInputSchema(procedure, path, bBranch, hBranch, probeBreaking, []);
+        return probeBreaking.length === 0;
+      })
+    );
+    if (!allBaseAccepted) {
+      breaking.push({
+        procedure,
+        path,
+        reason: 'Input union narrowed or branch became incompatible',
+      });
+    } else if (hList.length > bList.length) {
+      nonBreaking.push(`${procedure} ${path}: input union widened`);
+    }
+    return;
+  }
 
   if (base['type'] !== head['type']) {
     const widenedToNumber = base['type'] === 'integer' && head['type'] === 'number';
@@ -196,7 +267,39 @@ function compareInputSchema(
     }
   }
 
-  if (Array.isArray(head['enum'])) {
+  const hasBaseConst = Object.hasOwn(base, 'const');
+  const hasHeadConst = Object.hasOwn(head, 'const');
+  if (hasBaseConst && hasHeadConst) {
+    if (!deepEqual(base['const'], head['const'])) {
+      breaking.push({
+        procedure,
+        path,
+        reason: `Input const literal changed from ${JSON.stringify(base['const'])} to ${JSON.stringify(head['const'])}`,
+      });
+    }
+  } else if (!hasBaseConst && hasHeadConst) {
+    const sameSingleEnum =
+      Array.isArray(base['enum']) &&
+      base['enum'].length === 1 &&
+      deepEqual(base['enum'][0], head['const']);
+    if (!sameSingleEnum) {
+      breaking.push({
+        procedure,
+        path,
+        reason: `Input restricted to const literal ${JSON.stringify(head['const'])}`,
+      });
+    }
+  } else if (hasBaseConst && !hasHeadConst) {
+    if (Array.isArray(head['enum']) && !head['enum'].some((v) => deepEqual(v, base['const']))) {
+      breaking.push({
+        procedure,
+        path,
+        reason: 'Input const value no longer allowed by enum',
+      });
+    } else {
+      nonBreaking.push(`${procedure} ${path}: input const constraint loosened`);
+    }
+  } else if (Array.isArray(head['enum'])) {
     if (!Array.isArray(base['enum'])) {
       breaking.push({ procedure, path, reason: 'Input restricted to enum values' });
     } else {
@@ -211,6 +314,16 @@ function compareInputSchema(
   }
 
   if (base['type'] === 'object' && head['type'] === 'object') {
+    if (base['additionalProperties'] !== false && head['additionalProperties'] === false) {
+      breaking.push({
+        procedure,
+        path,
+        reason: 'Input no longer allows additional properties',
+      });
+    } else if (base['additionalProperties'] === false && head['additionalProperties'] !== false) {
+      nonBreaking.push(`${procedure} ${path}: input now allows additional properties`);
+    }
+
     const baseProps = propertiesOf(base);
     const headProps = propertiesOf(head);
     const baseReq = new Set(stringList(base['required']));
@@ -273,6 +386,30 @@ function compareOutputSchema(
   const base = unwrapNullableSchema(baseRaw);
   const head = unwrapNullableSchema(headRaw);
 
+  const baseBranches = unionBranchesOf(base);
+  const headBranches = unionBranchesOf(head);
+  if (baseBranches !== null || headBranches !== null) {
+    const bList = baseBranches ?? [base];
+    const hList = headBranches ?? [head];
+    const allHeadCompatible = hList.every((hBranch) =>
+      bList.some((bBranch) => {
+        const probeBreaking: BreakingChange[] = [];
+        compareOutputSchema(procedure, path, bBranch, hBranch, probeBreaking, []);
+        return probeBreaking.length === 0;
+      })
+    );
+    if (!allHeadCompatible) {
+      breaking.push({
+        procedure,
+        path,
+        reason: 'Output union widened or branch became incompatible',
+      });
+    } else if (hList.length < bList.length) {
+      nonBreaking.push(`${procedure} ${path}: output union narrowed`);
+    }
+    return;
+  }
+
   if (base['type'] !== head['type']) {
     breaking.push({
       procedure,
@@ -282,14 +419,52 @@ function compareOutputSchema(
     return;
   }
 
-  if (Array.isArray(base['enum']) && Array.isArray(head['enum'])) {
-    const baseAllowed = new Set(base['enum']);
-    for (const val of head['enum']) {
-      if (!baseAllowed.has(val)) {
-        breaking.push({ procedure, path, reason: 'Output enum widened with new value' });
-        break;
+  const hasBaseConst = Object.hasOwn(base, 'const');
+  const hasHeadConst = Object.hasOwn(head, 'const');
+  if (hasBaseConst && hasHeadConst) {
+    if (!deepEqual(base['const'], head['const'])) {
+      breaking.push({
+        procedure,
+        path,
+        reason: `Output const literal changed from ${JSON.stringify(base['const'])} to ${JSON.stringify(head['const'])}`,
+      });
+    }
+  } else if (hasBaseConst && !hasHeadConst) {
+    const sameSingleEnum =
+      Array.isArray(head['enum']) &&
+      head['enum'].length === 1 &&
+      deepEqual(head['enum'][0], base['const']);
+    if (!sameSingleEnum) {
+      breaking.push({
+        procedure,
+        path,
+        reason: `Output const literal ${JSON.stringify(base['const'])} removed`,
+      });
+    }
+  } else if (!hasBaseConst && hasHeadConst) {
+    if (Array.isArray(base['enum']) && !base['enum'].some((v) => deepEqual(v, head['const']))) {
+      breaking.push({
+        procedure,
+        path,
+        reason: 'Output const literal outside previous enum',
+      });
+    } else {
+      nonBreaking.push(`${procedure} ${path}: output narrowed to const literal`);
+    }
+  } else if (Array.isArray(base['enum'])) {
+    if (!Array.isArray(head['enum'])) {
+      breaking.push({ procedure, path, reason: 'Output enum constraint removed' });
+    } else {
+      const baseAllowed = new Set(base['enum']);
+      for (const val of head['enum']) {
+        if (!baseAllowed.has(val)) {
+          breaking.push({ procedure, path, reason: 'Output enum widened with new value' });
+          break;
+        }
       }
     }
+  } else if (Array.isArray(head['enum'])) {
+    nonBreaking.push(`${procedure} ${path}: output narrowed to enum`);
   }
 
   if (base['type'] === 'object' && head['type'] === 'object') {

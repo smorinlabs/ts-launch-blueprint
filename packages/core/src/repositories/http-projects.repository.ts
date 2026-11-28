@@ -242,6 +242,9 @@ export function createHttpProjectsRepository(
     },
 
     async getProject(id: string): Promise<Project | null> {
+      if (id === '.' || id === '..') {
+        throw new ApiError("Invalid project ID: '.' and '..' are not allowed");
+      }
       const body = await request(
         `/projects/${encodeURIComponent(id)}`,
         { opt_fields: 'name,workspace.name' },

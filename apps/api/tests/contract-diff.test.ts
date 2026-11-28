@@ -326,4 +326,284 @@ describe('detectBreakingContractChanges', () => {
     expect(diff.nonBreaking.some((m) => m.includes('minimum loosened'))).toBe(true);
     expect(diff.nonBreaking.some((m) => m.includes('maximum loosened'))).toBe(true);
   });
+
+  it('flags output enum removal and input additionalProperties tightening as breaking', () => {
+    const base = router({
+      items: router({
+        op: publicProcedure
+          .input(z.looseObject({ a: z.string() }))
+          .output(z.object({ role: z.enum(['admin', 'user']) }))
+          .query(() => ({ role: 'admin' as const })),
+      }),
+    });
+    const head = router({
+      items: router({
+        op: publicProcedure
+          .input(z.object({ a: z.string() }))
+          .output(z.object({ role: z.string() }))
+          .query(() => ({ role: 'admin' })),
+      }),
+    });
+    const diff = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(head));
+    expect(diff.breaking.some((b) => b.path === 'input' && b.reason.includes('additional'))).toBe(
+      true
+    );
+    expect(diff.breaking.some((b) => b.path === 'output.role' && b.reason.includes('enum'))).toBe(
+      true
+    );
+  });
+
+  it('flags const literal changes on input and output as breaking', () => {
+    const base = router({
+      items: router({
+        op: publicProcedure
+          .input(z.object({ kind: z.literal('v1'), tag: z.string() }))
+          .output(z.object({ version: z.literal(1) }))
+          .query(() => ({ version: 1 as const })),
+      }),
+    });
+    const head = router({
+      items: router({
+        op: publicProcedure
+          .input(z.object({ kind: z.literal('v2'), tag: z.literal('fixed') }))
+          .output(z.object({ version: z.number() }))
+          .query(() => ({ version: 2 })),
+      }),
+    });
+    const diff = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(head));
+    expect(diff.breaking.some((b) => b.path === 'input.kind' && b.reason.includes('const'))).toBe(
+      true
+    );
+    expect(diff.breaking.some((b) => b.path === 'input.tag' && b.reason.includes('const'))).toBe(
+      true
+    );
+    expect(
+      diff.breaking.some((b) => b.path === 'output.version' && b.reason.includes('const'))
+    ).toBe(true);
+  });
+
+  it('detects breaking vs non-breaking changes in non-nullable anyOf/oneOf and primitive unions', () => {
+    const base = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              objUnion: z.union([z.object({ a: z.string() }), z.object({ b: z.number() })]),
+              primUnion: z.union([z.string(), z.number()]),
+              discUnion: z.discriminatedUnion('k', [
+                z.object({ k: z.literal('a'), v: z.string() }),
+                z.object({ k: z.literal('b'), n: z.number() }),
+              ]),
+              widenedInput: z.string(),
+            })
+          )
+          .output(
+            z.object({
+              objUnion: z.union([z.object({ a: z.string() }), z.object({ b: z.number() })]),
+              primUnion: z.union([z.string(), z.number()]),
+              narrowedOutput: z.union([z.string(), z.number()]),
+            })
+          )
+          .query(() => ({
+            objUnion: { a: 'x' },
+            primUnion: 'x',
+            narrowedOutput: 'x',
+          })),
+      }),
+    });
+
+    const compatibleHead = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              objUnion: z.union([
+                z.object({ a: z.string() }),
+                z.object({ b: z.number() }),
+                z.object({ c: z.boolean() }),
+              ]),
+              primUnion: z.union([z.string(), z.number(), z.boolean()]),
+              discUnion: z.discriminatedUnion('k', [
+                z.object({ k: z.literal('a'), v: z.string() }),
+                z.object({ k: z.literal('b'), n: z.number() }),
+              ]),
+              widenedInput: z.union([z.string(), z.number()]),
+            })
+          )
+          .output(
+            z.object({
+              objUnion: z.object({ a: z.string() }),
+              primUnion: z.string(),
+              narrowedOutput: z.string(),
+            })
+          )
+          .query(() => ({
+            objUnion: { a: 'x' },
+            primUnion: 'x',
+            narrowedOutput: 'x',
+          })),
+      }),
+    });
+    expect(
+      detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(compatibleHead)).breaking
+    ).toEqual([]);
+
+    const breakingHead = router({
+      items: router({
+        op: publicProcedure
+          .input(
+            z.object({
+              objUnion: z.union([z.object({ a: z.string() }), z.object({ c: z.boolean() })]),
+              primUnion: z.string(),
+              discUnion: z.discriminatedUnion('k', [
+                z.object({ k: z.literal('a'), v: z.string().min(3) }),
+                z.object({ k: z.literal('b'), n: z.number() }),
+              ]),
+              widenedInput: z.string(),
+            })
+          )
+          .output(
+            z.object({
+              objUnion: z.union([z.object({ a: z.string() }), z.object({ b: z.string() })]),
+              primUnion: z.union([z.string(), z.boolean()]),
+              narrowedOutput: z.union([z.string(), z.number()]),
+            })
+          )
+          .query(() => ({
+            objUnion: { a: 'x' },
+            primUnion: 'x',
+            narrowedOutput: 'x',
+          })),
+      }),
+    });
+
+    const diff = detectBreakingContractChanges(snapshotFrom(base), snapshotFrom(breakingHead));
+    expect(diff.breaking.some((b) => b.path === 'input.objUnion')).toBe(true);
+    expect(diff.breaking.some((b) => b.path === 'input.primUnion')).toBe(true);
+    expect(diff.breaking.some((b) => b.path === 'input.discUnion')).toBe(true);
+    expect(diff.breaking.some((b) => b.path === 'output.objUnion')).toBe(true);
+    expect(diff.breaking.some((b) => b.path === 'output.primUnion')).toBe(true);
+  });
+
+  it('handles const/enum transitions, additionalProperties loosening, nullable unions, and deep const values', () => {
+    const baseSnap: ApiContractSnapshot = {
+      schemaVersion: 1,
+      version: '0.0.0',
+      procedures: {
+        okTransitions: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              fromLitToEnum: { type: 'string', const: 'a' },
+              fromLitToAny: { type: 'string', const: 'a' },
+              fromEnumToLit: { type: 'string', enum: ['a'] },
+              nullableMulti: { type: ['string', 'number', 'null'] },
+              anyOfNull: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }] },
+            },
+          },
+          output: {
+            type: 'object',
+            properties: {
+              toEnum: { type: 'string' },
+              fromLitToSingleEnum: { type: 'string', const: 'a' },
+              fromEnumToLit: { type: 'string', enum: ['a', 'b'] },
+              toLit: { type: 'string' },
+              objConst: { type: 'object', const: { nested: [1, 2] } },
+            },
+          },
+        },
+        badTransitions: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            type: 'object',
+            properties: {
+              fromLitToDisjointEnum: { type: 'string', const: 'a' },
+              objConst: { type: 'object', const: { nested: [1, 2] } },
+            },
+          },
+          output: {
+            type: 'object',
+            properties: {
+              fromEnumToOutsideLit: { type: 'string', enum: ['a', 'b'] },
+            },
+          },
+        },
+      },
+    };
+
+    const headSnap: ApiContractSnapshot = {
+      schemaVersion: 1,
+      version: '0.0.0',
+      procedures: {
+        okTransitions: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            type: 'object',
+            additionalProperties: {},
+            properties: {
+              fromLitToEnum: { type: 'string', enum: ['a', 'b'] },
+              fromLitToAny: { type: 'string' },
+              fromEnumToLit: { type: 'string', const: 'a' },
+              nullableMulti: { type: ['string', 'number', 'null'] },
+              anyOfNull: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }] },
+            },
+          },
+          output: {
+            type: 'object',
+            properties: {
+              toEnum: { type: 'string', enum: ['x', 'y'] },
+              fromLitToSingleEnum: { type: 'string', enum: ['a'] },
+              fromEnumToLit: { type: 'string', const: 'a' },
+              toLit: { type: 'string', const: 'fixed' },
+              objConst: { type: 'object', const: { nested: [1, 2] } },
+            },
+          },
+        },
+        badTransitions: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            type: 'object',
+            properties: {
+              fromLitToDisjointEnum: { type: 'string', enum: ['b', 'c'] },
+              objConst: { type: 'object', const: { nested: [1, 3] } },
+            },
+          },
+          output: {
+            type: 'object',
+            properties: {
+              fromEnumToOutsideLit: { type: 'string', const: 'z' },
+            },
+          },
+        },
+      },
+    };
+
+    const diff = detectBreakingContractChanges(baseSnap, headSnap);
+    expect(diff.breaking).toEqual([
+      {
+        procedure: 'badTransitions',
+        path: 'input.fromLitToDisjointEnum',
+        reason: 'Input const value no longer allowed by enum',
+      },
+      {
+        procedure: 'badTransitions',
+        path: 'input.objConst',
+        reason: 'Input const literal changed from {"nested":[1,2]} to {"nested":[1,3]}',
+      },
+      {
+        procedure: 'badTransitions',
+        path: 'output.fromEnumToOutsideLit',
+        reason: 'Output const literal outside previous enum',
+      },
+    ]);
+    expect(diff.nonBreaking.some((m) => m.includes('allows additional properties'))).toBe(true);
+    expect(diff.nonBreaking.some((m) => m.includes('output narrowed to enum'))).toBe(true);
+    expect(diff.nonBreaking.some((m) => m.includes('output narrowed to const literal'))).toBe(true);
+  });
 });

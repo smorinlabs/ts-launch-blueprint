@@ -28,11 +28,16 @@ export const ListProjectsOutputSchema: z.ZodObject<{
   nextCursor: z.string().nullable(),
 });
 
-/** Input for getProject: a non-empty project ID. */
+/** Input for getProject: a non-empty project ID (excluding dot segments). */
 export const GetProjectInputSchema: z.ZodObject<{
   id: z.ZodString;
 }> = z.object({
-  id: z.string().min(1),
+  id: z
+    .string()
+    .min(1)
+    .refine((id) => id !== '.' && id !== '..', {
+      message: "Project id must not be '.' or '..'",
+    }),
 });
 
 /** Output of getProject: single project wrapper. */
