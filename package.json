@@ -1,6 +1,6 @@
 {
   "name": "ts-launch-blueprint-workspace",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "pnpm workspace root for ts-launch-blueprint (D-040): packages/core + apps/cli",
   "license": "MIT",
