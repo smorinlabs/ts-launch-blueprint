@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: MIT
+
+# Blueprint-only acceptance; generation removes this workflow and its tests.
+name: bootstrap-acceptance
+
+on:
+  schedule:
+    - cron: '37 6 * * 3'
+  workflow_dispatch: {}
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/bootstrap-acceptance.yml'
+      - 'tests/press-acceptance.test.ts'
+      - 'tests/press-config.test.ts'
+      - 'tests/guard.test.ts'
+      - 'tests/bootstrap-skill.test.ts'
+      - 'press/**'
+      - 'scripts/**'
+      - 'packages/**'
+      - 'apps/**'
+      - 'docs/about/**'
+      - 'docs/tutorials/**'
+      - 'docs/skills/**'
+      - '.nvmrc'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+      - 'vitest.config.ts'
+      - 'Makefile'
+      - 'Justfile'
+      - 'lefthook.yml'
+      - 'release-please-config.json'
+      - '.release-please-manifest.json'
+
+permissions: {}
+
+concurrency:
+  group: bootstrap-acceptance-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  bootstrap-acceptance:
+    # A same-repo release-please PR only bumps the version and changelog of
+    # commits that already passed acceptance on their own PRs, so skip it there
+    # (not a required check). Weekly schedule and manual dispatch still run it.
+    if: >-
+      github.event_name != 'pull_request' ||
+      !startsWith(github.head_ref, 'release-please--') ||
+      github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.3
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          github-token: ${{ github.token }}
+      - name: Provision workspace toolchain and dependencies
+        run: |
+          just setup
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Generate and exercise a fresh child repository
+        run: PRESS_ACCEPTANCE=1 pnpm exec vitest run tests/press-acceptance.test.ts

@@ -47,3 +47,7 @@ npm-debug.log*
 # Local Claude Code session settings (machine-specific; untracked copies
 # must never trip oxfmt format-check — see .oxfmtrc.json ignorePatterns)
 .claude/settings.local.json
+
+# Blueprint fork guard — local opt-out sentinel (silences the setup guard
+# for blueprint maintainers/contributors). NEVER committed; per-developer.
+.blueprint-contributor

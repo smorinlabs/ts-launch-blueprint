@@ -13,9 +13,25 @@ extra_exclude_files = [
   ".release-please-manifest.json",
   "README.md",
   "PROJECTS.md",
+  ".github/SECURITY.md",
+  ".claude/skills/new-ts-project/README.md",
+  "docs/skills/new-ts-project.md",
   "docs/about/index.md",
   "docs/about/philosophy.md",
   "docs/tutorials/full-project-setup.md",
+]
+
+# Remove ignored build, coverage, and copied package artifacts before rebrand.
+# Concrete workspace paths are required because pathspecs are literal.
+[[clean]]
+paths = [
+  "apps/cli/dist",
+  "apps/api/dist",
+  "apps/web/dist",
+  "packages/core/dist",
+  "coverage",
+  "apps/cli/README.md",
+  "apps/cli/LICENSE",
 ]
 
 # Compound tokens that join cli_name with a separator cannot be matched by the
@@ -93,6 +109,20 @@ stub_file = "press/stubs/project-philosophy.md"
 file = "docs/tutorials/full-project-setup.md"
 stub_file = "press/stubs/application-setup.md"
 
+# The template's security policy describes template maintenance; a child
+# repository carries its own reporting and CodeQL setup guidance.
+[[reset]]
+file = ".github/SECURITY.md"
+stub_file = "press/stubs/security.md"
+
+[[reset]]
+file = ".claude/skills/new-ts-project/README.md"
+stub_file = "press/stubs/retired-bootstrap.md"
+
+[[reset]]
+file = "docs/skills/new-ts-project.md"
+stub_file = "press/stubs/bootstrap-provenance.md"
+
 # Template-only maintenance workflows, contributor state, port history, and
 # acceptance tests are removed from pressed child repositories.
 # Note: .github/workflows/difftree-pr-comment.yml is deliberately NOT removed;
@@ -121,6 +151,18 @@ reason = "pins the removed contributor workflow and state files"
 [[remove]]
 file = "tests/press-acceptance.test.ts"
 reason = "template live-press acceptance test generates a child project and must not recurse"
+
+[[remove]]
+file = ".claude/skills/new-ts-project/SKILL.md"
+reason = "template bootstrap skill; retired in pressed child repositories"
+
+[[remove]]
+file = "tests/bootstrap-skill.test.ts"
+reason = "template bootstrap skill contract test; retired alongside SKILL.md"
+
+[[remove]]
+file = ".github/workflows/bootstrap-acceptance.yml"
+reason = "template bootstrap acceptance workflow; tests/press-acceptance.test.ts is removed in child repositories"
 
 [[remove]]
 dir = "docs/port"

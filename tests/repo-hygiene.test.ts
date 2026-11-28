@@ -2353,3 +2353,94 @@ describe('Testing resilience and web browser E2E contract (P08)', () => {
     expect(ci.jobs['ci-ok']?.needs).toContain('web-e2e');
   });
 });
+
+describe('fork guard & bootstrap acceptance workflow (P07)', () => {
+  const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
+  const BOOTSTRAP_ACCEPTANCE_PATH = join(WORKFLOW_DIR, 'bootstrap-acceptance.yml');
+
+  it('[P07-TS01] .gitignore ignores .blueprint-contributor and Justfile wires _blueprint_notice + _guard on artifact recipes only', () => {
+    const gitignore = readFileSync(join(REPO_ROOT, '.gitignore'), 'utf8').replaceAll('\r\n', '\n');
+    expect(gitignore).toMatch(/^\.blueprint-contributor$/m);
+
+    const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8').replaceAll('\r\n', '\n');
+    expect(justfile).toContain("_blueprint_notice := shell('bash scripts/guard.sh warn')");
+    expect(justfile).toMatch(/^\[private\]\n@_guard:\n\s+bash scripts\/guard\.sh block$/m);
+
+    expect(justfile).toMatch(/^@build:\s+_guard$/m);
+    expect(justfile).toMatch(/^@docker-build:\s+_guard$/m);
+    expect(justfile).toMatch(/^pack-check:\s+_guard$/m);
+
+    for (const unblocked of [
+      'setup',
+      'install',
+      'all',
+      'test',
+      'lint',
+      'typecheck',
+      'check-deps',
+      'debug-info',
+      'press-verify',
+      'clean',
+    ]) {
+      const headerMatch = justfile.match(new RegExp(`^@?${unblocked}[^:\\n]*:(.*)$`, 'm'));
+      expect(headerMatch?.[0], `missing Justfile recipe ${unblocked}`).toBeTruthy();
+      expect(headerMatch?.[1] ?? '', `${unblocked} must not depend on _guard`).not.toContain(
+        '_guard'
+      );
+    }
+  });
+
+  // bootstrap-acceptance.yml is [[remove]]d in pressed child repositories.
+  it.skipIf(existsSync(join(REPO_ROOT, 'press', 'press-receipt.toml')))(
+    '[P07-TS02] bootstrap-acceptance.yml exists and satisfies CI hygiene, schedule/PR triggers, release-please skip, and live press run',
+    () => {
+      expect(existsSync(BOOTSTRAP_ACCEPTANCE_PATH)).toBe(true);
+      const raw = readFileSync(BOOTSTRAP_ACCEPTANCE_PATH, 'utf8');
+      expect(raw.split(/\r?\n/)[0]).toBe('# SPDX-License-Identifier: MIT');
+
+      const parsed = parse(raw) as {
+        permissions?: Record<string, unknown>;
+        concurrency?: { group?: string; 'cancel-in-progress'?: string };
+        on?: {
+          schedule?: Array<{ cron?: string }>;
+          workflow_dispatch?: unknown;
+          pull_request?: { branches?: string[]; paths?: string[] };
+        };
+        jobs?: Record<
+          string,
+          {
+            if?: string;
+            'runs-on'?: string;
+            permissions?: Record<string, unknown>;
+            steps?: Array<{ uses?: string; run?: string }>;
+          }
+        >;
+      };
+
+      expect(parsed.permissions).toEqual({});
+      expect(parsed.concurrency?.['cancel-in-progress']).toContain(
+        "github.event_name == 'pull_request'"
+      );
+      expect(parsed.on?.schedule?.length).toBeGreaterThan(0);
+      expect(Object.prototype.hasOwnProperty.call(parsed.on ?? {}, 'workflow_dispatch')).toBe(true);
+      expect(parsed.on?.pull_request?.branches).toEqual(['main']);
+      expect(parsed.on?.pull_request?.paths?.length).toBeGreaterThan(0);
+
+      const job = parsed.jobs?.['bootstrap-acceptance'];
+      expect(job).toBeDefined();
+      expect(job?.if).toContain('release-please--');
+      expect(job?.if).toContain('github.repository');
+      expect(job?.permissions).toEqual({ contents: 'read' });
+
+      expect(raw).toMatch(/pnpm\/action-setup@[0-9a-f]{40}\s*#\s*v\d/);
+      expect(raw).toMatch(/extractions\/setup-just@[0-9a-f]{40}\s*#\s*v\d/);
+      expect(raw).toMatch(/astral-sh\/setup-uv@[0-9a-f]{40}\s*#\s*v\d/);
+
+      const runs = (job?.steps ?? []).map((s) => s.run ?? '').join('\n');
+      expect(runs).toContain('just setup');
+      expect(runs).toContain(
+        'PRESS_ACCEPTANCE=1 pnpm exec vitest run tests/press-acceptance.test.ts'
+      );
+    }
+  );
+});

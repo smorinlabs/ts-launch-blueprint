@@ -41,10 +41,10 @@ step() {
 step "copy the repo to $scratch (without node_modules)"
 cd "$root"
 git ls-files --cached --others --exclude-standard | while IFS= read -r file; do
-  # Skip tracked files deleted in the working tree.
-  [ -e "$file" ] || continue
+  # Skip tracked files deleted in the working tree (keep symlinks intact).
+  [ -e "$file" ] || [ -L "$file" ] || continue
   mkdir -p "$scratch/$(dirname "$file")"
-  cp -p "$file" "$scratch/$file"
+  cp -pP "$file" "$scratch/$file"
 done
 
 for app in "$@"; do
