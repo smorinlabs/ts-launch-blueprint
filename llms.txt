@@ -1,0 +1,35 @@
+# ts-launch-blueprint
+
+> A production-ready TypeScript CLI, API, and web workspace template with best
+> practices baked in: a gh-style noun-verb CLI (`ts-projects`) on Commander, a
+> typed core library (`@ts-launch-blueprint/core` with Zod schemas), a Hono +
+> tRPC API (`@ts-launch-blueprint/api`), a React + Vite web app
+> (`@ts-launch-blueprint/web`), and a fork-ready rename system (`template-press`)
+> so the whole stack can be rebranded in one command.
+
+Architecture in one line: `packages/core` holds pure schemas, repositories, and
+services; `apps/cli` (`ts-projects`) is a thin CLI over it; `apps/api` serves
+REST + tRPC over `createCore`; and `apps/web` is a React + Vite front-end
+importing only the `AppRouter` type from `@ts-launch-blueprint/api/router`.
+
+## Docs
+
+- [README](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/README.md): overview, installation, and feature tour
+- [CLI conventions](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/EXAMPLECLI.md): the `ts-projects` command shapes, global flags, output contract, exit and error codes
+- [Documentation hub](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/docs.md): index of guides, tutorials, reference docs, and tool docs
+- [Agent guidelines](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/AGENTS.md): canonical commands and rules for AI coding agents (imported by [CLAUDE.md](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/CLAUDE.md))
+- [Changelog](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/CHANGELOG.md): release history (release-please managed)
+
+## Architecture & Contracts
+
+- [Architecture overview](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/about/architecture.md): workspace layers, request flow, and add-a-feature checklist
+- [Boundary rules](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/reference/boundary-rules.md): enforceable import rules and removable-app guarantees
+- [CLI reference](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/reference/cli-reference.md): `ts-projects` flags, output formats (`text`/`json`/`markdown`), and config paths
+- [API reference](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/reference/api-reference.md): Hono + tRPC endpoints, observability, and smoke checks
+- [Web app reference](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/reference/web-app.md): React + Vite + TanStack Query + tRPC client setup
+
+## Optional
+
+- [Contributing](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/contributing/index.md): contribution guide and workflow conventions
+- [Release process](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/maintainers-release.md): release-please + npm OIDC Trusted Publishing
+- [Project setup](https://github.com/smorinlabs/ts-launch-blueprint/blob/main/docs/tutorials/full-project-setup.md): development setup and repository configuration after rebranding

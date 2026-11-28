@@ -82,8 +82,6 @@ just test
 # Please refer to the project documentation or the CONTRIBUTING.md file for setup instructions.
 ```
 
--->
-
 ## Documentation Updates
 
 <!-- Describe any documentation changes made or needed -->
@@ -100,6 +98,16 @@ just test
 <!-- List any backwards-incompatible changes this PR introduces -->
 <!-- If none, state "None" -->
 <!-- Example: The config format has changed, existing config files need to be updated following the migration guide in docs/migrations.md -->
+
+## Review Trigger (copy/paste as a PR comment after your latest commit)
+
+<!-- Bots also auto-review on push; use this block to (re)request a review on demand. -->
+
+```text
+@coderabbitai review
+@greptile-apps review
+@cubic-dev-ai review
+```
 
 ## Checklist
 
