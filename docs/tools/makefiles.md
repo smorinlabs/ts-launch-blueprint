@@ -32,14 +32,20 @@ This project uses a **Bootstrap-Only Makefile** for a specific purpose:
 
 ## Usage
 
-The Makefile in the root directory is used to check system requirements and set up the development environment. Typical commands include:
+The Makefile in the root directory provides **Level 1 bootstrap** — it verifies and helps install the foundational tools (`just`, `node >=24`, `pnpm 10`) before handing off to **Level 2 setup** (`just setup`). Typical commands include:
 
 ```sh
-make check                 # To check system requirements (just, node)
-make install-just         # To print the install command for tool 'just'
-make install-just-force   # To forcibly install the 'just' command runner
-make install-node         # To print the Node.js install guidance
-make install-node-force   # To forcibly install Node.js (requires mise)
+make bootstrap             # Level 1 bootstrap: ensure node >=24, pnpm 10, and just are installed
+make check                 # Check system requirements (just, node >=24, pnpm, optional docker)
+make hook-check            # Verify external and workspace hook tools are available
+make install-just          # Print the install command for 'just'
+make install-just-force    # Install 'just' to ~/.local/bin and update PATH in your shell rc
+make install-node          # Print Node.js install guidance
+make install-node-force    # Install Node.js 24 via mise
+make install-pnpm          # Print pnpm install guidance
+make install-docker        # (Optional) Print Docker install instructions
+make install-docker-force  # (Optional, Linux only) Install Docker engine
+make install-flox          # (Optional) Print flox install instructions
 ```
 
 ### Checking System Requirements
@@ -50,24 +56,28 @@ Use `make check` to verify that required tools are installed:
 make check
 ```
 
-This will check for:
+This checks for:
 
 - **just** – Command runner for development tasks
 - **node** – Runtime (version 24 or later is required)
+- **pnpm** – Package manager (`packageManager` in `package.json`)
+- **docker** _(optional)_ – Only needed for `just docker-build` / `just docker-run`
 
 ### Force Installing Core Dependencies
 
-If you encounter issues with `just` or `node`, or if you want to ensure you have the very latest version, you can use the installation commands:
+If you encounter issues with `just` or `node`, or want to install them explicitly, you can use the installation commands:
 
-- `make install-just`: Prints the installation command for `just`. You can run it manually or use the force variant below.
+- `make install-just`: Prints the installation command for `just` (into `~/.local/bin`) as well as the rate-limit-free `--tag` / `uv tool install rust-just` fallback.
 
-- `make install-just-force`: This command runs the official `just` installation script. It will install `just` to `~/bin` and automatically add this directory to your PATH in your shell configuration file (`~/.zshenv`, `~/.bashrc`, or `~/.profile`) if it's not already there.
+- `make install-just-force`: Runs the official `just` installation script into `~/.local/bin` (falling back to a pinned `--tag` release or `uv tool install rust-just` if the GitHub API rate-limits), then adds `~/.local/bin` to your `PATH` in `~/.zshenv`, `~/.bashrc`, or `~/.profile`.
 
-- `make install-node`: Prints Node.js installation guidance. The recommended approach is to use a version manager (mise, nvm, or fnm).
+- `make install-node`: Prints Node.js installation guidance. The recommended approach is to use a version manager (`mise`, `nvm`, or `fnm`).
 
-- `make install-node-force`: This command installs Node.js 24 via mise (if available). Ensure a Node version manager is installed first.
+- `make install-node-force`: Installs Node.js 24 via `mise` (if available). Ensure a Node version manager is installed first.
 
-After running any installation command, especially a force install, ensure the tool's installation directory (e.g., `~/bin` for `just`) is correctly configured in your system's `PATH`.
+- `make install-pnpm`: Prints pnpm 10 installation guidance (standalone script, `npm install -g pnpm@10`, or Homebrew).
+
+After running any installation command, especially a force install, ensure `~/.local/bin` is on your `PATH`, then continue with Level 2 setup (`just setup`).
 
 ## Additional Resources
 

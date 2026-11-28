@@ -68,11 +68,11 @@ just setup-hooks
 
 ## Running the gates yourself
 
-`just pre-commit-run` (alias `just pc`) runs `format-check`, `lint`,
-`typecheck`, and `test` on **all** files — the same underlying gates as the
-hooks, without needing a commit. CI runs this too (`pnpm exec lefthook run
-pre-commit --all-files`) so the committed hook discipline is exercised on
-every push, not just locally.
+`just hooks-run` (alias `just hooks`) and `just pre-commit-run` (alias
+`just pc`) run `pnpm exec lefthook run pre-commit --all-files` against **all**
+files — exercising the committed hook discipline on demand and in `just ci`. To
+verify recent commit messages against Conventional Commits, run
+`just verify-commits`.
 
 ## Skipping hooks
 

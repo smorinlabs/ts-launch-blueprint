@@ -9,15 +9,19 @@ Start with [Full Project Setup](./docs/tutorials/full-project-setup.md) and
 [Setting Up Development](./docs/tasks/setting-up-development.md).
 
 ```bash
-make check          # verify foundational tools (just, node) are installed
-just install        # install shell analyzers, dependencies, and git hooks
-just setup-hooks    # wire git hooks and commit-message template
-just all            # format-check, lint, boundaries, shell/workflow checks, typecheck, test
+make bootstrap      # Level 1: ensure node >=24, pnpm 10, and just are installed
+just setup          # Level 2: install pinned analyzers, pnpm install, git hooks, check-deps
+just all            # format-check, lint, boundaries, shell/workflow, editorconfig, cspell, typecheck, test
 just build          # build apps/*/dist/ with tsdown
 ```
 
-Run `just` with no arguments to list all available recipes. The CLI command
-name is defined in `apps/cli/package.json` under `bin` (documented in
+Optional turnkey environments are also included: `mise install` (`mise.toml`),
+`flox activate` (`.flox/env/manifest.toml`), and VS Code Dev Containers
+(`.devcontainer/devcontainer.json`).
+
+Run `just` with no arguments to list all available recipes (`just dev`,
+`just api`, `just api-dev`, `just web`). The CLI command name is defined in
+`apps/cli/package.json` under `bin` (documented in
 [EXAMPLECLI.md](./EXAMPLECLI.md) and
 [CLI Reference](./docs/reference/cli-reference.md)), and the optional HTTP API
 is documented in [API Reference](./docs/reference/api-reference.md).

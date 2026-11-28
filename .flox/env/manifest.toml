@@ -1,0 +1,28 @@
+# flox env — one of the project's three first-class dev environments, alongside
+# native per-tool installs (Makefile + Justfile `install-*` targets,
+# scripts/install-*.sh) and the mise toolchain (mise.toml).
+# Keep all three synced when adding or removing a tool.
+#
+# Intentionally NOT installed here: workspace devDependencies (provided by
+# `pnpm install` from pnpm-lock.yaml) and Python-only tools (not used in
+# this TS repo).
+schema-version = "1.12.0"
+
+[install]
+nodejs_24.pkg-path = "nodejs_24" # matches .nvmrc (24)
+pnpm.pkg-path = "pnpm_10" # .npmrc managePackageManagerVersions pins exact 10.34.3
+just.pkg-path = "just"
+actionlint.pkg-path = "actionlint"
+actionlint.version = "1.7.12"
+shellcheck.pkg-path = "shellcheck"
+shellcheck.version = "0.11.0"
+gitleaks.pkg-path = "gitleaks"
+gitleaks.version = "8.27.2"
+editorconfig-checker.pkg-path = "editorconfig-checker"
+gh.pkg-path = "gh"
+gnumake.pkg-path = "gnumake"
+bun.pkg-path = "bun" # optional advisory dev/test lane (D-036; ci.yml pins 1.3.14)
+uv.pkg-path = "uv" # optional; required only for `just press-verify`
+
+[options]
+systems = ["aarch64-darwin", "x86_64-linux", "aarch64-linux", "x86_64-darwin"]

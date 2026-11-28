@@ -1,0 +1,24 @@
+{
+  "name": "ts-launch-blueprint",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm",
+  "postCreateCommand": "sh .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "TypeScriptTeam.native-preview",
+        "oxc.oxc-vscode",
+        "tamasfe.even-better-toml",
+        "redhat.vscode-yaml",
+        "streetsidesoftware.code-spell-checker",
+        "EditorConfig.EditorConfig"
+      ],
+      "settings": {
+        "js/ts.experimental.useTsgo": true,
+        "js/ts.tsdk.path": "./node_modules/typescript"
+      }
+    }
+  },
+  "remoteEnv": {
+    "PATH": "/home/node/.local/bin:/root/.local/bin:${containerEnv:PATH}"
+  }
+}
