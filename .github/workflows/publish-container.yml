@@ -7,6 +7,22 @@ on:
   release:
     types: [published]
   pull_request:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/core/**'
+      - 'apps/cli/package.json'
+      - 'apps/web/package.json'
+      - 'scripts/publish-container.mjs'
+      - 'scripts/smoke-api.sh'
+      - '.github/workflows/publish-container.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.nvmrc'
+      - '.npmrc'
+      - '.dockerignore'
+      - 'tsconfig.json'
   merge_group:
 
 permissions: {}
