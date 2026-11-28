@@ -56,7 +56,7 @@ jobs:
       - name: Run Claude Code
         if: steps.configuration.outputs.configured == 'true'
         id: claude
-        uses: anthropics/claude-code-action@4411a9e9b0283becf4b924f7bce360fd7756c78c # v1
+        uses: anthropics/claude-code-action@acfe7992852970efb4fee683d63d628e3e52df67 # v1.0.286
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # This is an optional setting that allows Claude to read CI results on PRs
