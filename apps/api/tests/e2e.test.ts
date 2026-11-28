@@ -47,7 +47,11 @@ function buildIfStale(): void {
     statSync(join(ROOT, 'tsdown.config.ts')).mtimeMs
   );
   if (sourcesMtime > distMtime) {
-    execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'ignore' });
+    execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build'], {
+      cwd: ROOT,
+      stdio: 'ignore',
+      shell: process.platform === 'win32',
+    });
   }
 }
 
@@ -145,18 +149,21 @@ describe('API end-to-end (built server)', () => {
 });
 
 describe('API process lifecycle (built server)', () => {
-  it('exits 0 within 5 s on SIGTERM and logs the shutdown line', async () => {
-    const server = await startServer(SERVER, ROOT);
-    const exited = new Promise<number | null>((resolve) => {
-      server.child.once('exit', (code) => resolve(code));
-    });
-    server.child.kill('SIGTERM');
-    const timeout = new Promise<'timeout'>((resolve) => {
-      setTimeout(() => resolve('timeout'), 5000).unref();
-    });
-    expect(await Promise.race([exited, timeout])).toBe(0);
-    expect(server.stdout()).toContain('shutting down (SIGTERM)');
-  });
+  it.skipIf(process.platform === 'win32')(
+    'exits 0 within 5 s on SIGTERM and logs the shutdown line',
+    async () => {
+      const server = await startServer(SERVER, ROOT);
+      const exited = new Promise<number | null>((resolve) => {
+        server.child.once('exit', (code) => resolve(code));
+      });
+      server.child.kill('SIGTERM');
+      const timeout = new Promise<'timeout'>((resolve) => {
+        setTimeout(() => resolve('timeout'), 5000).unref();
+      });
+      expect(await Promise.race([exited, timeout])).toBe(0);
+      expect(server.stdout()).toContain('shutting down (SIGTERM)');
+    }
+  );
 
   it('exits 1 with one CRITICAL JSON line and no stack when the port is taken', async () => {
     const port = new URL(baseUrl).port;
@@ -191,45 +198,48 @@ describe('API process lifecycle (built server)', () => {
     expect(stdout + stderr).not.toMatch(/\n\s+at /);
   });
 
-  it('with an OTLP endpoint, flushes spans to the collector on SIGTERM and exits 0', async () => {
-    // A tiny OTLP/HTTP collector: records each POST body.
-    const bodies: { path: string | undefined; body: string }[] = [];
-    const collector: Server = createHttpServer((req, res) => {
-      let body = '';
-      req.on('data', (chunk: Buffer) => {
-        body += chunk.toString();
+  it.skipIf(process.platform === 'win32')(
+    'with an OTLP endpoint, flushes spans to the collector on SIGTERM and exits 0',
+    async () => {
+      // A tiny OTLP/HTTP collector: records each POST body.
+      const bodies: { path: string | undefined; body: string }[] = [];
+      const collector: Server = createHttpServer((req, res) => {
+        let body = '';
+        req.on('data', (chunk: Buffer) => {
+          body += chunk.toString();
+        });
+        req.on('end', () => {
+          bodies.push({ path: req.url, body });
+          res.writeHead(200, { 'content-type': 'application/json' }).end('{}');
+        });
       });
-      req.on('end', () => {
-        bodies.push({ path: req.url, body });
-        res.writeHead(200, { 'content-type': 'application/json' }).end('{}');
+      const collectorPort = await freePort();
+      await new Promise<void>((resolve) => {
+        collector.listen(collectorPort, '127.0.0.1', resolve);
       });
-    });
-    const collectorPort = await freePort();
-    await new Promise<void>((resolve) => {
-      collector.listen(collectorPort, '127.0.0.1', resolve);
-    });
-    try {
-      const server = await startServer(SERVER, ROOT, {
-        OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${collectorPort}`,
-      });
-      expect(server.stdout()).toContain('tracing enabled (endpoint: http://127.0.0.1:');
-      await fetch(`${server.url}/trpc/projects.list`);
-      const exited = new Promise<number | null>((resolve) => {
-        server.child.once('exit', (code) => resolve(code));
-      });
-      server.child.kill('SIGTERM');
-      expect(await exited).toBe(0);
-      // The batch processor's delay is 5 s: only the shutdown flush sends it this soon.
-      const traces = bodies.filter((entry) => entry.path === '/v1/traces');
-      expect(traces.length).toBeGreaterThan(0);
-      const body = traces.map((entry) => entry.body).join('');
-      expect(body).toContain('"resourceSpans"');
-      expect(body).toContain('ts-launch-blueprint-api');
-      expect(body).toContain('GET /trpc/projects.list');
-    } finally {
-      collector.close();
+      try {
+        const server = await startServer(SERVER, ROOT, {
+          OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${collectorPort}`,
+        });
+        expect(server.stdout()).toContain('tracing enabled (endpoint: http://127.0.0.1:');
+        await fetch(`${server.url}/trpc/projects.list`);
+        const exited = new Promise<number | null>((resolve) => {
+          server.child.once('exit', (code) => resolve(code));
+        });
+        server.child.kill('SIGTERM');
+        expect(await exited).toBe(0);
+        // The batch processor's delay is 5 s: only the shutdown flush sends it this soon.
+        const traces = bodies.filter((entry) => entry.path === '/v1/traces');
+        expect(traces.length).toBeGreaterThan(0);
+        const body = traces.map((entry) => entry.body).join('');
+        expect(body).toContain('"resourceSpans"');
+        expect(body).toContain('ts-launch-blueprint-api');
+        expect(body).toContain('GET /trpc/projects.list');
+      } finally {
+        collector.close();
+      }
     }
-  });
+  );
 
   it('runs from a folder with only dist/ (no node_modules): every dependency is bundled', async () => {
     const folder = mkdtempSync(join(tmpdir(), 'ts-api-dist-only-'));
@@ -242,7 +252,28 @@ describe('API process lifecycle (built server)', () => {
         // prom-client (and its @opentelemetry/api dependency) is bundled too.
         expect((await fetch(`${server.url}/metrics`)).status).toBe(200);
       } finally {
-        server.child.kill('SIGTERM');
+        // Await child termination/close before deleting `folder` so Windows
+        // does not throw EBUSY while the child still holds its cwd handle.
+        if (server.child.exitCode === null && server.child.signalCode === null) {
+          await new Promise<void>((resolve) => {
+            const killTimer = setTimeout(() => {
+              server.child.kill('SIGKILL');
+            }, 3000);
+            killTimer.unref();
+            const giveUpTimer = setTimeout(resolve, 5000);
+            giveUpTimer.unref();
+            server.child.once('close', () => {
+              clearTimeout(killTimer);
+              clearTimeout(giveUpTimer);
+              resolve();
+            });
+            if (!server.child.kill('SIGTERM')) {
+              clearTimeout(killTimer);
+              clearTimeout(giveUpTimer);
+              resolve();
+            }
+          });
+        }
       }
     } finally {
       rmSync(folder, { recursive: true, force: true });

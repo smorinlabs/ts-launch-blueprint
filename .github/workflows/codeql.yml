@@ -36,6 +36,7 @@ on:
     branches: ['main']
   pull_request:
     branches: ['main']
+  merge_group:
   schedule:
     - cron: '44 21 * * 4'
   public:
@@ -44,10 +45,14 @@ on:
 # set CodeQL requires.
 permissions: {}
 
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   repository-visibility:
     name: Inspect repository visibility
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
     permissions:
       contents: read
     outputs:
@@ -70,7 +75,7 @@ jobs:
     #   - https://gh.io/recommended-hardware-resources-for-running-codeql
     #   - https://gh.io/supported-runners-and-hardware-resources
     #   - https://gh.io/using-larger-runners (GitHub.com only)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
     permissions:
       # required for all workflows
       security-events: write

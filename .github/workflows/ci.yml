@@ -17,13 +17,11 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-# CI — quality gates for the TypeScript port (D-022(1)).
+# CI — slim PR gates + 4-cell cross-OS matrix for the TypeScript port (P03).
 #
-# Dual enforcement (mirrors the Python source's ci.yaml shape): the individual
-# quality gates run as named `just` recipes AND the whole hook suite is re-run
-# on every file, so the committed pre-commit discipline is exercised in CI, not
-# just the recipes. The `just`-recipe steps map 1:1 to the source's explicit
-# per-check steps (mypy / ruff / pre-commit-run) in TS idiom.
+# `changes` gates heavy jobs on docs-only and verified release-please PRs;
+# `lint` (including `docs-check`) always runs; `ci-ok` is the single aggregate
+# gate for rulesets / merge queues (skipped jobs count as success).
 
 name: CI
 
@@ -32,90 +30,240 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The merge queue emits merge_group (not pull_request) for its speculative
+  # merge — without this trigger the ci-ok required check never reports and
+  # every queue entry deadlocks at "Expected".
+  merge_group:
 
-# Deny-all baseline (D-022(10)); the job below re-grants only what it needs.
+# Deny-all baseline (D-022(10)); each job below re-grants only what it needs.
 permissions: {}
 
-jobs:
-  ci:
-    name: continuous-integration
-    runs-on: ubuntu-latest
-    permissions:
-      # Read-only checkout of the repository.
-      contents: read
-      # OIDC token for tokenless Codecov upload (public repo).
-      id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        # D-027 / D-011(2): Active-LTS floor (24.x) + Current (26.x) — the
-        # source's "test the floor and the next version" compatibility signal.
-        node-version: ['24.x', '26.x']
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+jobs:
+  # Detect whether a PR touches code beyond docs/prose or is a verified
+  # release-please version bump, so heavy jobs skip when safe.
+  changes:
+    name: changes
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+      release: ${{ steps.detect.outputs.release }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          # No job here pushes; drop the persisted token (zizmor artipacked).
+          fetch-depth: 0
           persist-credentials: false
+      - name: Detect code changes
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          emit() {
+            {
+              echo "code=$1"
+              echo "release=$2"
+            } >> "$GITHUB_OUTPUT"
+          }
+          if [ "${EVENT_NAME}" != "pull_request" ]; then
+            emit true false
+            echo "INFO: ${EVENT_NAME} event - running all jobs"
+            exit 0
+          fi
+          changed="$(git diff --no-renames --name-only "${BASE_SHA}...HEAD")"
+          # No `grep -q` below: it exits on the first match, the writer gets
+          # SIGPIPE, and under pipefail a found match reads as "no match".
+          # `grep ... >/dev/null` consumes the whole stream.
 
-      # pnpm MUST be on PATH before setup-node so its cache:'pnpm' can find the
-      # store (D-035). Third-party action → full-SHA pin + version comment
-      # (D-022(9)); kept fresh by the Dependabot github-actions ecosystem.
+          # Release-please fast path: same-repo release-please branch AND a
+          # diff that is only the manifest, CHANGELOG.md, and the version
+          # line in package.json / apps/cli/package.json.
+          release_only() {
+            local allowed ver old new strip base_manifest head_manifest
+            case "${HEAD_REF}" in release-please--*) ;; *) return 1 ;; esac
+            [ "${HEAD_REPO}" = "${REPOSITORY}" ] || return 1
+            allowed='^(\.release-please-manifest\.json|CHANGELOG\.md|package\.json|apps/cli/package\.json)$'
+            if printf '%s\n' "$changed" | grep -vE "$allowed" | grep . >/dev/null; then
+              return 1
+            fi
+            ver='s/.*"\.": *"([^"]+)".*/\1/p'
+            old="$(git show "${BASE_SHA}:.release-please-manifest.json" \
+              | sed -nE "$ver")" || return 1
+            new="$(sed -nE "$ver" .release-please-manifest.json)"
+            [ -n "$old" ] && [ -n "$new" ] && [ "$old" != "$new" ] || return 1
+            strip='s/"\.": *"[^"]+"/".": ""/'
+            base_manifest="$(git show "${BASE_SHA}:.release-please-manifest.json" \
+              | sed -E "$strip")" || return 1
+            head_manifest="$(sed -E "$strip" .release-please-manifest.json)"
+            [ "$head_manifest" = "$base_manifest" ] || return 1
+            if git diff -U0 "${BASE_SHA}...HEAD" -- package.json apps/cli/package.json \
+                | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) ' \
+                | grep -vxF -e "-  \"version\": \"${old}\"," -e "+  \"version\": \"${new}\"," \
+                | grep . >/dev/null; then
+              return 1
+            fi
+          }
+          if release_only; then
+            emit false true
+            echo "INFO: release-please version bump - skipping heavy jobs"
+            exit 0
+          fi
+
+          # README.md is markdown but NOT skippable: apps/cli packs it into
+          # the published tarball, so pack-check and code jobs must run.
+          skip='^docs/|^assets/|^\.vscode/|^\.cursor/|^\.windsurf|\.md$'
+          skip="$skip|^LICENSE$|^\.github/ISSUE_TEMPLATE/"
+          skip="$skip|^\.contributors\.jsonl$"
+          if printf '%s\n' "$changed" | grep -x 'README\.md' >/dev/null \
+              || printf '%s\n' "$changed" \
+              | grep -vE "$skip" \
+              | grep . >/dev/null; then
+            emit true false
+            echo "INFO: code paths changed - running all jobs"
+          else
+            emit false false
+            echo "INFO: docs-only diff - skipping heavy jobs"
+          fi
+
+  # Always runs (even on docs-only PRs) so markdown links, formatting, shell
+  # scripts, workflows, and lint are always validated.
+  lint:
+    name: lint
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Install pnpm
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 10.34.3
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+      - name: Install dependencies
+        id: setup
+        run: pnpm install --frozen-lockfile
+      - name: Install shell lint tools
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: |
+          just install-shell-tools
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Check shell scripts and workflows
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: just check-shell check-workflows
+      - name: Check formatting
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: just format-check
+      - name: Lint
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: just lint
+      - name: Docs link check
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: just docs-check
 
+  typecheck:
+    name: typecheck
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.3
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+      - name: Install dependencies
+        id: setup
+        run: pnpm install --frozen-lockfile
+      - name: Architecture boundaries (D-042)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: just check-boundaries
+      - name: Type check
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: just typecheck
+
+  test:
+    name: test (${{ matrix.os }} / node-${{ matrix.node-version }})
+    runs-on: >-
+      ${{
+        matrix.os == 'ubuntu' && (vars.RUNNER_UBUNTU || 'ubuntu-latest') ||
+        matrix.os == 'macos' && (vars.RUNNER_MACOS || 'macos-latest') ||
+        matrix.os == 'windows' && (vars.RUNNER_WINDOWS || 'windows-latest') ||
+        matrix.os
+      }}
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu, macos, windows]
+        node-version: ['24.x']
+        include:
+          - os: ubuntu
+            node-version: '26.x'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.3
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
-          # setup-node's built-in cache keyed to the committed pnpm-lock.yaml
-          # (D-022(3); pnpm per D-035).
           cache: 'pnpm'
-
-      # Third-party action → full-SHA pin + version comment (D-022(9));
-      # kept fresh by the Dependabot github-actions ecosystem.
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Install shell lint tools
-        run: |
-          just install-shell-tools
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Check shell scripts and workflows
-        run: just check-shell check-workflows
-
-      # --- Direct quality gates as named just recipes (source per-check steps) ---
-      - name: Check formatting
-        run: just format-check
-
-      - name: Lint
-        run: just lint
-
-      - name: Architecture boundaries (D-042)
-        run: just check-boundaries
-
-      - name: Type check
-        run: just typecheck
-
+      - name: Build
+        run: just build
       - name: Test with coverage
-        if: matrix.node-version == '24.x'
+        if: matrix.os == 'ubuntu' && matrix.node-version == '24.x'
         run: just coverage
-
       - name: Test
-        if: matrix.node-version != '24.x'
+        if: ${{ !(matrix.os == 'ubuntu' && matrix.node-version == '24.x') }}
         run: just test
-
       - name: Upload coverage to Codecov
-        # Only the Node 24.x matrix cell collects/uploads coverage.
+        # Only the ubuntu / Node 24.x matrix cell collects/uploads coverage.
         # use_oidc: tokenless upload (public repo). Requires `id-token: write`.
-        if: matrix.node-version == '24.x'
+        if: matrix.os == 'ubuntu' && matrix.node-version == '24.x'
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           use_oidc: true
@@ -123,145 +271,94 @@ jobs:
           flags: unittests
           fail_ci_if_error: false
 
-      - name: Docs link check
-        run: just docs-check
-
-      - name: Build
-        run: just build
-
-      - name: Packaging validation and smoke test (just pack-check)
-        # Once per run, not per Node version: validates dist + tarball install.
-        if: matrix.node-version == '24.x'
-        run: just pack-check
-
-      # Proves apps/cli can be deleted and the core + root tooling still pass
-      # (D-040/D-042). Its own step, not in `just all`: it reinstalls in a
-      # temp copy, so it needs the network.
-      - name: Removable app check (apps/cli)
-        # Once per run, not per Node version: it reinstalls in a temp copy.
-        if: matrix.node-version == '24.x'
-        run: just check-removable cli
-
-      # apps/web uses the API's router type (D-054), so removing the API
-      # removes the web app with it.
-      - name: Removable app check (apps/api + apps/web)
-        # Once per run, not per Node version: it reinstalls in a temp copy.
-        if: matrix.node-version == '24.x'
-        run: just check-removable api web
-
-      - name: Removable app check (apps/web)
-        # Once per run, not per Node version: it reinstalls in a temp copy.
-        if: matrix.node-version == '24.x'
-        run: just check-removable web
-
-      # --- Dual enforcement: re-run the WHOLE hook suite on all files, mirroring
-      #     the source's `just pre-commit-run` step (D-022(1)). ---
-      - name: Run pre-commit hook suite (all files)
-        run: pnpm exec lefthook run pre-commit --all-files
-
-      # ============================================================
-      # Commented scaffolding — uncomment-to-enable (executable docs),
-      # preserved from the source ci.yaml's disabled-but-documented intent.
-      # ============================================================
-
-      # Always-on SCA gate (D-022(7)): PM-native audit — no third-party action,
-      # no secret. The same-repo fork guard mirrors the source's security job so
-      # it never runs in a forked-PR context (where secrets/attack surface
-      # differ). Uncomment to enforce:
-      # - name: Audit dependencies (SCA)
-      #   if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-      #   run: pnpm audit --audit-level high
-
-      # Publish job — owned by the release topic (release-please publish.yml,
-      # D-022(13)); intentionally not defined here.
-
-  # ADVISORY, NON-GATING Bun dev/test lane (D-036). `continue-on-error: true`
-  # means this job can never block a PR or push: Bun tracks Node v23 parity —
-  # one major behind this template's engines.node >=24 floor — so it is a
-  # forward-compatibility signal, not a required gate. Three hard rules mirror
-  # the local `just test-bun` recipe: installs stay pnpm-only (never
-  # `bun install`, which would fork a bun.lock and drift from pnpm-lock.yaml);
-  # the runner is Vitest driven by `bun run vitest` (never bare `bun test`,
-  # which invokes Bun's own runner); apps/cli/tests/e2e.test.ts is excluded because it
-  # spawns process.execPath to assert the published Node signal contract
-  # (SIGINT->130/SIGTERM->143), which under Bun would exercise Bun's signal
-  # emulation instead. The published package + engines are unchanged.
-  bun-lane:
-    name: bun-lane (advisory, non-gating)
-    runs-on: ubuntu-latest
-    continue-on-error: true
+  pack-check:
+    name: pack-check
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true' ||
+      needs.changes.outputs.release == 'true'
     permissions:
-      # Read-only checkout; nothing here writes.
       contents: read
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          # No push here; drop the persisted token (zizmor artipacked).
           persist-credentials: false
-
-      # pnpm on PATH before setup-node so cache:'pnpm' finds the store (D-035).
       - name: Install pnpm
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 10.34.3
-
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
-
-      # Third-party action → full-SHA pin + version comment (D-022(9)).
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
-
-      # Third-party action → full-SHA pin + version comment (D-022(9)); pinned
-      # to the exact Bun release this lane is verified against (D-036).
-      - name: Install Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.3.14
-
-      # Installs stay pnpm-only — never `bun install` (would fork a bun.lock).
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Build (Node)
+      - name: Build
         run: just build
+      - name: Packaging validation and smoke test (just pack-check)
+        run: just pack-check
 
-      # Vitest is the runner (never bare `bun test`); e2e stays Node-only.
-      - name: Test under Bun (non-e2e tiers)
-        run: bun run vitest run --exclude tests/e2e.test.ts
-
-  # API container (D-050): build the image from the repo root, run it, smoke-
-  # test it with the same script the Cloud Run deploy uses, then check that
-  # `docker stop` (SIGTERM) shuts it down gracefully with exit code 0.
-  # Started WITHOUT --rm, so its exit code can still be inspected after stop.
-  api-image:
-    name: api-image
-    runs-on: ubuntu-latest
+  # Proves apps can be deleted and the core + root tooling still pass (D-040/D-042).
+  check-removable:
+    name: check-removable
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     permissions:
-      # Read-only checkout; nothing here writes or pushes.
       contents: read
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          # No push here; drop the persisted token (zizmor artipacked).
           persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.3
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+      - name: Install dependencies
+        id: setup
+        run: pnpm install --frozen-lockfile
+      - name: Removable app check (apps/cli)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: just check-removable cli
+      - name: Removable app check (apps/api + apps/web)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: just check-removable api web
+      - name: Removable app check (apps/web)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: just check-removable web
 
+  # API container (D-050): build the image, smoke-test it, check graceful SIGTERM stop.
+  api-image:
+    name: api-image
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Build the API image
         run: docker build -f apps/api/Dockerfile -t ts-launch-blueprint-api .
-
       - name: Run the image
         run: docker run -d --name api -p 8080:8080 ts-launch-blueprint-api
-
       - name: Smoke-test the running container
         run: sh scripts/smoke-api.sh http://localhost:8080 10
-
       - name: Stop gracefully (SIGTERM) and check exit code 0
         run: |
           docker stop api
@@ -269,7 +366,73 @@ jobs:
           code="$(docker inspect -f '{{.State.ExitCode}}' api)"
           echo "exit code: ${code}"
           test "${code}" = "0"
-
       - name: Remove the container
         if: always()
         run: docker rm -f api || true
+
+  # ADVISORY, NON-GATING Bun dev/test lane (D-036).
+  bun-lane:
+    name: bun-lane (advisory, non-gating)
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.3
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build (Node)
+        run: just build
+      - name: Test under Bun (non-e2e tiers)
+        run: bun run vitest run --exclude tests/e2e.test.ts
+
+  # Single required status gate: skipped jobs count as success; failure or
+  # cancellation fails the gate.
+  ci-ok:
+    name: ci-ok
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    needs:
+      - changes
+      - lint
+      - typecheck
+      - test
+      - pack-check
+      - check-removable
+      - api-image
+      - bun-lane
+    if: always()
+    permissions: {}
+    steps:
+      - name: Check aggregate result
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "job results: ${RESULTS}"
+          for r in ${RESULTS}; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "FAIL: at least one required job did not succeed" >&2
+              exit 1
+            fi
+          done
+          echo "PASS: all required jobs succeeded or were skipped"
