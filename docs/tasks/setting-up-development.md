@@ -2,17 +2,50 @@
 
 ## Setup & Dependency Check
 
-Run the following command to check that the foundational tools — `just`
-and `node` — are installed:
+Setup is split into two levels:
 
-```bash
-make check
-```
+1. **Level 1 (`Makefile`)**: ensures the base toolchain (`just`, `node >=24`,
+   `pnpm 10`) is present:
 
-`make check` only ever checks for and helps install `just` and `node`; it
-never wraps development tasks itself (D-024(2)). If either tool is
-missing, it prints the matching `make install-just` / `make install-node`
-guidance.
+   ```bash
+   make bootstrap   # checks/installs node >=24, pnpm 10, and just
+   make check       # verifies just, node >=24, pnpm (required) + docker (optional)
+   make hook-check  # verifies all external and workspace hook tools are present
+   ```
+
+   `make check` never wraps development tasks itself (D-024(2)). If any tool
+   is missing, it prints copy-pasteable `make install-*` guidance.
+
+2. **Level 2 (`just setup`)**: installs pinned analyzers (`shellcheck`,
+   `actionlint`, `editorconfig-checker`, `gitleaks`), runs `pnpm install`,
+   wires git hooks and `.gitmessage`, restores `projects/.gitkeep` when
+   `PROJECTS.md` is present, and runs `just check-deps`:
+
+   ```bash
+   just setup
+   ```
+
+## Optional Toolchain Provisioning
+
+Along with native per-tool installs (`make bootstrap` + `just setup`), the
+repository declares two optional turnkey environments synced to the same
+toolset:
+
+- **mise** ([`mise.toml`](../../mise.toml)): run `mise install` to provision
+  Node 24, pnpm 10.34.3, `just`, `actionlint`, `shellcheck`, `gitleaks`,
+  `editorconfig-checker`, `gh`, `make`, and optional `bun` / `uv`, then run
+  `just setup`.
+- **flox** ([`.flox/env/manifest.toml`](../../.flox/env/manifest.toml)): run
+  `make install-flox` for platform install instructions, then `flox activate`
+  and `just setup`.
+- **Dev Containers** ([`.devcontainer/devcontainer.json`](../../.devcontainer/devcontainer.json)):
+  open the repo in a VS Code Dev Container; `.devcontainer/post-create.sh`
+  runs `make bootstrap && just setup` automatically.
+
+Workspace JavaScript tools (`oxfmt`, `oxlint`, `vitest`, `cspell`, `commitlint`,
+`lefthook`, `dependency-cruiser`, `tsdown`, `typescript`) are intentionally
+excluded from `mise.toml` and `.flox/env/manifest.toml` so `pnpm-lock.yaml`
+remains their single version source.
 
 ## Setup Development Environment
 
@@ -107,10 +140,12 @@ the source's "optional pre-commit" posture while making the default gate
 faster.
 
 To run the full hook suite against every file on demand (not just staged
-changes):
+changes), or verify commit messages against Conventional Commits:
 
 ```bash
-just pre-commit-run
+just hooks-run       # alias: just hooks (pnpm exec lefthook run pre-commit --all-files)
+just pre-commit-run  # alias: just pc (CI mirror of lefthook pre-commit)
+just verify-commits  # commitlint over recent commits (default HEAD~10..HEAD)
 ```
 
 ## Customization for New Projects

@@ -26,11 +26,10 @@ To ensure consistency and maintainability, please follow these code style guidel
    ```bash
    git checkout -b my-feature-branch
    ```
-4. **Install Dependencies**: Verify tooling, install dependencies, and wire the git hooks.
+4. **Install Dependencies**: Bootstrap base tooling and run unified setup:
    ```bash
-   make check        # verify node/just are installed
-   pnpm install        # install dependencies (also runs the lefthook "prepare" install)
-   just setup-hooks   # install git hooks + commit-message template
+   make bootstrap    # verify/install node >=24, pnpm 10, just
+   just setup        # install pinned analyzers, pnpm install, git hooks, check-deps
    ```
 5. **Make Changes**: Make your changes to the codebase.
 6. **Run Tests**: Run the tests to ensure your changes do not break anything.

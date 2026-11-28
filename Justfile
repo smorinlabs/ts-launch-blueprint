@@ -68,6 +68,16 @@ DASH := GRAY + "-" + NC
 # (CLEAN and LEGACY were used-but-undocumented in the Python source's block;
 # listed here to fix that drift. The legacy pip recipes themselves are dropped
 # per D-024(1); the LEGACY group is reserved.)
+#
+# Note (P06, superseding D-024(1)): the Python source's GitHub-Actions-testing
+# trio (pr-to-testrepo, clean-pr-to-testrepo, create-test-pr) is formally
+# superseded by automated CI workflows and tests/press-acceptance.test.ts
+# (PRESS_ACCEPTANCE=1), so those three recipes are intentionally omitted.
+
+# Select a just recipe interactively
+[group('utilities'), group('help')]
+@select-shell:
+    just --choose
 
 # Check if required tools are installed
 [group('setup'), group('debug')]
@@ -80,15 +90,54 @@ check-deps:
     if ! command -v git >/dev/null 2>&1; then printf "{{YELLOW}}git is not installed{{NC}}\n Install: {{BLUE}}xcode-select --install{{NC}} (macOS) or {{BLUE}}sudo apt install git{{NC}} (Debian/Ubuntu)\n"; exit 1; fi
     if ! command -v actionlint >/dev/null 2>&1 || ! command -v shellcheck >/dev/null 2>&1; then printf "Shell lint tools missing: run just install-shell-tools\n" >&2; exit 1; fi
     if ! command -v editorconfig-checker >/dev/null 2>&1; then printf "EditorConfig checker missing: run just install-editorconfig-checker\n" >&2; exit 1; fi
+    if ! command -v gitleaks >/dev/null 2>&1; then printf "gitleaks missing: run just install-gitleaks\n" >&2; exit 1; fi
     echo "All required tools are installed"
     # Optional tools (advisory only; not required to build/test the project):
     if ! command -v bun >/dev/null 2>&1; then printf "{{YELLOW}}(optional) bun not installed{{NC}} — advisory dev/test lane only (D-036), runs 'just test-bun'; install: {{BLUE}}curl -fsSL https://bun.sh/install | bash{{NC}} or {{BLUE}}brew install oven-sh/bun/bun{{NC}}. Do NOT run 'bun install' (keeps the lockfile pnpm-only)\n"; fi
 
 alias c := check-deps
 
+# One-command project setup — Level 2 of the two-level flow. Level 1 is
+# `make bootstrap` (base toolchain: node, pnpm, just); run that first on a
+# bare machine. Idempotent: safe to re-run in every fresh clone/container.
+[group('setup'), group('quick start')]
+setup:
+    #!/usr/bin/env sh
+    set -eu
+    if command -v make >/dev/null 2>&1; then
+        if ! make --no-print-directory check; then
+            printf "{{RED}}Base toolchain incomplete — run {{BLUE}}make bootstrap{{RED}} first, then re-run {{BLUE}}just setup{{RED}}.{{NC}}\n" >&2
+            exit 1
+        fi
+    elif command -v node >/dev/null 2>&1 && command -v pnpm >/dev/null 2>&1; then
+        printf "{{YELLOW}}make not found — skipping bootstrap check (node + pnpm present, continuing).{{NC}}\n"
+    else
+        printf "{{RED}}node/pnpm not found (and make is unavailable to check them).{{NC}}\n" >&2
+        printf "{{RED}}Run {{BLUE}}make bootstrap{{RED}} on a machine with make, or install Node >=24 and pnpm 10.{{NC}}\n" >&2
+        exit 1
+    fi
+    export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
+    printf "{{BLUE}}[1/4] Installing pinned shell, EditorConfig, and secret-scan tools...{{NC}}\n"
+    bash scripts/install-shellcheck.sh
+    bash scripts/install-actionlint.sh
+    bash scripts/install-editorconfig-checker.sh
+    bash scripts/install-gitleaks.sh
+    printf "{{BLUE}}[2/4] Installing workspace dependencies: pnpm install{{NC}}\n"
+    pnpm install
+    printf "{{BLUE}}[3/4] Wiring git hooks and commit template...{{NC}}\n"
+    just setup-hooks
+    if [ -f PROJECTS.md ]; then
+        mkdir -p projects
+        touch projects/.gitkeep
+    fi
+    printf "{{BLUE}}[4/4] Verifying...{{NC}}\n"
+    just check-deps
+    printf "{{GREEN}}✓ Setup complete.{{NC}} Try {{BLUE}}just all{{NC}} to run every quality gate.\n"
+    printf "If a tool is missing in NEW shells, ensure ~/.local/bin is on your PATH.\n"
+
 # Install project dependencies (generates/updates pnpm-lock.yaml)
 [group('install'), group('quick start')]
-@install: install-shell-tools install-editorconfig-checker
+@install: install-shell-tools install-editorconfig-checker install-gitleaks
     #!/usr/bin/env sh
     export PATH="$HOME/.local/bin:$PATH"
     just check-deps
@@ -213,10 +262,17 @@ test-bun:
 
 alias a := all
 
-# Run the full hook-suite gates on ALL files (CI mirror of the
-# pre-commit/commit-time discipline; source pre-commit-run intent)
+# Run all lefthook pre-commit checks against the whole tree
 [group('pre-commit')]
-@pre-commit-run: format-check lint check-boundaries check-shell check-workflows check-editorconfig check-spelling typecheck test
+@hooks-run:
+    pnpm exec lefthook run pre-commit --all-files
+
+alias hooks := hooks-run
+
+# Run the full lefthook pre-commit suite on all files (CI mirror)
+[group('pre-commit')]
+@pre-commit-run:
+    pnpm exec lefthook run pre-commit --all-files
 
 alias pc := pre-commit-run
 
@@ -245,10 +301,10 @@ alias pc := pre-commit-run
     pnpm exec typedoc --out docs/reference/api apps/cli/src/lib.ts
 
 # Run the full CI sequence locally (mirror of .github/workflows/ci.yml).
-# Same order CI runs: install deps, the direct quality gates, build, then the
-# whole hook suite on all files (the source's dual-enforcement parity).
+# Same order CI runs: install deps, all quality gates, docs link check,
+# build, then the whole hook suite on all files.
 [group('workflow')]
-@ci: install format-check lint typecheck test build
+@ci: install all docs-check build
     pnpm exec lefthook run pre-commit --all-files
 
 # Install git hooks (lefthook) and wire the commit-message template
@@ -258,12 +314,59 @@ alias pc := pre-commit-run
     git config commit.template .gitmessage
     echo "Hooks installed; commit template wired (.gitmessage)"
 
+# Verify commit messages follow Conventional Commits (commitlint)
+[group('pre-commit')]
+verify-commits start="HEAD~10" end="HEAD":
+    #!/usr/bin/env sh
+    set -eu
+    echo "Verifying commit messages with commitlint..."
+    if [ ! -x node_modules/.bin/commitlint ]; then
+        printf "{{RED}}commitlint not installed — run 'just setup' or 'pnpm install' first{{NC}}\n" >&2
+        exit 1
+    fi
+    if ! git rev-parse --verify --quiet "{{end}}^{commit}" >/dev/null 2>&1; then
+        printf "{{YELLOW}}No commits found at {{end}} — skipping commitlint{{NC}}\n"
+        exit 0
+    fi
+    if git rev-parse --verify --quiet "{{start}}^{commit}" >/dev/null 2>&1; then
+        pnpm exec commitlint --from="{{start}}" --to="{{end}}"
+        exit 0
+    fi
+    if [ "{{start}}" != "HEAD~10" ]; then
+        printf "{{RED}}Unknown revision: {{start}}{{NC}}\n" >&2
+        exit 1
+    fi
+    count="$(git rev-list --count "{{end}}")"
+    if [ "$count" -le 1 ]; then
+        git log -1 --pretty=%B "{{end}}" | pnpm exec commitlint
+        exit 0
+    fi
+    root="$(git rev-list --reverse "{{end}}" | head -n 1)"
+    git log -1 --pretty=%B "$root" | pnpm exec commitlint
+    pnpm exec commitlint --from="$root" --to="{{end}}"
+
 # Build and start the API (Hono + tRPC) on PORT (default 8080), in-memory
 # demo data by default (D-048). See docs/reference/api-reference.md.
 [group('run'), group('quick start')]
 @api:
     pnpm --filter @ts-launch-blueprint/api build
     node apps/api/dist/server.js
+
+# Start the API (Hono + tRPC) in watch/reload mode via tsx (D-048)
+[group('run'), group('dev')]
+@api-dev:
+    pnpm --filter @ts-launch-blueprint/api exec tsx watch src/server.ts
+
+# Full developer cycle: format, lint, typecheck, test, build
+[group('dev'), group('quick start')]
+@dev:
+    just format
+    just lint
+    just typecheck
+    just test
+    just build
+
+alias cycle := dev
 
 # Start the web app's Vite dev server (D-054); it proxies /trpc to the API on
 # :8080, so start `just api` in another terminal first.
@@ -386,10 +489,10 @@ pack-check:
 # Clean up build artifacts, caches, and installed dependencies
 [group('clean')]
 @clean:
-    rm -rf apps/cli/dist apps/cli/README.md apps/cli/LICENSE
+    rm -rf apps/*/dist packages/*/dist apps/cli/README.md apps/cli/LICENSE
     rm -rf coverage
     rm -rf node_modules packages/*/node_modules apps/*/node_modules
-    rm -f *.tsbuildinfo
+    rm -f *.tsbuildinfo packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo
 
 # Collect system and environment information for debugging (dependency-free)
 [group('debug')]
@@ -425,6 +528,10 @@ debug-info:
     if command -v npm >/dev/null 2>&1; then echo "npm: $(npm --version)"; else echo "npm: Not Found"; fi
     if command -v git >/dev/null 2>&1; then echo "git: $(git --version)"; else echo "git: Not Found"; fi
     if command -v just >/dev/null 2>&1; then echo "just: $(just --version)"; else echo "just: Not Found"; fi
+    if command -v actionlint >/dev/null 2>&1; then echo "actionlint: $(actionlint --version | head -n 1)"; else echo "actionlint: Not Found"; fi
+    if command -v shellcheck >/dev/null 2>&1; then echo "shellcheck: $(shellcheck --version | sed -n 's/^version: //p')"; else echo "shellcheck: Not Found"; fi
+    if command -v gitleaks >/dev/null 2>&1; then echo "gitleaks: $(gitleaks version 2>/dev/null | head -n 1)"; else echo "gitleaks: Not Found"; fi
+    if command -v editorconfig-checker >/dev/null 2>&1; then echo "editorconfig-checker: $(editorconfig-checker --version)"; else echo "editorconfig-checker: Not Found"; fi
     if command -v bun >/dev/null 2>&1; then echo "bun: $(bun --version) (optional dev/test lane, D-036)"; else echo "bun: Not Found (optional, D-036)"; fi
     echo "CLI Version ({{command_name}}): $(node apps/cli/dist/cli.js --version 2>/dev/null || echo 'Not Found (run: just build)')"
     if command -v node >/dev/null 2>&1; then
@@ -432,11 +539,15 @@ debug-info:
     fi
     echo ""
     echo "### Installed Project Packages"
-    if command -v pnpm >/dev/null 2>&1; then pnpm list --depth 0 2>/dev/null || echo "(no node_modules; run 'just install')"; else echo "pnpm not found, cannot list packages"; fi
+    if command -v pnpm >/dev/null 2>&1; then pnpm list --depth 0 2>/dev/null || echo "(no node_modules; run 'just setup')"; else echo "pnpm not found, cannot list packages"; fi
     echo ""
-    echo "### Declared Dependencies (apps/cli/package.json)"
+    echo "### Declared Dependencies"
     if command -v node >/dev/null 2>&1; then
-        node -p "const p=JSON.parse(require('node:fs').readFileSync('apps/cli/package.json','utf8')); JSON.stringify({dependencies:p.dependencies??{},devDependencies:p.devDependencies??{}},null,2)" 2>/dev/null || echo "Could not read dependencies from package.json"
+        for pkg in package.json packages/*/package.json apps/*/package.json; do
+            [ -f "$pkg" ] || continue
+            printf "#### %s\n" "$pkg"
+            node -e 'const fs=require("node:fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));console.log(JSON.stringify({dependencies:p.dependencies??{},devDependencies:p.devDependencies??{}},null,2));' "$pkg" 2>/dev/null || echo "Could not read dependencies from $pkg"
+        done
     else
         echo "node not found, cannot read package.json"
     fi

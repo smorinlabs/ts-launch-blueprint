@@ -8,8 +8,9 @@ how releases happen.
 ## Prerequisites
 
 This template only assumes you have `git` and a shell. Everything else
-— Node.js and `just` — is checked (and, where possible, installed) for
-you by the bootstrap `Makefile`.
+— Node.js, pnpm, and `just` — is checked (and, where possible, installed)
+for you by the bootstrap `Makefile`, or provisioned via `mise`, `flox`, or a
+VS Code Dev Container.
 
 ## Steps
 
@@ -20,58 +21,61 @@ git clone https://github.com/smorinlabs/ts-launch-blueprint.git
 cd ts-launch-blueprint
 ```
 
-### 2. Check Foundational Tools
+### 2. Level 1: Bootstrap Foundational Tools
 
 ```bash
-make check
+make bootstrap   # ensures node >=24, pnpm 10, and just are installed, then runs make check
 ```
 
 `make` is the one tool this template assumes you already have (almost
-everyone does). `make check` verifies that `just` and `node` are
-installed and prints copy-pasteable install commands for whichever is
-missing:
+everyone does). `make check` verifies that `just`, `node` (>=24), and `pnpm`
+are installed (plus optional `docker`) and prints copy-pasteable install
+commands for whichever is missing:
 
 ```bash
 make install-just    # prints the just install command (or `make install-just-force`)
 make install-node    # prints Node version-manager guidance (mise/nvm/fnm)
+make install-pnpm    # prints pnpm install guidance (standalone/npm/Homebrew)
 ```
 
 Node **24 or newer** is required (`.nvmrc` pins `24`; `package.json`
-`engines.node` enforces `>=24`). Everything else — formatting, linting,
-type checking, testing, building — is a `just` recipe; the `Makefile`
-never wraps development tasks itself.
+`engines.node` enforces `>=24`). You can also use `mise install` (`mise.toml`),
+`flox activate` (`.flox/env/manifest.toml`), or `.devcontainer/` to provision
+the full external toolchain. Everything else — formatting, linting, type
+checking, testing, building — is a `just` recipe; the `Makefile` never wraps
+development tasks itself.
 
-### 3. Install Dependencies
-
-```bash
-pnpm install
-```
-
-This installs both runtime dependencies (`commander`, `@inquirer/prompts`,
-`zod`, `smol-toml`, etc.) and dev dependencies (`typescript`, `tsdown`,
-`oxlint`, `vitest`, `lefthook`, ...), and generates/updates
-`pnpm-lock.yaml`. `pnpm install` also runs the `prepare` script
-(`lefthook install`), which activates the git hooks — but see the next
-step to fully wire the commit-message template too.
-
-### 4. Set Up Git Hooks
+### 3. Level 2: Run Unified Setup
 
 ```bash
-just setup-hooks
+just setup
 ```
 
-This (re)installs the [lefthook](https://lefthook.dev) git hooks and
-points `git commit` at `.gitmessage` as the commit-message template.
-With hooks installed:
+`just setup` is idempotent and handles the entire workspace setup in one pass:
 
-- **pre-commit** runs oxfmt (auto-fixing staged files), oxlint, a
-  large-file check, and a full-program `tsc --noEmit` — in parallel.
+1. Runs `make check` to verify the Level 1 toolchain.
+2. Installs pinned `shellcheck`, `actionlint`, `editorconfig-checker`, and
+   `gitleaks` into `~/.local/bin`.
+3. Runs `pnpm install` (which installs runtime and dev dependencies and
+   generates/updates `pnpm-lock.yaml`).
+4. Runs `just setup-hooks` to wire [lefthook](https://lefthook.dev) git hooks
+   and `.gitmessage`.
+5. Restores `projects/.gitkeep` when `PROJECTS.md` is present and runs
+   `just check-deps`.
+
+### 4. Git Hooks Summary
+
+With `just setup-hooks` wired:
+
+- **pre-commit** runs oxfmt (auto-fixing staged files), oxlint, boundary
+  checks (`depcruise`), `shellcheck`, `actionlint`, `editorconfig-checker`,
+  `cspell`, `pnpm-lock-check`, `check-large-files`, `gitleaks`, and a
+  full-program `tsc --noEmit` — in parallel.
 - **commit-msg** runs commitlint against your commit message
   ([Conventional Commits](https://www.conventionalcommits.org/), 100/200/200
   header/body/footer line-length limits).
-- **pre-push** runs the test suite only if you opt in:
-  `export TS_PROJECTS_PREPUSH_TESTS=1`. By default, tests are left to
-  CI so local pushes stay fast.
+- **pre-push** runs `gitleaks-range`, `press-verify`, and (if you opt in via
+  `export TS_PROJECTS_PREPUSH_TESTS=1`) the test suite.
 
 ### 5. Run All Quality Gates
 
@@ -79,10 +83,10 @@ With hooks installed:
 just all
 ```
 
-This runs `format-check`, `lint`, `typecheck`, and `test` — the same
-four gates enforced by the pre-commit hook suite and by CI. Run
-`just` with no arguments to see every available recipe grouped by
-purpose (setup, build, test, docs, releases, ...).
+This runs `format-check`, `lint`, `check-boundaries`, `check-shell`,
+`check-workflows`, `check-editorconfig`, `check-spelling`, `typecheck`, and
+`test`. Run `just` with no arguments (or `just select-shell` for interactive
+selection) to see every available recipe grouped by purpose.
 
 ### 6. Build and Run the CLI
 
@@ -127,33 +131,44 @@ for the exact commands.
 Common recipes you'll reach for during day-to-day development:
 
 ```bash
-just format       # oxfmt --write
-just lint         # oxlint
-just lint-fix     # oxlint --fix
-just typecheck    # tsc --noEmit
+just dev                    # format + lint + typecheck + test + build (alias: just cycle)
+just format                 # oxfmt --write
+just lint                   # oxlint
+just lint-fix               # oxlint --fix
+just typecheck              # tsc --noEmit
 just test                   # vitest run
 just coverage               # vitest run --coverage (95/95/90/95 thresholds)
 just open-coverage-report   # open coverage/index.html in browser
+just api                    # build and start API on :8080
+just api-dev                # start API in tsx watch mode
 ```
 
 ## Project Commands Reference
 
-| Task              | Recipe                      | Underlying command                     |
-| ----------------- | --------------------------- | -------------------------------------- |
-| Install deps      | `pnpm install`              | —                                      |
-| Setup git hooks   | `just setup-hooks`          | `pnpm exec lefthook install`           |
-| Format            | `just format`               | `pnpm exec oxfmt`                      |
-| Format check      | `just format-check`         | `pnpm exec oxfmt --check`              |
-| Lint              | `just lint`                 | `pnpm exec oxlint`                     |
-| Type check        | `just typecheck`            | `pnpm run typecheck` (`tsc --noEmit`)  |
-| Test              | `just test`                 | `pnpm exec vitest run`                 |
-| Coverage          | `just coverage`             | `pnpm run test:coverage`               |
-| Coverage report   | `just open-coverage-report` | Open `coverage/index.html` in browser  |
-| All quality gates | `just all`                  | format-check + lint + typecheck + test |
-| Build             | `just build`                | `pnpm run build` (tsdown)              |
-| Run built CLI     | `just run [args]`           | `node apps/cli/dist/cli.js [args]`     |
-| Docs link check   | `just docs-check`           | `node scripts/check-links.mjs`         |
-| Full CI mirror    | `just ci`                   | install + gates + build + hook suite   |
+| Task                 | Recipe                       | Underlying command                               |
+| -------------------- | ---------------------------- | ------------------------------------------------ |
+| Unified setup        | `just setup`                 | Level 2 setup (analyzers, `pnpm install`, hooks) |
+| Install deps         | `just install`               | Pinned tools + `pnpm install`                    |
+| Developer cycle      | `just dev` (`cycle`)         | format + lint + typecheck + test + build         |
+| Setup git hooks      | `just setup-hooks`           | `pnpm exec lefthook install` + `.gitmessage`     |
+| Run pre-commit       | `just hooks-run` (`hooks`)   | `pnpm exec lefthook run pre-commit --all-files`  |
+| CI pre-commit        | `just pre-commit-run` (`pc`) | `pnpm exec lefthook run pre-commit --all-files`  |
+| Verify commits       | `just verify-commits`        | `pnpm exec commitlint`                           |
+| Format               | `just format`                | `pnpm exec oxfmt`                                |
+| Format check         | `just format-check`          | `pnpm exec oxfmt --check`                        |
+| Lint                 | `just lint`                  | `pnpm exec oxlint`                               |
+| Type check           | `just typecheck`             | `pnpm run typecheck`                             |
+| Test                 | `just test`                  | `pnpm exec vitest run`                           |
+| Coverage             | `just coverage`              | `pnpm run test:coverage`                         |
+| Coverage report      | `just open-coverage-report`  | Open `coverage/index.html` in browser            |
+| All quality gates    | `just all`                   | All check, lint, typecheck, and test gates       |
+| Build                | `just build`                 | `pnpm -r --filter './apps/*' build` (tsdown)     |
+| Run built CLI        | `just run [args]`            | `node apps/cli/dist/cli.js [args]`               |
+| Run API / dev API    | `just api` / `just api-dev`  | built `server.js` / `tsx watch src/server.ts`    |
+| Select interactively | `just select-shell`          | `just --choose`                                  |
+| Clean artifacts      | `just clean`                 | Remove `apps/*/dist`, `packages/*/dist`, caches  |
+| Docs link check      | `just docs-check`            | `node scripts/check-links.mjs README.md docs`    |
+| Full CI mirror       | `just ci`                    | install + all + docs-check + build + lefthook    |
 
 ## Release Flow
 

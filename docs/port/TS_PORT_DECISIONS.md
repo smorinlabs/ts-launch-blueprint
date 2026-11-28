@@ -594,3 +594,9 @@ the old one.
   6. **Accessibility**: a visible label, a table caption with `th scope="col"`, `<output>` (implicit `status`) for loading and empty, `role="alert"` for errors, an `aria-live="polite"` count, `:focus-visible` outlines, keyboard-only use; jsx-a11y prefers the native elements (`<output>` over `role="status"`), and `import/no-unassigned-import` allows the stylesheet import.
   7. Types come from the router (`ProjectsListOutput` = `inferRouterOutputs<AppRouter>['projects']['list']`); no `Project` type is redefined. Test dependencies: `@testing-library/user-event` 14.6.13 and `@testing-library/dom` (its peer, and `@testing-library/react`'s), now explicit.
 - Why: the first screen a template user sees should show the patterns they copy (typed query, error kinds, URL state, accessible markup) without choosing their UI stack for them.
+
+## D-056: Supersede D-024(1) GitHub-Actions-testing Justfile trio (amends D-024(1))
+- Ref: P06 (`projects/P06-turnkey-toolchains-and-unified-local-setup.md`), maintainer decision 2026-11-27
+- Options: (1) port `pr-to-testrepo`, `clean-pr-to-testrepo`, and `create-test-pr` with `[confirm]` guards per D-024(1) (2) formally supersede the trio with automated CI workflows and `tests/press-acceptance.test.ts`
+- Decision: (2). Supersedes the `"GitHub-Actions-testing trio with [confirm] guards"` clause of D-024(1); `Justfile` intentionally omits `pr-to-testrepo`, `clean-pr-to-testrepo`, and `create-test-pr`.
+- Why: All three recipes were unimplemented placeholders in the TS port and mutated live GitHub repositories for manual workflow smoke-testing. Automated workflow validation (`actionlint` + `shellcheck` in `check-workflows`), PR/merge-group CI (`.github/workflows/ci.yml`), and hermetic/live template verification (`just press-verify` + `tests/press-acceptance.test.ts`, wired into CI in P07) cover the same verification surface deterministically without manual remote test repos.

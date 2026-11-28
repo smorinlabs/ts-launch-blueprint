@@ -35,6 +35,63 @@ const readJsonc = (file: string): { ignorePatterns: string[] } => {
   return JSON.parse(text);
 };
 
+interface SimpleTomlDoc {
+  root: Record<string, string | string[]>;
+  sections: Record<string, Record<string, string | string[]>>;
+}
+
+const parseSimpleToml = (text: string): SimpleTomlDoc => {
+  const root: Record<string, string | string[]> = {};
+  const sections: Record<string, Record<string, string | string[]>> = {};
+  let current = root;
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    let inQuotes = false;
+    let stripped = '';
+    for (let i = 0; i < rawLine.length; i += 1) {
+      const ch = rawLine[i]!;
+      if (ch === '"' && rawLine[i - 1] !== '\\') inQuotes = !inQuotes;
+      if (ch === '#' && !inQuotes) break;
+      stripped += ch;
+    }
+    const line = stripped.trim();
+    if (!line) continue;
+
+    const sectionMatch = line.match(/^\[([A-Za-z0-9_.-]+)\]$/);
+    if (sectionMatch?.[1]) {
+      sections[sectionMatch[1]] ??= {};
+      current = sections[sectionMatch[1]]!;
+      continue;
+    }
+
+    const kvMatch = line.match(/^([A-Za-z0-9_.-]+)\s*=\s*(.+)$/);
+    if (!kvMatch?.[1] || !kvMatch[2]) continue;
+    const key = kvMatch[1];
+    const val = kvMatch[2].trim();
+    if (val.startsWith('[') && val.endsWith(']')) {
+      current[key] = JSON.parse(val) as string[];
+    } else if (val.startsWith('"') && val.endsWith('"')) {
+      current[key] = val.slice(1, -1);
+    }
+  }
+  return { root, sections };
+};
+
+const extractBlock = (source: string, startRe: RegExp, endRe: RegExp): string => {
+  const lines = source.split(/\r?\n/);
+  const startIdx = lines.findIndex((line) => startRe.test(line));
+  if (startIdx === -1) return '';
+  const collected = [lines[startIdx]!];
+  for (let i = startIdx + 1; i < lines.length; i += 1) {
+    if (endRe.test(lines[i]!)) break;
+    collected.push(lines[i]!);
+  }
+  return collected.join('\n');
+};
+
+const JUSTFILE_BOUNDARY = /^(?:\[|#|alias\s|[A-Za-z0-9_@-][^:\n]*:)/;
+const MAKEFILE_BOUNDARY = /^(?:#|[a-zA-Z_-]+:)/;
+
 describe('commit-message contract (D-020(2,4))', () => {
   it('commitlint type-enum matches the .gitmessage type list exactly', () => {
     const rule = commitlintConfig.rules['type-enum'];
@@ -1343,18 +1400,277 @@ describe('EditorConfig, cspell, and Justfile quality gates (P05)', () => {
     expect(matchesAction('smorinlabs/template-press')).toBe(true);
   });
 
-  it('Justfile provides install-editorconfig-checker, check-editorconfig, and check-spelling wired into all and pre-commit-run', () => {
+  it('Justfile provides install-editorconfig-checker, check-editorconfig, and check-spelling wired into all and lefthook-backed pre-commit-run', () => {
     const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8');
     expect(justfile).toMatch(/^@?install-editorconfig-checker:/m);
     expect(justfile).toMatch(/^@?check-editorconfig:/m);
     expect(justfile).toMatch(/^@?check-spelling:/m);
 
     const allLine = justfile.split(/\r?\n/).find((l) => l.startsWith('@all:')) ?? '';
-    const preCommitLine =
-      justfile.split(/\r?\n/).find((l) => l.startsWith('@pre-commit-run:')) ?? '';
     expect(allLine).toContain('check-editorconfig');
     expect(allLine).toContain('check-spelling');
-    expect(preCommitLine).toContain('check-editorconfig');
-    expect(preCommitLine).toContain('check-spelling');
+
+    const preCommitBlock = extractBlock(justfile, /^@?pre-commit-run:/, JUSTFILE_BOUNDARY);
+    expect(preCommitBlock).toMatch(/lefthook run pre-commit --all-files/);
+  });
+});
+
+describe('turnkey toolchains: mise, flox, and devcontainer (P06)', () => {
+  it('[P06-TS01] mise.toml declares the synced TS toolset without Python-only or pnpm-managed tools', () => {
+    const misePath = join(REPO_ROOT, 'mise.toml');
+    expect(existsSync(misePath)).toBe(true);
+
+    const doc = parseSimpleToml(readFileSync(misePath, 'utf8'));
+    const tools = doc.sections.tools ?? {};
+    const nvmrcVersion = readFileSync(join(REPO_ROOT, '.nvmrc'), 'utf8').trim();
+    const pkgManagerMatch = packageJson.packageManager.match(/^pnpm@([^+]+)/);
+
+    expect(tools.node).toBe(nvmrcVersion);
+    expect(tools.pnpm).toBe(pkgManagerMatch?.[1]);
+    expect(tools.just).toBeDefined();
+    expect(tools.actionlint).toBe('1.7.12');
+    expect(tools.shellcheck).toBe('0.11.0');
+    expect(tools.gitleaks).toBe('8.27.2');
+    expect(tools['editorconfig-checker']).toBe('4.0.2');
+    expect(tools.gh).toBeDefined();
+    expect(tools.make).toBeDefined();
+    expect(tools.bun).toBe('1.3.14');
+    expect(tools.uv).toBeDefined();
+
+    for (const excluded of [
+      'codespell',
+      'taplo',
+      'yamlfmt',
+      'ruff',
+      'lefthook',
+      'cspell',
+      'commitlint',
+      'oxfmt',
+      'oxlint',
+    ]) {
+      expect(tools[excluded]).toBeUndefined();
+    }
+  });
+
+  it('[P06-TS01] .flox manifests declare the synced TS toolset and hygiene files', () => {
+    const manifestPath = join(REPO_ROOT, '.flox', 'env', 'manifest.toml');
+    const envJsonPath = join(REPO_ROOT, '.flox', 'env.json');
+    const gitignorePath = join(REPO_ROOT, '.flox', '.gitignore');
+    const gitattributesPath = join(REPO_ROOT, '.flox', '.gitattributes');
+
+    expect(existsSync(manifestPath)).toBe(true);
+    expect(existsSync(envJsonPath)).toBe(true);
+    expect(existsSync(gitignorePath)).toBe(true);
+    expect(existsSync(gitattributesPath)).toBe(true);
+
+    const envJson = JSON.parse(readFileSync(envJsonPath, 'utf8')) as {
+      name: string;
+      version: number;
+    };
+    expect(envJson.name.length).toBeGreaterThan(0);
+    expect(envJson.version).toBe(1);
+
+    const floxGitignore = readFileSync(gitignorePath, 'utf8');
+    for (const entry of ['run/', 'cache/', 'lib/', 'log/', '!env/', 'env/manifest.lock']) {
+      expect(floxGitignore).toContain(entry);
+    }
+
+    const doc = parseSimpleToml(readFileSync(manifestPath, 'utf8'));
+    const install = doc.sections.install ?? {};
+    expect(install['nodejs_24.pkg-path']).toBe('nodejs_24');
+    expect(install['pnpm.pkg-path']).toBe('pnpm_10');
+    expect(install['just.pkg-path']).toBe('just');
+    expect(install['actionlint.pkg-path']).toBe('actionlint');
+    expect(install['actionlint.version']).toBe('1.7.12');
+    expect(install['shellcheck.pkg-path']).toBe('shellcheck');
+    expect(install['shellcheck.version']).toBe('0.11.0');
+    expect(install['gitleaks.pkg-path']).toBe('gitleaks');
+    expect(install['gitleaks.version']).toBe('8.27.2');
+    expect(install['editorconfig-checker.pkg-path']).toBe('editorconfig-checker');
+    expect(install['gh.pkg-path']).toBe('gh');
+    expect(install['gnumake.pkg-path']).toBe('gnumake');
+    expect(install['bun.pkg-path']).toBe('bun');
+    expect(install['uv.pkg-path']).toBe('uv');
+
+    const installKeys = Object.keys(install);
+    for (const excluded of ['codespell', 'taplo', 'yamlfmt', 'ruff', 'lefthook']) {
+      expect(installKeys.some((k) => k === excluded || k.startsWith(`${excluded}.`))).toBe(false);
+    }
+
+    const systems = doc.sections.options?.systems;
+    expect(Array.isArray(systems)).toBe(true);
+    expect(systems).toEqual(
+      expect.arrayContaining(['aarch64-darwin', 'x86_64-linux', 'aarch64-linux'])
+    );
+  });
+
+  it('[P06-TS01] .devcontainer/devcontainer.json and post-create.sh configure Node 24 + two-level setup', () => {
+    const devcontainerPath = join(REPO_ROOT, '.devcontainer', 'devcontainer.json');
+    const postCreateRelPath = '.devcontainer/post-create.sh';
+    const postCreatePath = join(REPO_ROOT, postCreateRelPath);
+
+    expect(existsSync(devcontainerPath)).toBe(true);
+    expect(existsSync(postCreatePath)).toBe(true);
+
+    const devcontainer = JSON.parse(readFileSync(devcontainerPath, 'utf8')) as {
+      name: string;
+      image: string;
+      postCreateCommand: string;
+      customizations?: {
+        vscode?: {
+          extensions?: string[];
+          settings?: Record<string, unknown>;
+        };
+      };
+      remoteEnv?: Record<string, string>;
+    };
+    const vscodeSettings = JSON.parse(
+      readFileSync(join(REPO_ROOT, '.vscode', 'settings.json'), 'utf8')
+    ) as Record<string, unknown>;
+
+    expect(devcontainer.image).toMatch(/node.*24|24.*bookworm/);
+    expect(devcontainer.postCreateCommand).toContain('.devcontainer/post-create.sh');
+    expect(devcontainer.customizations?.vscode?.extensions).toEqual(
+      expect.arrayContaining([
+        'TypeScriptTeam.native-preview',
+        'oxc.oxc-vscode',
+        'tamasfe.even-better-toml',
+        'redhat.vscode-yaml',
+        'streetsidesoftware.code-spell-checker',
+      ])
+    );
+    expect(devcontainer.customizations?.vscode?.settings).toEqual(vscodeSettings);
+    expect(devcontainer.remoteEnv?.PATH).toContain('.local/bin');
+
+    const workingTreeExecMode =
+      process.platform === 'win32' ? 0o111 : statSync(postCreatePath).mode & 0o111;
+    expect(workingTreeExecMode).not.toBe(0);
+    const gitStageLine = execFileSync('git', ['ls-files', '--stage', postCreateRelPath], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    }).trim();
+    expect(gitStageLine === '' || /^100755\s/.test(gitStageLine)).toBe(true);
+
+    const postCreate = readFileSync(postCreatePath, 'utf8');
+    expect(postCreate).toContain('set -eu');
+    expect(postCreate).toContain('.local/bin');
+    expect(postCreate).toContain('make bootstrap');
+    expect(postCreate).toContain('just setup');
+  });
+});
+
+describe('Makefile Level 1 bootstrap and Justfile DX parity (P06)', () => {
+  it('[P06-TS02] Makefile provides POSIX bootstrap, hook-check, pnpm+docker checks, ~/.local/bin install-just, and install-flox/docker', () => {
+    const makefile = readFileSync(join(REPO_ROOT, 'Makefile'), 'utf8');
+    expect(makefile).toMatch(/^SHELL\s*:=\s*\/bin\/sh$/m);
+    expect(makefile).not.toContain('echo -e');
+
+    for (const target of [
+      'bootstrap:',
+      'hook-check:',
+      'check:',
+      'install-just:',
+      'install-just-force:',
+      'install-docker:',
+      'install-docker-force:',
+      'install-flox:',
+    ]) {
+      expect(makefile).toContain(target);
+    }
+
+    const checkBlock = extractBlock(makefile, /^check:/, MAKEFILE_BOUNDARY);
+    expect(checkBlock).toContain('just');
+    expect(checkBlock).toContain('node');
+    expect(checkBlock).toContain('pnpm');
+    expect(checkBlock).toContain('docker');
+    expect(checkBlock).toContain('optional');
+
+    const hookCheckBlock = extractBlock(makefile, /^hook-check:/, MAKEFILE_BOUNDARY);
+    for (const tool of [
+      'node',
+      'pnpm',
+      'just',
+      'gitleaks',
+      'actionlint',
+      'shellcheck',
+      'editorconfig-checker',
+      'lefthook',
+      'oxfmt',
+      'oxlint',
+      'depcruise',
+      'cspell',
+      'commitlint',
+      'tsc',
+    ]) {
+      expect(hookCheckBlock).toContain(tool);
+    }
+    expect(hookCheckBlock).toContain('node_modules/.bin');
+
+    const installJustBlock = extractBlock(makefile, /^install-just:/, MAKEFILE_BOUNDARY);
+    const installJustForceBlock = extractBlock(makefile, /^install-just-force:/, MAKEFILE_BOUNDARY);
+    expect(installJustBlock).toContain('.local/bin');
+    expect(installJustBlock).not.toContain('~/bin');
+    expect(installJustBlock).not.toContain('$(HOME)/bin');
+    expect(installJustForceBlock).toContain('.local/bin');
+    expect(installJustForceBlock).not.toContain('~/bin');
+    expect(installJustForceBlock).not.toContain('$(HOME)/bin');
+    expect(installJustForceBlock).toMatch(/--tag|rust-just/);
+  });
+
+  it('[P06-TS02] Justfile provides unified setup, workspace-wide clean/debug-info, dev/cycle, hooks-run, verify-commits, api-dev, reconciled ci, and omits D-024(1) testrepo trio', () => {
+    const justfile = readFileSync(join(REPO_ROOT, 'Justfile'), 'utf8');
+
+    expect(justfile).toMatch(/^setup:/m);
+    expect(justfile).toMatch(/^@?dev:/m);
+    expect(justfile).toMatch(/^alias cycle := dev$/m);
+    expect(justfile).toMatch(/^@?select-shell:/m);
+    expect(justfile).toMatch(/^@?hooks-run:/m);
+    expect(justfile).toMatch(/^alias hooks := hooks-run$/m);
+    expect(justfile).toMatch(/^verify-commits\b/m);
+    expect(justfile).toMatch(/^@?api-dev:/m);
+    expect(justfile).toMatch(/^@?api:/m);
+
+    const setupBlock = extractBlock(justfile, /^setup:/, JUSTFILE_BOUNDARY);
+    expect(setupBlock).toContain('make');
+    expect(setupBlock).toContain('install-shellcheck.sh');
+    expect(setupBlock).toContain('install-actionlint.sh');
+    expect(setupBlock).toContain('install-editorconfig-checker.sh');
+    expect(setupBlock).toContain('install-gitleaks.sh');
+    expect(setupBlock).toContain('pnpm install');
+    expect(setupBlock).toContain('setup-hooks');
+    expect(setupBlock).toContain('projects/.gitkeep');
+    expect(setupBlock).toContain('check-deps');
+
+    const installBlock = extractBlock(justfile, /^@?install:/, JUSTFILE_BOUNDARY);
+    expect(installBlock).toContain('install-gitleaks');
+
+    const checkDepsBlock = extractBlock(justfile, /^check-deps:/, JUSTFILE_BOUNDARY);
+    expect(checkDepsBlock).toContain('gitleaks');
+
+    const cleanBlock = extractBlock(justfile, /^@?clean:/, JUSTFILE_BOUNDARY);
+    expect(cleanBlock).toContain('apps/*/dist');
+    expect(cleanBlock).toContain('packages/*/dist');
+
+    const debugInfoBlock = extractBlock(justfile, /^debug-info:/, JUSTFILE_BOUNDARY);
+    for (const tool of ['actionlint', 'shellcheck', 'gitleaks', 'editorconfig-checker']) {
+      expect(debugInfoBlock).toContain(tool);
+    }
+    expect(debugInfoBlock).toContain('packages/*/package.json');
+    expect(debugInfoBlock).toContain('apps/*/package.json');
+
+    const apiBlock = extractBlock(justfile, /^@?api:/, JUSTFILE_BOUNDARY);
+    expect(apiBlock).toContain('node apps/api/dist/server.js');
+
+    const apiDevBlock = extractBlock(justfile, /^@?api-dev:/, JUSTFILE_BOUNDARY);
+    expect(apiDevBlock).toContain('tsx watch src/server.ts');
+
+    const ciBlock = extractBlock(justfile, /^@?ci:/, JUSTFILE_BOUNDARY);
+    expect(ciBlock).toContain('install');
+    expect(ciBlock).toContain('all');
+    expect(ciBlock).toContain('docs-check');
+    expect(ciBlock).toContain('build');
+    expect(ciBlock).toContain('lefthook run pre-commit --all-files');
+
+    expect(justfile).not.toMatch(/^@?(?:pr-to-testrepo|clean-pr-to-testrepo|create-test-pr)\b.*:/m);
   });
 });

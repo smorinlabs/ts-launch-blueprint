@@ -5,27 +5,27 @@ gates, and builds its packages. Run the commands from the repository root.
 Source-template provenance is recorded in
 [the press receipt](../../press/press-receipt.toml) under `[press.from]`.
 
-## 1. Check Foundational Tools
+## 1. Level 1: Bootstrap Foundational Tools
 
 ```bash
-make check
+make bootstrap   # ensures node >=24, pnpm 10, and just are installed, then runs make check
 ```
 
-Node **24 or newer** (`.nvmrc`, `engines.node`) and `just` are required, with
-pnpm 10 (`packageManager` in `package.json`) managing dependencies. See
-[Setting Up Development](../tasks/setting-up-development.md) for install
-options.
+Node **24 or newer** (`.nvmrc`, `engines.node`), pnpm 10 (`packageManager` in
+`package.json`), and `just` are required. Optional `mise install`,
+`flox activate`, and VS Code Dev Container configurations are also provided —
+see [Setting Up Development](../tasks/setting-up-development.md) for details.
 
-## 2. Install Dependencies and Hooks
+## 2. Level 2: Run Unified Setup
 
 ```bash
-just install
-just setup-hooks
+just setup
 ```
 
-`just install` installs the pinned shell/workflow analyzers and runs
-`pnpm install` (which activates lefthook via `prepare`). `just setup-hooks`
-ensures git hooks and `.gitmessage` are wired.
+`just setup` is idempotent: it verifies the Level 1 toolchain (`make check`),
+installs the pinned analyzers (`shellcheck`, `actionlint`,
+`editorconfig-checker`, `gitleaks`), runs `pnpm install`, wires git hooks and
+`.gitmessage` via `just setup-hooks`, and runs `just check-deps`.
 
 ## 3. Verify Quality Gates
 
@@ -35,7 +35,8 @@ just docs-check
 ```
 
 `just all` runs formatting checks, linting, architecture boundary checks, shell
-and workflow checks, type checking, and the Vitest suite.
+and workflow checks, EditorConfig and spelling checks, type checking, and the
+Vitest suite.
 
 ## 4. Build and Run
 
@@ -48,7 +49,8 @@ just version
 The CLI command name is listed in `apps/cli/package.json` under `bin` (see
 [EXAMPLECLI.md](../../EXAMPLECLI.md) and
 [CLI Reference](../reference/cli-reference.md)). For the HTTP API, run
-`just api` and see [API Reference](../reference/api-reference.md).
+`just api` (built bundle) or `just api-dev` (`tsx watch` reload mode) and see
+[API Reference](../reference/api-reference.md).
 
 ## 5. Configure Releases and Repository Services
 
