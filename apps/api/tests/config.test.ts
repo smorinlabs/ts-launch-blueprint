@@ -17,6 +17,7 @@ describe('resolveApiConfig', () => {
       tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
       corsOrigins: [],
       rateLimit: undefined,
+      trustProxy: false,
       shutdownTimeoutMs: 10_000,
     });
   });
@@ -32,6 +33,7 @@ describe('resolveApiConfig', () => {
       tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
       corsOrigins: [],
       rateLimit: undefined,
+      trustProxy: false,
       shutdownTimeoutMs: 10_000,
     });
     expect(resolveApiConfig({ HOST: '' }).host).toBe('127.0.0.1');
@@ -93,6 +95,7 @@ describe('resolveApiConfig', () => {
       tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
       corsOrigins: [],
       rateLimit: undefined,
+      trustProxy: false,
       shutdownTimeoutMs: 10_000,
     });
     expect(resolveApiConfig({ TS_PROJECTS_SOURCE: 'http', TS_PROJECTS_TOKEN: 't' })).toEqual({
@@ -107,6 +110,7 @@ describe('resolveApiConfig', () => {
       tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
       corsOrigins: [],
       rateLimit: undefined,
+      trustProxy: false,
       shutdownTimeoutMs: 10_000,
     });
   });
@@ -271,6 +275,46 @@ describe('resolveApiConfig', () => {
         );
       }
     );
+  });
+
+  describe('TRUST_PROXY', () => {
+    it('defaults to false when unset, empty, "false", or "0"', () => {
+      expect(resolveApiConfig({}).trustProxy).toBe(false);
+      expect(resolveApiConfig({ TRUST_PROXY: '' }).trustProxy).toBe(false);
+      expect(resolveApiConfig({ TRUST_PROXY: 'false' }).trustProxy).toBe(false);
+      expect(resolveApiConfig({ TRUST_PROXY: 'FALSE' }).trustProxy).toBe(false);
+      expect(resolveApiConfig({ TRUST_PROXY: '0' }).trustProxy).toBe(false);
+    });
+
+    it('accepts "true" / "1" and comma-separated or JSON IP/CIDR allowlists', () => {
+      expect(resolveApiConfig({ TRUST_PROXY: 'true' }).trustProxy).toBe(true);
+      expect(resolveApiConfig({ TRUST_PROXY: '1' }).trustProxy).toBe(true);
+      expect(
+        resolveApiConfig({ TRUST_PROXY: '127.0.0.1, 10.0.0.0/8, ::1, fd00::/8' }).trustProxy
+      ).toEqual(['127.0.0.1', '10.0.0.0/8', '::1', 'fd00::/8']);
+      expect(
+        resolveApiConfig({ TRUST_PROXY: '["192.168.0.0/16","2001:db8::/32"]' }).trustProxy
+      ).toEqual(['192.168.0.0/16', '2001:db8::/32']);
+    });
+
+    it.each([
+      'yes',
+      'not-an-ip',
+      '10.0.0.0/33',
+      '10.0.0.0/-1',
+      '10.0.0.0/abc',
+      '10.0.0.1/8/16',
+      '::1/129',
+      '[]',
+      '[123]',
+      '[invalid',
+      '127.0.0.1,',
+    ])('rejects invalid TRUST_PROXY=%s', (value) => {
+      expect(() => resolveApiConfig({ TRUST_PROXY: value })).toThrow(ConfigError);
+      expect(() => resolveApiConfig({ TRUST_PROXY: value })).toThrow(
+        `Invalid TRUST_PROXY "${value}"`
+      );
+    });
   });
 
   describe('SHUTDOWN_TIMEOUT_MS', () => {

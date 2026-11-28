@@ -1460,4 +1460,301 @@ describe('detectBreakingContractChanges', () => {
       diff.breaking.some((b) => b.procedure === 'broken' && b.path === 'output.dropAPSchema.*')
     ).toBe(true);
   });
+
+  it('distinguishes exclusive oneOf (z.xor) from inclusive anyOf on input union evolution (#97)', () => {
+    const xorBaseRouter = router({
+      items: router({
+        byDisc: publicProcedure
+          .input(
+            z.xor([
+              z.object({ kind: z.literal('a'), val: z.string() }),
+              z.object({ kind: z.literal('b'), num: z.number() }),
+            ])
+          )
+          .query(() => ({ ok: true })),
+        byPrim: publicProcedure
+          .input(z.xor([z.string().min(1).max(3), z.number().int().min(1).max(10)]))
+          .query(() => ({ ok: true })),
+        byTuple: publicProcedure
+          .input(z.xor([z.tuple([z.string()]), z.tuple([z.number()])]))
+          .query(() => ({ ok: true })),
+        alreadyOverlapping: publicProcedure
+          .input(z.xor([z.object({ a: z.string() }), z.object({ b: z.string() })]))
+          .query(() => ({ ok: true })),
+        inclusive: publicProcedure
+          .input(z.union([z.string().min(1), z.number()]))
+          .query(() => ({ ok: true })),
+      }),
+    });
+
+    // Adding disjoint branches to z.xor (and reordering unchanged overlapping z.xor, or adding overlapping branch to z.union) is non-breaking.
+    const disjointHead = router({
+      items: router({
+        byDisc: publicProcedure
+          .input(
+            z.xor([
+              z.object({ kind: z.literal('a'), val: z.string() }),
+              z.object({ kind: z.literal('b'), num: z.number() }),
+              z.object({ kind: z.literal('c'), flag: z.boolean() }),
+            ])
+          )
+          .query(() => ({ ok: true })),
+        byPrim: publicProcedure
+          .input(
+            z.xor([
+              z.string().min(1).max(3),
+              z.number().int().min(1).max(10),
+              z.string().min(5),
+              z.number().int().min(20),
+              z.boolean(),
+            ])
+          )
+          .query(() => ({ ok: true })),
+        byTuple: publicProcedure
+          .input(z.xor([z.tuple([z.string()]), z.tuple([z.number()]), z.tuple([z.boolean()])]))
+          .query(() => ({ ok: true })),
+        alreadyOverlapping: publicProcedure
+          .input(z.xor([z.object({ b: z.string() }), z.object({ a: z.string() })]))
+          .query(() => ({ ok: true })),
+        inclusive: publicProcedure
+          .input(z.union([z.string().min(1), z.number(), z.string().max(10)]))
+          .query(() => ({ ok: true })),
+      }),
+    });
+
+    const compatDiff = detectBreakingContractChanges(
+      snapshotFrom(xorBaseRouter),
+      snapshotFrom(disjointHead)
+    );
+    expect(compatDiff.breaking).toEqual([]);
+
+    // Adding overlapping branches to z.xor or switching overlapping anyOf -> oneOf breaks previously accepted inputs.
+    const overlappingHead = router({
+      items: router({
+        byDisc: publicProcedure
+          .input(
+            z.xor([
+              z.object({ kind: z.literal('a'), val: z.string() }),
+              z.object({ kind: z.literal('b'), num: z.number() }),
+              z.object({ val: z.string() }), // overlaps kind='a' branch!
+            ])
+          )
+          .query(() => ({ ok: true })),
+        byPrim: publicProcedure
+          .input(
+            z.xor([
+              z.string().min(1).max(3),
+              z.number().int().min(1).max(10),
+              z.string().min(2), // overlaps length 2..3!
+            ])
+          )
+          .query(() => ({ ok: true })),
+        byTuple: publicProcedure
+          .input(
+            z.xor([
+              z.tuple([z.string()]),
+              z.tuple([z.number()]),
+              z.array(z.string()).min(1).max(2), // overlaps [string] tuple!
+            ])
+          )
+          .query(() => ({ ok: true })),
+        alreadyOverlapping: publicProcedure
+          .input(
+            z.xor([
+              z.object({ a: z.string() }),
+              z.object({ b: z.string() }),
+              z.object({ c: z.string().optional() }), // new branch overlapping both!
+            ])
+          )
+          .query(() => ({ ok: true })),
+        inclusive: publicProcedure
+          .input(z.xor([z.string().min(1), z.number(), z.string().max(10)]))
+          .query(() => ({ ok: true })),
+      }),
+    });
+
+    const overlapDiff = detectBreakingContractChanges(
+      snapshotFrom(xorBaseRouter),
+      snapshotFrom(overlappingHead)
+    );
+    expect(new Set(overlapDiff.breaking.map((b) => b.procedure))).toEqual(
+      new Set([
+        'items.alreadyOverlapping',
+        'items.byDisc',
+        'items.byPrim',
+        'items.byTuple',
+        'items.inclusive',
+      ])
+    );
+    for (const item of overlapDiff.breaking) {
+      expect(item.reason).toContain('oneOf');
+    }
+  });
+
+  it('handles additional oneOf overlap edge cases (enums, strict objects, nullability, numeric bounds, catchalls)', () => {
+    const baseSnap: ApiContractSnapshot = {
+      schemaVersion: 1,
+      version: '0.0.0',
+      procedures: {
+        disjointStrict: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              {
+                type: 'object',
+                properties: { a: { type: 'string' } },
+                required: ['a'],
+                additionalProperties: false,
+              },
+              {
+                type: 'object',
+                properties: { b: { type: 'number' } },
+                required: ['b'],
+                additionalProperties: false,
+              },
+            ],
+          },
+          output: null,
+        },
+        disjointCatchall: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              {
+                type: 'object',
+                properties: { a: { type: 'number' } },
+                required: ['a'],
+                additionalProperties: { type: 'number' },
+              },
+            ],
+          },
+          output: null,
+        },
+        enumXor: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              { type: 'string', enum: ['red', 'blue'] },
+              { type: 'integer', minimum: 1, maximum: 5, multipleOf: 2 },
+            ],
+          },
+          output: null,
+        },
+        nullXor: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [{ type: 'null' }, { type: 'string', pattern: '^[a-z]+$' }],
+          },
+          output: null,
+        },
+        arrayLenXor: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [{ type: 'array', minItems: 1, maxItems: 2 }],
+          },
+          output: null,
+        },
+      },
+    };
+
+    const headSnap: ApiContractSnapshot = {
+      schemaVersion: 1,
+      version: '0.0.0',
+      procedures: {
+        disjointStrict: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              {
+                type: 'object',
+                properties: { a: { type: 'string' } },
+                required: ['a'],
+                additionalProperties: false,
+              },
+              {
+                type: 'object',
+                properties: { b: { type: 'number' } },
+                required: ['b'],
+                additionalProperties: false,
+              },
+              {
+                type: 'object',
+                properties: { c: { type: 'boolean' } },
+                required: ['c'],
+                additionalProperties: false,
+              },
+            ],
+          },
+          output: null,
+        },
+        disjointCatchall: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              {
+                type: 'object',
+                properties: { a: { type: 'number' } },
+                required: ['a'],
+                additionalProperties: { type: 'number' },
+              },
+              {
+                type: 'object',
+                properties: { tag: { type: 'string' } },
+                required: ['tag'],
+                additionalProperties: { type: 'string' },
+              },
+            ],
+          },
+          output: null,
+        },
+        enumXor: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              { type: 'string', enum: ['red', 'blue'] },
+              { type: 'integer', minimum: 1, maximum: 5, multipleOf: 2 },
+              { type: 'string', const: 'green' },
+              { type: 'integer', const: 4 }, // overlaps 1..5 multipleOf 2!
+            ],
+          },
+          output: null,
+        },
+        nullXor: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              { type: 'null' },
+              { type: 'string', pattern: '^[a-z]+$' },
+              { type: 'string', const: 'abc' }, // matches ^[a-z]+$!
+              { type: 'string', const: '123' }, // disjoint from ^[a-z]+$
+            ],
+          },
+          output: null,
+        },
+        arrayLenXor: {
+          type: 'query',
+          inputOptional: false,
+          input: {
+            oneOf: [
+              { type: 'array', minItems: 1, maxItems: 2 },
+              { type: 'array', minItems: 3, maxItems: 4 },
+            ],
+          },
+          output: null,
+        },
+      },
+    };
+
+    const diff = detectBreakingContractChanges(baseSnap, headSnap);
+    expect(new Set(diff.breaking.map((b) => b.procedure))).toEqual(new Set(['enumXor', 'nullXor']));
+  });
 });

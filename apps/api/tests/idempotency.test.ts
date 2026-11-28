@@ -324,6 +324,7 @@ describe('idempotency middleware mounted in createApp with a tRPC mutation (Q8.A
       router: mutationTestRouter,
       corsOrigins: ['https://app.example.com'],
       rateLimit: { limit: 2, windowMs: 60_000, unit: 'minute' },
+      trustProxy: true,
     });
 
     const first = await app.request('/trpc/items.create', {

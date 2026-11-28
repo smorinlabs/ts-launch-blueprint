@@ -237,20 +237,41 @@ describe('security headers, CORS, and rate limiting', () => {
     }
   });
 
-  it('enforces opt-in rate limit and preserves security headers + x-request-id on 429', async () => {
+  it('enforces opt-in rate limit, wires trustProxy, and preserves security headers + x-request-id on 429', async () => {
     const limitedApp = createApp({
       core: createCore({ source: 'memory' }),
       logger: captureLogger().logger,
       rateLimit: { limit: 2, windowMs: 60_000, unit: 'minute' },
+      trustProxy: ['10.0.0.0/8'],
     });
 
-    const r1 = await limitedApp.request('/healthz', { headers: { 'x-real-ip': '203.0.113.5' } });
-    const r2 = await limitedApp.request('/healthz', { headers: { 'x-real-ip': '203.0.113.5' } });
-    const r3 = await limitedApp.request('/healthz', { headers: { 'x-real-ip': '203.0.113.5' } });
+    const proxyEnv = { incoming: { socket: { remoteAddress: '10.0.0.1' } } };
+    const r1 = await limitedApp.request(
+      '/healthz',
+      { headers: { 'x-real-ip': '203.0.113.5' } },
+      proxyEnv
+    );
+    const r2 = await limitedApp.request(
+      '/healthz',
+      { headers: { 'x-real-ip': '203.0.113.5' } },
+      proxyEnv
+    );
+    const r3 = await limitedApp.request(
+      '/healthz',
+      { headers: { 'x-real-ip': '203.0.113.5' } },
+      proxyEnv
+    );
+    // Different client behind the trusted proxy gets its own bucket.
+    const other = await limitedApp.request(
+      '/healthz',
+      { headers: { 'x-real-ip': '203.0.113.6' } },
+      proxyEnv
+    );
 
     expect(r1.status).toBe(200);
     expect(r2.status).toBe(200);
     expect(r3.status).toBe(429);
+    expect(other.status).toBe(200);
     expect(r3.headers.get('content-type')).toContain(PROBLEM_CONTENT_TYPE);
     expect(r3.headers.get('retry-after')).toBeTruthy();
     expect(r3.headers.get('x-ratelimit-limit')).toBe('2');

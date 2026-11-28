@@ -38,7 +38,7 @@ const core =
         http: { token: config.token, fetchImpl: globalThis.fetch, baseUrl: config.baseUrl },
       });
 
-const { host, port, source, corsOrigins, rateLimit, shutdownTimeoutMs } = config;
+const { host, port, source, corsOrigins, rateLimit, trustProxy, shutdownTimeoutMs } = config;
 const metrics = config.metricsEnabled ? createMetrics({ collectDefaults: true }) : undefined;
 const app = createApp({
   core,
@@ -48,6 +48,7 @@ const app = createApp({
   tracing,
   corsOrigins,
   rateLimit,
+  trustProxy,
 });
 const server = serve({ fetch: app.fetch, hostname: host, port }, () => {
   logger.info(
