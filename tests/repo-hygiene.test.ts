@@ -1674,3 +1674,488 @@ describe('Makefile Level 1 bootstrap and Justfile DX parity (P06)', () => {
     expect(justfile).not.toMatch(/^@?(?:pr-to-testrepo|clean-pr-to-testrepo|create-test-pr)\b.*:/m);
   });
 });
+
+describe('P12-TS01: AI readiness hub and vendor rule retirement (P12)', () => {
+  it('CLAUDE.md is a minimal <=10 line entrypoint importing @AGENTS.md without duplicated tables', () => {
+    const claudeMd = readFileSync(join(REPO_ROOT, 'CLAUDE.md'), 'utf8').replaceAll('\r\n', '\n');
+    const lines = claudeMd.replace(/\n$/, '').split('\n');
+    expect(lines.length).toBeLessThanOrEqual(10);
+    expect(lines).toContain('@AGENTS.md');
+    expect(claudeMd).not.toContain('## Project Commands');
+    expect(claudeMd).not.toContain('## Code Style');
+    expect(claudeMd).not.toContain('50 chars');
+  });
+
+  it('retires .cursor/ and .windsurf/ vendor rule directories (Q10.A, Py ADR 0014)', () => {
+    expect(existsSync(join(REPO_ROOT, '.cursor'))).toBe(false);
+    expect(existsSync(join(REPO_ROOT, '.windsurf'))).toBe(false);
+  });
+
+  it('AGENTS.md stays <= 20,000 bytes and drops stale S3a/S3b, 50-char, and vendor-spoke claims', () => {
+    const agentsMd = readFileSync(join(REPO_ROOT, 'AGENTS.md'), 'utf8');
+    expect(Buffer.byteLength(agentsMd, 'utf8')).toBeLessThanOrEqual(20_000);
+    expect(agentsMd).not.toContain('None yet');
+    expect(agentsMd).not.toContain('S3a/S3b');
+    expect(agentsMd).not.toContain('50-char');
+    expect(agentsMd).not.toContain('72-char');
+    expect(agentsMd).not.toContain('.cursor/rules');
+    expect(agentsMd).not.toContain('.windsurf/rules');
+    expect(agentsMd).not.toMatch(/\bjust setup(?!-hooks)\b/);
+    expect(agentsMd).not.toContain('new-ts-project');
+  });
+
+  it('AGENTS.md documents all 4 workspace packages and accurate per-package runtime deps', () => {
+    const agentsMd = readFileSync(join(REPO_ROOT, 'AGENTS.md'), 'utf8');
+    for (const token of [
+      'packages/core',
+      'apps/cli',
+      'apps/api',
+      'apps/web',
+      '@ts-launch-blueprint/core',
+      '@ts-launch-blueprint/api',
+      '@ts-launch-blueprint/web',
+      'ts-projects',
+      'apps/cli/dist',
+      'apps/api/dist',
+      'apps/web/dist',
+      'zod',
+      'commander',
+      'hono',
+      '@trpc/server',
+      'react',
+      '@tanstack/react-query',
+      '@trpc/client',
+    ]) {
+      expect(agentsMd).toContain(token);
+    }
+  });
+
+  it('AGENTS.md documents 100/200/200 commitlint, verification flow, merge guard, releases, doc link policy, and folded rules', () => {
+    const agentsMd = readFileSync(join(REPO_ROOT, 'AGENTS.md'), 'utf8');
+    for (const token of [
+      '100',
+      '200',
+      'just all',
+      'just coverage',
+      'just pack-check',
+      'just docs-check',
+      'just press-verify',
+      'just api',
+      'just web',
+      'required_review_thread_resolution',
+      'resolveReviewThread',
+      'release-please',
+      '--merge',
+      'publish.yml',
+      'Trusted Publishing',
+      'scripts/check-links.mjs',
+      "[group('",
+      'Introduction',
+      'Purpose and Problem Solved by This Feature/Tool',
+      'Getting Started',
+      'Usage',
+      'Configuration',
+      'Testing',
+      'Disabling the Feature',
+      'References',
+    ]) {
+      expect(agentsMd).toContain(token);
+    }
+  });
+
+  it('.claude/settings.json covers apps/web, api/web/coverage/docs-check announcements and preserves plugins', () => {
+    const settings = JSON.parse(
+      readFileSync(join(REPO_ROOT, '.claude', 'settings.json'), 'utf8')
+    ) as {
+      companyAnnouncements?: string[];
+      enabledPlugins?: Record<string, boolean>;
+      extraKnownMarketplaces?: Record<string, unknown>;
+    };
+    expect(Array.isArray(settings.companyAnnouncements)).toBe(true);
+    const announcement = settings.companyAnnouncements?.[0] ?? '';
+    expect(announcement).toContain('apps/web');
+    expect(announcement).toContain('just api');
+    expect(announcement).toContain('just web');
+    expect(announcement).toContain('just coverage');
+    expect(announcement).toContain('just docs-check');
+    expect(settings.enabledPlugins?.['typescript-lsp@claude-plugins-official']).toBe(true);
+    expect(settings.enabledPlugins?.['ast-grep@ast-grep-marketplace']).toBe(true);
+    expect(settings.extraKnownMarketplaces?.['ast-grep-marketplace']).toBeDefined();
+  });
+});
+
+describe('P12-TS02: AI review configs, CODEOWNERS, PR template, llms.txt, and Claude workflows (P12)', () => {
+  const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
+
+  it('.coderabbit.yaml configures assertive non-failing review, TS/YAML path_instructions, and AGENTS/CLAUDE/docs knowledge_base', () => {
+    const path = join(REPO_ROOT, '.coderabbit.yaml');
+    expect(existsSync(path)).toBe(true);
+    const raw = readFileSync(path, 'utf8');
+    const parsed = parse(raw) as {
+      knowledge_base?: { code_guidelines?: { enabled?: boolean; filePatterns?: string[] } };
+      reviews?: {
+        profile?: string;
+        fail_commit_status?: boolean;
+        commit_status?: boolean;
+        auto_review?: { enabled?: boolean };
+        path_instructions?: Array<{ path?: string; instructions?: string }>;
+      };
+    };
+    expect(parsed.knowledge_base?.code_guidelines?.enabled).toBe(true);
+    expect(parsed.knowledge_base?.code_guidelines?.filePatterns).toContain('AGENTS.md');
+    expect(parsed.knowledge_base?.code_guidelines?.filePatterns).toContain('CLAUDE.md');
+    expect(parsed.reviews?.profile).toBe('assertive');
+    expect(parsed.reviews?.fail_commit_status).toBe(false);
+    expect(parsed.reviews?.commit_status).toBe(true);
+    expect(parsed.reviews?.auto_review?.enabled).toBe(true);
+    const paths = parsed.reviews?.path_instructions?.map((entry) => entry.path ?? '') ?? [];
+    expect(paths.some((p) => p.includes('ts'))).toBe(true);
+    expect(paths.some((p) => p.includes('yml') || p.includes('yaml'))).toBe(true);
+  });
+
+  it('.greptile/config.json and .greptile/rules.md include TS checklist and PR-head prompt-injection guard', () => {
+    const configPath = join(REPO_ROOT, '.greptile', 'config.json');
+    const rulesPath = join(REPO_ROOT, '.greptile', 'rules.md');
+    expect(existsSync(configPath)).toBe(true);
+    expect(existsSync(rulesPath)).toBe(true);
+
+    const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
+      strictness?: number;
+      statusCheck?: boolean;
+      triggerOnUpdates?: boolean;
+      instructions?: string;
+    };
+    expect(config.strictness).toBe(2);
+    expect(config.statusCheck).toBe(true);
+    expect(config.triggerOnUpdates).toBe(true);
+    expect(config.instructions).toContain('AGENTS.md');
+    expect(config.instructions).toContain('CLAUDE.md');
+    expect(config.instructions).toContain('.greptile/');
+    expect(config.instructions).toMatch(/merged into the base branch/i);
+
+    const rules = readFileSync(rulesPath, 'utf8');
+    expect(rules).toContain('AGENTS.md');
+    expect(rules).toContain('CLAUDE.md');
+    expect(rules).toContain('oxlint');
+    expect(rules).toContain('oxfmt');
+    expect(rules).toContain('typecheck');
+    expect(rules).toMatch(/SHA-pinned/i);
+  });
+
+  it('.github/CODEOWNERS protects workflows, audit-triage, CODEOWNERS, and AI configs', () => {
+    const codeownersPath = join(REPO_ROOT, '.github', 'CODEOWNERS');
+    expect(existsSync(codeownersPath)).toBe(true);
+    const content = readFileSync(codeownersPath, 'utf8');
+    for (const protectedPath of [
+      '/.github/workflows/',
+      '/.github/scripts/muse_audit_triage.py',
+      '/.github/muse-audit-triage/',
+      '/.github/CODEOWNERS',
+      '/AGENTS.md',
+      '/CLAUDE.md',
+      '/.coderabbit.yaml',
+      '/.greptile/',
+    ]) {
+      expect(content).toContain(protectedPath);
+    }
+  });
+
+  it('.github/pull_request_template.md removes stray --> and includes ## Review Trigger', () => {
+    const tpl = readFileSync(join(REPO_ROOT, '.github', 'pull_request_template.md'), 'utf8');
+    expect(tpl).not.toContain('```\n\n-->');
+    const openCount = (tpl.match(/<!--/g) ?? []).length;
+    const closeCount = (tpl.match(/-->/g) ?? []).length;
+    expect(openCount).toBe(closeCount);
+    expect(tpl).toContain('## Review Trigger');
+    expect(tpl).toContain('@coderabbitai review');
+    expect(tpl).toContain('@greptile-apps review');
+    expect(tpl).toContain('@cubic-dev-ai review');
+  });
+
+  it('llms.txt indexes all 4 workspace packages and every repo link target exists on disk', () => {
+    const llmsPath = join(REPO_ROOT, 'llms.txt');
+    expect(existsSync(llmsPath)).toBe(true);
+    const llms = readFileSync(llmsPath, 'utf8');
+    for (const pkg of ['packages/core', 'apps/cli', 'apps/api', 'apps/web']) {
+      expect(llms).toContain(pkg);
+    }
+
+    const linkRe = /\]\(([^)]+)\)/g;
+    const targets = [...llms.matchAll(linkRe)].map((m) => m[1]!);
+    expect(targets.length).toBeGreaterThanOrEqual(8);
+
+    const repoRelPaths = targets.map((target) => {
+      const ghMatch = target.match(/^https:\/\/github\.com\/[^/]+\/[^/]+\/blob\/main\/(.+)$/);
+      return ghMatch ? ghMatch[1]! : target;
+    });
+    expect(repoRelPaths.every((rel) => !rel.startsWith('http'))).toBe(true);
+    expect(
+      repoRelPaths.every((rel) => !rel.startsWith('docs/port/') && !rel.startsWith('projects/'))
+    ).toBe(true);
+    const missing = repoRelPaths.filter((rel) => !existsSync(join(REPO_ROOT, rel)));
+    expect(missing).toEqual([]);
+  });
+
+  it('claude-code-review.yml passes SPDX, permissions, concurrency, pinning, fork/bot guards, and step gating', () => {
+    const wfPath = join(WORKFLOW_DIR, 'claude-code-review.yml');
+    expect(existsSync(wfPath)).toBe(true);
+    const raw = readFileSync(wfPath, 'utf8');
+    expect(raw.split(/\r?\n/)[0]).toBe('# SPDX-License-Identifier: MIT');
+
+    const wf = parse(raw) as {
+      permissions?: Record<string, unknown>;
+      concurrency?: { group?: string; 'cancel-in-progress'?: unknown };
+      jobs: {
+        'claude-review': {
+          if?: string;
+          permissions?: Record<string, string>;
+          'continue-on-error'?: boolean;
+          steps: Array<{
+            id?: string;
+            if?: string;
+            uses?: string;
+            with?: Record<string, unknown>;
+            env?: Record<string, string>;
+            'continue-on-error'?: boolean;
+          }>;
+        };
+      };
+    };
+
+    expect(wf.permissions).toEqual({});
+    expect(wf.concurrency?.group).toContain('github.event.pull_request.number || github.sha');
+    expect(wf.concurrency?.['cancel-in-progress']).toBe(
+      "${{ github.event_name == 'pull_request' }}"
+    );
+
+    const job = wf.jobs['claude-review'];
+    expect(job).toBeDefined();
+    expect(job.if).toContain('github.event.pull_request.head.repo.full_name == github.repository');
+    expect(job.if).toContain("github.event.pull_request.user.type != 'Bot'");
+    expect(job.if).toContain("github.event.sender.type != 'Bot'");
+    expect(job.if).not.toContain('vars.CLAUDE_REVIEW_ENABLED');
+    expect(job.permissions).toEqual({
+      contents: 'read',
+      'pull-requests': 'read',
+      issues: 'read',
+      'id-token': 'write',
+    });
+    expect(job['continue-on-error']).toBeUndefined();
+
+    const [configuration, checkout, review] = job.steps;
+    expect(configuration?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(
+      '${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}'
+    );
+    const cond = `steps.${configuration!.id}.outputs.configured == 'true'`;
+    expect(checkout?.if).toBe(cond);
+    expect(checkout?.uses).toBe('actions/checkout@v7');
+    expect(checkout?.with?.['persist-credentials']).toBe(false);
+    expect(review?.if).toBe(cond);
+    expect(review?.['continue-on-error']).toBeUndefined();
+    expect(raw).toMatch(/anthropics\/claude-code-action@[0-9a-f]{40}\s+#\s*v1\b/);
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'claude-code-review.yml configuration step skips cleanly when CLAUDE_CODE_OAUTH_TOKEN is empty',
+    () => {
+      const wf = parse(readFileSync(join(WORKFLOW_DIR, 'claude-code-review.yml'), 'utf8')) as {
+        jobs: { 'claude-review': { steps: Array<{ run?: string }> } };
+      };
+      const runScript = wf.jobs['claude-review'].steps[0]?.run ?? '';
+      const dir = mkdtempSync(join(tmpdir(), 'claude-review-empty-'));
+      try {
+        const output = join(dir, 'output');
+        const summary = join(dir, 'summary');
+        writeFileSync(output, '');
+        writeFileSync(summary, '');
+        const res = spawnSync(
+          'bash',
+          ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', runScript],
+          {
+            cwd: dir,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              CLAUDE_CODE_OAUTH_TOKEN: '',
+              GITHUB_OUTPUT: output,
+              GITHUB_STEP_SUMMARY: summary,
+            },
+          }
+        );
+        expect(res.status).toBe(0);
+        expect(readFileSync(output, 'utf8')).toBe('configured=false\n');
+        expect(res.stdout).toBe('Claude review is not configured; skipping.\n');
+        expect(readFileSync(summary, 'utf8')).toBe('Claude review is not configured; skipping.\n');
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'claude-code-review.yml configuration step sets configured=true without leaking synthetic token',
+    () => {
+      const wf = parse(readFileSync(join(WORKFLOW_DIR, 'claude-code-review.yml'), 'utf8')) as {
+        jobs: { 'claude-review': { steps: Array<{ run?: string }> } };
+      };
+      const runScript = wf.jobs['claude-review'].steps[0]?.run ?? '';
+      const token = 'synthetic-credential-$special"value';
+      const dir = mkdtempSync(join(tmpdir(), 'claude-review-token-'));
+      try {
+        const output = join(dir, 'output');
+        const summary = join(dir, 'summary');
+        writeFileSync(output, '');
+        writeFileSync(summary, '');
+        const res = spawnSync(
+          'bash',
+          ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', runScript],
+          {
+            cwd: dir,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              CLAUDE_CODE_OAUTH_TOKEN: token,
+              GITHUB_OUTPUT: output,
+              GITHUB_STEP_SUMMARY: summary,
+            },
+          }
+        );
+        expect(res.status).toBe(0);
+        const outputText = readFileSync(output, 'utf8');
+        expect(outputText).toBe('configured=true\n');
+        expect(res.stdout + res.stderr + outputText).not.toContain(token);
+        expect(readFileSync(summary, 'utf8')).toBe('');
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('claude.yml passes SPDX, permissions, triggers, pinning, fork/bot guards, and step gating', () => {
+    const wfPath = join(WORKFLOW_DIR, 'claude.yml');
+    expect(existsSync(wfPath)).toBe(true);
+    const raw = readFileSync(wfPath, 'utf8');
+    expect(raw.split(/\r?\n/)[0]).toBe('# SPDX-License-Identifier: MIT');
+
+    const wf = parse(raw) as {
+      on?: Record<string, unknown>;
+      permissions?: Record<string, unknown>;
+      jobs: {
+        claude: {
+          if?: string;
+          permissions?: Record<string, string>;
+          'continue-on-error'?: boolean;
+          steps: Array<{
+            id?: string;
+            if?: string;
+            uses?: string;
+            with?: Record<string, unknown>;
+            env?: Record<string, string>;
+            'continue-on-error'?: boolean;
+          }>;
+        };
+      };
+    };
+
+    expect(wf.permissions).toEqual({});
+    expect(wf.on).toHaveProperty('issue_comment');
+    expect(wf.on).toHaveProperty('pull_request_review_comment');
+    expect(wf.on).toHaveProperty('issues');
+    expect(wf.on).toHaveProperty('pull_request_review');
+
+    const job = wf.jobs.claude;
+    expect(job).toBeDefined();
+    expect(job.if).toContain('@claude');
+    expect(job.if).toContain("github.event.sender.type != 'Bot'");
+    expect(job.if).toContain('github.event.pull_request.head.repo.full_name == github.repository');
+    expect(job['continue-on-error']).toBeUndefined();
+
+    const [configuration, checkout, claude] = job.steps;
+    expect(configuration?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(
+      '${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}'
+    );
+    const cond = `steps.${configuration!.id}.outputs.configured == 'true'`;
+    expect(checkout?.if).toBe(cond);
+    expect(checkout?.uses).toBe('actions/checkout@v7');
+    expect(checkout?.with?.['persist-credentials']).toBe(false);
+    expect(claude?.if).toBe(cond);
+    expect(claude?.['continue-on-error']).toBeUndefined();
+    expect(raw).toMatch(/anthropics\/claude-code-action@[0-9a-f]{40}\s+#\s*v1\b/);
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'claude.yml configuration step skips cleanly when CLAUDE_CODE_OAUTH_TOKEN is empty',
+    () => {
+      const wf = parse(readFileSync(join(WORKFLOW_DIR, 'claude.yml'), 'utf8')) as {
+        jobs: { claude: { steps: Array<{ run?: string }> } };
+      };
+      const runScript = wf.jobs.claude.steps[0]?.run ?? '';
+      const dir = mkdtempSync(join(tmpdir(), 'claude-empty-'));
+      try {
+        const output = join(dir, 'output');
+        const summary = join(dir, 'summary');
+        writeFileSync(output, '');
+        writeFileSync(summary, '');
+        const res = spawnSync(
+          'bash',
+          ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', runScript],
+          {
+            cwd: dir,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              CLAUDE_CODE_OAUTH_TOKEN: '',
+              GITHUB_OUTPUT: output,
+              GITHUB_STEP_SUMMARY: summary,
+            },
+          }
+        );
+        expect(res.status).toBe(0);
+        expect(readFileSync(output, 'utf8')).toBe('configured=false\n');
+        expect(res.stdout).toBe('Claude is not configured; skipping.\n');
+        expect(readFileSync(summary, 'utf8')).toBe('Claude is not configured; skipping.\n');
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'claude.yml configuration step sets configured=true without leaking synthetic token',
+    () => {
+      const wf = parse(readFileSync(join(WORKFLOW_DIR, 'claude.yml'), 'utf8')) as {
+        jobs: { claude: { steps: Array<{ run?: string }> } };
+      };
+      const runScript = wf.jobs.claude.steps[0]?.run ?? '';
+      const token = 'synthetic-credential-$special"value';
+      const dir = mkdtempSync(join(tmpdir(), 'claude-token-'));
+      try {
+        const output = join(dir, 'output');
+        const summary = join(dir, 'summary');
+        writeFileSync(output, '');
+        writeFileSync(summary, '');
+        const res = spawnSync(
+          'bash',
+          ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', runScript],
+          {
+            cwd: dir,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              CLAUDE_CODE_OAUTH_TOKEN: token,
+              GITHUB_OUTPUT: output,
+              GITHUB_STEP_SUMMARY: summary,
+            },
+          }
+        );
+        expect(res.status).toBe(0);
+        const outputText = readFileSync(output, 'utf8');
+        expect(outputText).toBe('configured=true\n');
+        expect(res.stdout + res.stderr + outputText).not.toContain(token);
+        expect(readFileSync(summary, 'utf8')).toBe('');
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
+});

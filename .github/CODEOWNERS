@@ -1,0 +1,10 @@
+# cspell:ignore smorin
+# Sensitive governance, workflow, and AI agent configuration paths.
+/.github/workflows/ @smorin
+/.github/scripts/muse_audit_triage.py @smorin
+/.github/muse-audit-triage/ @smorin
+/.github/CODEOWNERS @smorin
+/AGENTS.md @smorin
+/CLAUDE.md @smorin
+/.coderabbit.yaml @smorin
+/.greptile/ @smorin

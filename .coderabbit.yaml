@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'docs/about/*.md'
+      - 'docs/reference/*.md'
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  # A reviewer's own quota is not a build failure. When CodeRabbit cannot
+  # review — plan rate limit, transient error — leave the commit status alone
+  # instead of setting it to 'failure'.
+  fail_commit_status: false
+  # Keep the honest signal: 'pending' while reviewing, 'success' when done.
+  commit_status: true
+  auto_review:
+    enabled: true
+  path_instructions:
+    - path: '**/*.{ts,tsx,mts,cts}'
+      instructions: |
+        Treat AGENTS.md and CLAUDE.md as the source of truth for this repo.
+        Enforce: strict TypeScript 7 (tsc --noEmit, noUncheckedIndexedAccess,
+        exactOptionalPropertyTypes, isolatedDeclarations at root except
+        apps/api and apps/web), oxlint + oxfmt (printWidth 100, single quotes,
+        sortImports), architecture boundaries (packages/core imported only via
+        @ts-launch-blueprint/core entry; apps/web imports only the AppRouter
+        type from @ts-launch-blueprint/api/router; no cross-app runtime
+        imports), explicit error classes over assertions, and no hardcoded
+        credentials. Focus on production changes; ignore test-only scaffolding
+        unless it makes production behavior worse.
+    - path: '**/*.{yml,yaml}'
+      instructions: |
+        For GitHub Actions workflows and project config, flag unpinned
+        third-party actions (must use 40-hex SHA + version comment), missing
+        top-level permissions: {} or persist-credentials: false, secret
+        exposure, and drift from the conventions in AGENTS.md (pnpm locked
+        dependencies and Justfile recipes).
