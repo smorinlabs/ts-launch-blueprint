@@ -94,9 +94,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install shell lint tools
+      - name: Install lint tools
         run: |
           just install-shell-tools
+          just install-editorconfig-checker
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Quality gates (just all)
