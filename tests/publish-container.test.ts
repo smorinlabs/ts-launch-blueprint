@@ -1,7 +1,7 @@
 // Behavioral guards for release replay, publication identity, and promotion
 // (ported from py-launch-blueprint tests/meta/test_publish_container.py).
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   build,
+  compareVersions,
   fetchWithSafeRedirects,
   HttpError,
   INDEX_MEDIA_TYPES,
@@ -452,7 +453,7 @@ describe('publish-container behavioral guards', () => {
     await expect(registry.manifest('2.10.0')).rejects.toThrow(/single-platform/);
   });
 
-  it('versions are numeric, stable, and paginated', async () => {
+  it('versions are numeric, stable, and paginated (including relative query Link)', async () => {
     const registry = new Registry(REPOSITORY, 'tok');
     registry.request = vi
       .fn<RequestFn>()
@@ -461,7 +462,7 @@ describe('publish-container behavioral guards', () => {
           JSON.stringify({ tags: ['2.9.0', '2.10.0-rc.1', 'latest', '02.0.0'] }),
           'utf8'
         ),
-        headers: { link: `</v2/${REPOSITORY}/tags/list?last=2.9.0>; rel="next"` },
+        headers: { link: '<?n=1000&last=2.9.0>; rel="next"' },
       })
       .mockResolvedValueOnce({
         raw: Buffer.from(JSON.stringify({ tags: ['2.10.0', '1.0.0'] }), 'utf8'),
@@ -469,6 +470,16 @@ describe('publish-container behavioral guards', () => {
       });
 
     await expect(registry.versions()).resolves.toEqual(['1.0.0', '2.9.0', '2.10.0']);
+    expect(registry.request).toHaveBeenNthCalledWith(1, `/v2/${REPOSITORY}/tags/list?n=1000`);
+    expect(registry.request).toHaveBeenNthCalledWith(
+      2,
+      `/v2/${REPOSITORY}/tags/list?n=1000&last=2.9.0`
+    );
+  });
+
+  it('compareVersions compares large version components without Number rounding', () => {
+    expect(compareVersions('2.9.0', '2.10.0')).toBeLessThan(0);
+    expect(compareVersions('9007199254740993.0.0', '9007199254740992.0.0')).toBeGreaterThan(0);
   });
 
   it('registry pagination cannot send credentials to another host', async () => {
@@ -588,14 +599,16 @@ describe('publish-container behavioral guards', () => {
     });
   });
 
-  it('public check uses an empty temporary docker configuration', () => {
+  it('public check uses an isolated temporary docker configuration without inherited auth', () => {
     const { manifest } = makeImage();
     const directories: string[] = [];
     const run: RunFn = (cmd, args, options) => {
       const directory = options?.env?.DOCKER_CONFIG;
       expect(directory).toBeTypeOf('string');
+      expect(options?.env?.DOCKER_AUTH_CONFIG).toBeUndefined();
       directories.push(directory!);
-      expect(readdirSync(directory!)).toEqual([]);
+      expect(readdirSync(directory!)).toEqual(['config.json']);
+      expect(readFileSync(join(directory!, 'config.json'), 'utf8')).toBe('{"auths":{}}\n');
       expect([cmd, ...args]).toEqual([
         'docker',
         'pull',
@@ -605,7 +618,7 @@ describe('publish-container behavioral guards', () => {
       return '';
     };
 
-    verifyPublic(REPOSITORY, manifest, { env: {}, run });
+    verifyPublic(REPOSITORY, manifest, { env: { DOCKER_AUTH_CONFIG: '{"auths":{}}' }, run });
     expect(directories).toHaveLength(1);
     expect(existsSync(directories[0]!)).toBe(false);
   });
@@ -735,7 +748,7 @@ describe('publish-container behavioral guards', () => {
     expect(sourceVersion()).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
-  it('smokeTest validates non-root uid, health version, and always cleans up container', async () => {
+  it('smokeTest validates non-root uid, health version, passes remaining timeoutMs, and cleans up container', async () => {
     const runOk = vi
       .fn<RunFn>()
       .mockReturnValueOnce('container-123')
@@ -743,7 +756,13 @@ describe('publish-container behavioral guards', () => {
         JSON.stringify({ health: { status: 'ok', version: '2.10.0' }, uid: 1000 })
       )
       .mockReturnValueOnce('');
-    await smokeTest(IMAGE_ID, '2.10.0', { run: runOk, sleepMs: 0 });
+    await smokeTest(IMAGE_ID, '2.10.0', { run: runOk, sleepMs: 0, timeoutMs: 5_000 });
+    expect(runOk).toHaveBeenNthCalledWith(
+      2,
+      'docker',
+      ['exec', 'container-123', 'node', '-e', expect.any(String)],
+      { timeoutMs: expect.any(Number) }
+    );
     expect(runOk).toHaveBeenLastCalledWith('docker', ['rm', '--force', 'container-123']);
 
     const runRoot = vi
@@ -755,5 +774,68 @@ describe('publish-container behavioral guards', () => {
       /runs as root/
     );
     expect(runRoot).toHaveBeenLastCalledWith('docker', ['rm', '--force', 'container-456']);
+  });
+
+  it('main forwards injected run to publishFn and promoteLatestFn with isolated docker config', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ghcr-main-'));
+    try {
+      const eventPath = join(dir, 'event.json');
+      const version = sourceVersion();
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          action: 'published',
+          release: { draft: false, prerelease: false, tag_name: `v${version}` },
+        })
+      );
+      const { manifest } = makeImage(version);
+      const run = vi.fn<RunFn>().mockReturnValue(REVISION);
+      const connectRegistry = vi.fn<typeof Registry.connect>().mockResolvedValue(mockRegistry());
+      const publishFn = vi.fn<typeof publish>().mockResolvedValue(manifest);
+      const promoteLatestFn = vi.fn<typeof promoteLatest>().mockResolvedValue(manifest);
+      const env = {
+        GITHUB_EVENT_PATH: eventPath,
+        GITHUB_EVENT_NAME: 'release',
+        GITHUB_REPOSITORY: REPOSITORY,
+        GITHUB_REF: `refs/tags/v${version}`,
+        GITHUB_SHA: REVISION,
+        GITHUB_ACTOR: 'publisher',
+        GHCR_TOKEN: 'tok',
+      };
+
+      await main({
+        argv: ['publish'],
+        env,
+        run,
+        connectRegistry,
+        publishFn,
+        promoteLatestFn,
+      });
+      expect(publishFn).toHaveBeenCalledWith(
+        REPOSITORY,
+        version,
+        REVISION,
+        expect.any(Object),
+        expect.objectContaining({ DOCKER_CONFIG: expect.any(String) }),
+        { run }
+      );
+
+      await main({
+        argv: ['promote'],
+        env,
+        run,
+        connectRegistry,
+        publishFn,
+        promoteLatestFn,
+      });
+      expect(promoteLatestFn).toHaveBeenCalledWith(
+        REPOSITORY,
+        expect.any(Object),
+        expect.objectContaining({ DOCKER_CONFIG: expect.any(String) }),
+        { run }
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

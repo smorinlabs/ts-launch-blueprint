@@ -151,9 +151,13 @@ nothing, and `[core-no-app-import]` keeps it that way.
    `scripts/typecheck.sh` finds app tsconfigs by glob, so it needs no edit.
 4. `vitest.config.ts`: remove the `apps/api/src/server.ts` coverage exclusion.
 5. `Justfile`: remove the `api` recipe. `build` builds whatever apps exist.
-6. `.github/workflows/ci.yml`: remove the `Removable app check (apps/api +
-apps/web)` step.
-7. Docs that describe the API (`docs/reference/api-reference.md`, the README's
+6. `.github/workflows/ci.yml`: remove the `Removable app check (apps/api + apps/web)`
+   step and the `api-image` job (plus its entry in `ci-ok`'s `needs`).
+7. `.github/workflows/publish-container.yml`: remove the workflow (along with its
+   entry in `spdxRequired` in `tests/repo-hygiene.test.ts`,
+   `scripts/publish-container.*`, and `tests/publish-container.test.ts`), and
+   remove the `docker` ecosystem (`/apps/api`) from `.github/dependabot.yml`.
+8. Docs that describe the API (`docs/reference/api-reference.md`, the README's
    "Run the API" lines).
 
 ## Removing the Web App

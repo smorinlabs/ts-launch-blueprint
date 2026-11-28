@@ -149,6 +149,12 @@ describe('resolveApiConfig', () => {
       OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'http://traces:4318/custom',
     }).tracing;
     expect(tracing.tracesUrl).toBe('http://traces:4318/custom');
+
+    const grpcBaseOverridden = resolveApiConfig({
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'grpc://collector:4317',
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'https://traces.example/v1/traces',
+    }).tracing;
+    expect(grpcBaseOverridden.tracesUrl).toBe('https://traces.example/v1/traces');
   });
 
   it.each([
@@ -258,16 +264,19 @@ describe('resolveApiConfig', () => {
   });
 
   describe('SHUTDOWN_TIMEOUT_MS', () => {
-    it('defaults to 10_000 when unset or empty and parses positive integers', () => {
+    it('defaults to 10_000 when unset or empty and parses integers up to 2147483647', () => {
       expect(resolveApiConfig({}).shutdownTimeoutMs).toBe(10_000);
       expect(resolveApiConfig({ SHUTDOWN_TIMEOUT_MS: '' }).shutdownTimeoutMs).toBe(10_000);
       expect(resolveApiConfig({ SHUTDOWN_TIMEOUT_MS: '2500' }).shutdownTimeoutMs).toBe(2500);
+      expect(resolveApiConfig({ SHUTDOWN_TIMEOUT_MS: '2147483647' }).shutdownTimeoutMs).toBe(
+        2_147_483_647
+      );
     });
 
-    it.each(['0', '-5', '10.5', 'abc'])('rejects SHUTDOWN_TIMEOUT_MS=%s', (value) => {
+    it.each(['0', '-5', '10.5', 'abc', '2147483648'])('rejects SHUTDOWN_TIMEOUT_MS=%s', (value) => {
       expect(() => resolveApiConfig({ SHUTDOWN_TIMEOUT_MS: value })).toThrow(ConfigError);
       expect(() => resolveApiConfig({ SHUTDOWN_TIMEOUT_MS: value })).toThrow(
-        `Invalid SHUTDOWN_TIMEOUT_MS "${value}": expected a positive integer`
+        `Invalid SHUTDOWN_TIMEOUT_MS "${value}": expected an integer from 1 to 2147483647`
       );
     });
   });

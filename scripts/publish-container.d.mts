@@ -16,7 +16,7 @@ export interface BuiltImage {
 export type RunFn = (
   command: string,
   args: string[],
-  options?: { env?: NodeJS.ProcessEnv; inputText?: string; cwd?: string }
+  options?: { env?: NodeJS.ProcessEnv; inputText?: string; cwd?: string; timeoutMs?: number }
 ) => string;
 
 export declare const ROOT: string;
@@ -37,7 +37,7 @@ export declare function compareVersions(a: string, b: string): number;
 export declare function defaultRun(
   command: string,
   args: string[],
-  options?: { env?: NodeJS.ProcessEnv; inputText?: string; cwd?: string }
+  options?: { env?: NodeJS.ProcessEnv; inputText?: string; cwd?: string; timeoutMs?: number }
 ): string;
 export declare function stripRedirectCredentials(
   headers: Record<string, string>

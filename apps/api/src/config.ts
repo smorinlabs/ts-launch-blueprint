@@ -241,22 +241,6 @@ const metricsEnabledSchema = emptyOrString.transform((value, ctx) => {
   return parsed.data === 'true';
 });
 
-function otlpUrlFieldSchema(name: string) {
-  return emptyOrString.transform((value, ctx) => {
-    if (value === undefined || value === '') {
-      return undefined;
-    }
-    if (!isValidHttpUrl(value)) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `Invalid ${name} "${value}": expected an http(s) URL`,
-      });
-      return z.NEVER;
-    }
-    return value;
-  });
-}
-
 const sampleRatioSchema = emptyOrString.transform((value, ctx) => {
   if (value === undefined || value === '') {
     return 1;
@@ -300,16 +284,18 @@ const rateLimitSchema = emptyOrString.transform((value, ctx) => {
   }
 });
 
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
 const shutdownTimeoutMsSchema = emptyOrString.transform((value, ctx) => {
   if (value === undefined || value === '') {
     return DEFAULT_SHUTDOWN_TIMEOUT_MS;
   }
   const num = /^\d+$/.test(value) ? Number(value) : Number.NaN;
-  const parsed = z.number().int().positive().safeParse(num);
+  const parsed = z.number().int().positive().max(MAX_TIMEOUT_MS).safeParse(num);
   if (!parsed.success) {
     ctx.addIssue({
       code: 'custom',
-      message: `Invalid ${SHUTDOWN_TIMEOUT_ENV_VAR} "${value}": expected a positive integer`,
+      message: `Invalid ${SHUTDOWN_TIMEOUT_ENV_VAR} "${value}": expected an integer from 1 to ${MAX_TIMEOUT_MS}`,
     });
     return z.NEVER;
   }
@@ -338,8 +324,8 @@ const ApiEnvSchema = z
     [LOG_LEVEL_ENV_VAR]: logLevelSchema,
     [GCP_PROJECT_ENV_VAR]: emptyOrString.transform((v) => (v === '' ? undefined : v)),
     [METRICS_ENABLED_ENV_VAR]: metricsEnabledSchema,
-    [OTLP_TRACES_ENDPOINT_ENV_VAR]: otlpUrlFieldSchema(OTLP_TRACES_ENDPOINT_ENV_VAR),
-    [OTLP_ENDPOINT_ENV_VAR]: otlpUrlFieldSchema(OTLP_ENDPOINT_ENV_VAR),
+    [OTLP_TRACES_ENDPOINT_ENV_VAR]: emptyOrString.transform((v) => (v === '' ? undefined : v)),
+    [OTLP_ENDPOINT_ENV_VAR]: emptyOrString.transform((v) => (v === '' ? undefined : v)),
     [SERVICE_NAME_ENV_VAR]: emptyOrString.transform((v) =>
       v === undefined || v === '' ? DEFAULT_SERVICE_NAME : v
     ),
@@ -356,10 +342,27 @@ const ApiEnvSchema = z
   .transform((parsed, ctx): ApiConfig => {
     const tracesEndpoint = parsed[OTLP_TRACES_ENDPOINT_ENV_VAR];
     const baseEndpoint = parsed[OTLP_ENDPOINT_ENV_VAR];
-    // Trailing slashes dropped: `http://host:4318/` must not give `//v1/traces`.
-    const tracesUrl =
-      tracesEndpoint ??
-      (baseEndpoint !== undefined ? `${baseEndpoint.replace(/\/+$/, '')}/v1/traces` : undefined);
+    let tracesUrl: string | undefined;
+    if (tracesEndpoint !== undefined) {
+      if (!isValidHttpUrl(tracesEndpoint)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Invalid ${OTLP_TRACES_ENDPOINT_ENV_VAR} "${tracesEndpoint}": expected an http(s) URL`,
+        });
+        return z.NEVER;
+      }
+      tracesUrl = tracesEndpoint;
+    } else if (baseEndpoint !== undefined) {
+      if (!isValidHttpUrl(baseEndpoint)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Invalid ${OTLP_ENDPOINT_ENV_VAR} "${baseEndpoint}": expected an http(s) URL`,
+        });
+        return z.NEVER;
+      }
+      // Trailing slashes dropped: `http://host:4318/` must not give `//v1/traces`.
+      tracesUrl = `${baseEndpoint.replace(/\/+$/, '')}/v1/traces`;
+    }
 
     const base: BaseConfig = {
       host: parsed[HOST_ENV_VAR],

@@ -17,6 +17,7 @@ import {
   UPSTREAM_AUTH_MESSAGE,
   UPSTREAM_ERROR_MESSAGE,
 } from '../src/errors.js';
+import { createMetrics } from '../src/metrics.js';
 import { PROBLEM_CONTENT_TYPE } from '../src/problems.js';
 import { VERSION } from '../src/version.js';
 import { captureLogger, type LogLine } from './log-capture.js';
@@ -254,6 +255,29 @@ describe('security headers, CORS, and rate limiting', () => {
     for (const [header, value] of Object.entries(EXPECTED_HEADERS)) {
       expect(r3.headers.get(header)).toBe(value);
     }
+  });
+
+  it('applies CORS and rate-limit middleware to GET /metrics while counting rejected requests', async () => {
+    const metrics = createMetrics({ collectDefaults: false });
+    const metricsApp = createApp({
+      core: createCore({ source: 'memory' }),
+      logger: captureLogger().logger,
+      metrics,
+      corsOrigins: ['https://app.example.com'],
+      rateLimit: { limit: 1, windowMs: 60_000, unit: 'minute' },
+    });
+
+    const first = await metricsApp.request('/metrics', {
+      headers: { origin: 'https://app.example.com', 'x-real-ip': '203.0.113.9' },
+    });
+    expect(first.status).toBe(200);
+    expect(first.headers.get('access-control-allow-origin')).toBe('https://app.example.com');
+
+    const limited = await metricsApp.request('/metrics', {
+      headers: { origin: 'https://app.example.com', 'x-real-ip': '203.0.113.9' },
+    });
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('access-control-allow-origin')).toBe('https://app.example.com');
   });
 });
 

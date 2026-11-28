@@ -5,7 +5,14 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,27 +40,32 @@ export class HttpError extends Error {
   }
 }
 
-export function versionNumber(value) {
+function versionParts(value) {
   const match = STABLE_RE.exec(value);
   if (match === null) {
     throw new Error(`Expected a stable X.Y.Z version, got ${JSON.stringify(value)}`);
   }
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
+  return [BigInt(match[1]), BigInt(match[2]), BigInt(match[3])];
+}
+
+export function versionNumber(value) {
+  const parts = versionParts(value);
+  return [Number(parts[0]), Number(parts[1]), Number(parts[2])];
 }
 
 export function compareVersions(a, b) {
-  const va = versionNumber(a);
-  const vb = versionNumber(b);
+  const va = versionParts(a);
+  const vb = versionParts(b);
   for (let i = 0; i < 3; i += 1) {
     if (va[i] !== vb[i]) {
-      return va[i] - vb[i];
+      return va[i] < vb[i] ? -1 : 1;
     }
   }
   return 0;
 }
 
 export function defaultRun(command, args, options = {}) {
-  const { env = process.env, inputText = undefined, cwd = ROOT } = options;
+  const { env = process.env, inputText = undefined, cwd = ROOT, timeoutMs = 900_000 } = options;
   try {
     const out = execFileSync(command, args, {
       cwd,
@@ -61,7 +73,7 @@ export function defaultRun(command, args, options = {}) {
       input: inputText,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 900_000,
+      timeout: timeoutMs,
     });
     return out.trim();
   } catch (err) {
@@ -287,7 +299,15 @@ export class Registry {
         if (match === null) {
           throw new Error('Unexpected registry pagination link');
         }
-        path = match[1];
+        const currentUrl = new URL(path, 'https://ghcr.io');
+        const nextUrl = new URL(match[1], currentUrl);
+        if (nextUrl.protocol !== 'https:' || nextUrl.host !== 'ghcr.io') {
+          throw new Error('Registry pagination attempted to leave ghcr.io');
+        }
+        if (nextUrl.pathname !== `/v2/${this.repository}/tags/list`) {
+          throw new Error('Unexpected registry path');
+        }
+        path = `${nextUrl.pathname}${nextUrl.search}`;
       } else {
         path = '';
       }
@@ -443,8 +463,17 @@ export async function smokeTest(imageId, version, options = {}) {
     const deadline = Date.now() + timeoutMs;
     let result;
     for (;;) {
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        throw new Error('Container smoke test timed out before probe');
+      }
       try {
-        result = JSON.parse(run('docker', ['exec', container, 'node', '-e', probe]));
+        result = JSON.parse(
+          run('docker', ['exec', container, 'node', '-e', probe], { timeoutMs: remainingMs })
+        );
+        if (Date.now() > deadline) {
+          throw new Error('Container smoke test probe finished after deadline');
+        }
         break;
       } catch (err) {
         if (
@@ -533,7 +562,9 @@ export function verifyPublic(repository, manifest, options = {}) {
   const { env = process.env, run = defaultRun } = options;
   const directory = mkdtempSync(join(tmpdir(), 'ghcr-anonymous-'));
   try {
+    writeFileSync(join(directory, 'config.json'), '{"auths":{}}\n', 'utf8');
     const anonEnv = { ...env, DOCKER_CONFIG: directory };
+    delete anonEnv.DOCKER_AUTH_CONFIG;
     try {
       run(
         'docker',
@@ -638,15 +669,18 @@ export async function main(options = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'ghcr-publisher-'));
   let manifest;
   try {
+    // cspell:ignore creds
+    writeFileSync(join(directory, 'config.json'), '{"auths":{},"credsStore":""}\n', 'utf8');
     const dockerEnv = { ...env, DOCKER_CONFIG: directory };
+    delete dockerEnv.DOCKER_AUTH_CONFIG;
     run('docker', ['login', 'ghcr.io', '--username', env.GITHUB_ACTOR, '--password-stdin'], {
       env: dockerEnv,
       inputText: env.GHCR_TOKEN,
     });
     manifest =
       operation === 'publish'
-        ? await publishFn(repository, version, revision, registry, dockerEnv)
-        : await promoteLatestFn(repository, registry, dockerEnv);
+        ? await publishFn(repository, version, revision, registry, dockerEnv, { run })
+        : await promoteLatestFn(repository, registry, dockerEnv, { run });
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -68,15 +68,10 @@ export function createApp(deps: {
   // 3. Request ID, trace fields, child logger, one line per request.
   app.use('*', requestLog({ logger: deps.logger, gcpProjectId: deps.gcpProjectId }));
 
-  // 4. Request count and duration by route pattern, plus the scrape endpoint.
+  // 4. Request count and duration by route pattern (runs before CORS/rate-limit so rejections are counted).
   const { metrics } = deps;
   if (metrics !== undefined) {
     app.use('*', metrics.middleware());
-    app.get(METRICS_PATH, async (c) =>
-      c.body(await metrics.registry.metrics(), 200, {
-        'Content-Type': metrics.registry.contentType,
-      })
-    );
   }
 
   // 5. Opt-in CORS (only mounted when CORS_ORIGINS is non-empty).
@@ -92,6 +87,15 @@ export function createApp(deps: {
   // 6. Opt-in rate limiting (only mounted when RATE_LIMIT is configured).
   if (deps.rateLimit !== undefined) {
     app.use('*', rateLimit(deps.rateLimit));
+  }
+
+  // Scrape endpoint registered after global CORS/rate-limit middleware.
+  if (metrics !== undefined) {
+    app.get(METRICS_PATH, async (c) =>
+      c.body(await metrics.registry.metrics(), 200, {
+        'Content-Type': metrics.registry.contentType,
+      })
+    );
   }
 
   // Replaces Hono's default handler, which console.error()s the stack outside

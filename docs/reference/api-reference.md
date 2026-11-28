@@ -117,7 +117,7 @@ the server generates a UUID. The same ID is on the request's log lines.
 | `PORT`                               | Port to listen on (default `8080`, Cloud Run's default); an integer from 1 to 65535  |
 | `CORS_ORIGINS`                       | Optional opt-in CORS origins (`*`, comma-separated, or JSON array); off when unset   |
 | `RATE_LIMIT`                         | Optional opt-in rate limit (`<count>/<second\|minute\|hour\|day>`); off when unset   |
-| `SHUTDOWN_TIMEOUT_MS`                | Graceful shutdown timeout in ms (default `10000`, positive integer)                  |
+| `SHUTDOWN_TIMEOUT_MS`                | Graceful shutdown timeout in ms (default `10000`, integer `1` to `2147483647`)       |
 | `TS_PROJECTS_SOURCE`                 | `memory` (**default for the API**: demo data, no token) or `http` (the projects API) |
 | `TS_PROJECTS_TOKEN`                  | Required with `TS_PROJECTS_SOURCE=http`; checked at startup                          |
 | `TS_PROJECTS_API_URL`                | Optional API root override for the `http` source                                     |
