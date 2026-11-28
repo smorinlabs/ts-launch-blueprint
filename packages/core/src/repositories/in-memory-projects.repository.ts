@@ -1,7 +1,8 @@
 // In-memory projects repository: no network, no token, no errors. Serves a
-// seed (a built-in demo set by default) so the CLI, the future API, and
-// tests can run without the placeholder upstream service.
+// seed (a built-in demo set by default) so the CLI, the API, and tests can
+// run without the placeholder upstream service.
 import type { Project, Workspace } from '../schemas/project.schema.js';
+import type { ListProjectsOutput } from '../schemas/projects.contract.js';
 import type { ListProjectsQuery, ProjectsRepository } from './projects.repository.js';
 
 /** Data an in-memory repository serves. */
@@ -24,6 +25,26 @@ export const DEFAULT_IN_MEMORY_SEED: InMemoryProjectsSeed = {
   ],
 };
 
+function encodeCursor(offset: number): string {
+  return Buffer.from(JSON.stringify({ offset }), 'utf8').toString('base64url');
+}
+
+function decodeCursor(cursor: string): number | null {
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return null;
+    }
+    const offset = (parsed as { offset?: unknown }).offset;
+    if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0) {
+      return null;
+    }
+    return encodeCursor(offset) === cursor ? offset : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Create an in-memory repository over `seed`. Returned objects are copies,
  * so callers can't change the stored data. */
 export function createInMemoryProjectsRepository(
@@ -36,7 +57,7 @@ export function createInMemoryProjectsRepository(
       return Promise.resolve(structuredClone(store.workspaces));
     },
 
-    listProjects(query: ListProjectsQuery): Promise<Project[]> {
+    listProjects(query: ListProjectsQuery): Promise<ListProjectsOutput> {
       let projects = store.projects;
       if (query.workspaceGid !== undefined) {
         // Project carries only its workspace name, so resolve gid -> name.
@@ -46,9 +67,31 @@ export function createInMemoryProjectsRepository(
         projects =
           workspace === undefined
             ? []
-            : projects.filter((project) => project.workspace.name === workspace.name);
+            : projects.filter((project) => project.workspace?.name === workspace.name);
       }
-      return Promise.resolve(structuredClone(projects.slice(0, query.limit)));
+
+      let offset = 0;
+      if (query.cursor !== undefined) {
+        const decoded = decodeCursor(query.cursor);
+        if (decoded === null) {
+          return Promise.resolve({ projects: [], nextCursor: null });
+        }
+        offset = decoded;
+      }
+
+      const page = projects.slice(offset, offset + query.limit);
+      const nextOffset = offset + query.limit;
+      const nextCursor =
+        nextOffset < projects.length && page.length > 0 ? encodeCursor(nextOffset) : null;
+      return Promise.resolve({
+        projects: structuredClone(page),
+        nextCursor,
+      });
+    },
+
+    getProject(id: string): Promise<Project | null> {
+      const match = store.projects.find((project) => project.id === id);
+      return Promise.resolve(match === undefined ? null : structuredClone(match));
     },
   };
 }

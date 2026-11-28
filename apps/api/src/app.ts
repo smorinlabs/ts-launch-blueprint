@@ -6,8 +6,10 @@
 // (404, 429, 500, 503) return RFC 9457 application/problem+json. With a metrics
 // instance, requests and tRPC errors are counted and served at /metrics
 // (src/metrics.ts, D-052). With tracing on, every request gets a server span
-// that wraps the rest (src/tracing.ts, D-053).
+// that wraps the rest (src/tracing.ts, D-053). Unsafe requests carrying an
+// `Idempotency-Key` header replay cached 2xx responses (src/idempotency.ts, Q8.A).
 import { trpcServer } from '@hono/trpc-server';
+import type { AnyTRPCRouter } from '@trpc/server';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import type { Core } from '@ts-launch-blueprint/core';
 import { Hono } from 'hono';
@@ -16,6 +18,7 @@ import { secureHeaders } from 'hono/secure-headers';
 
 import type { RateLimitConfig } from './config.js';
 import { INTERNAL_ERROR_MESSAGE } from './errors.js';
+import { idempotency, type IdempotencyOptions } from './idempotency.js';
 import type { Logger } from './logger.js';
 import { METRICS_PATH, type Metrics, procedureLabel } from './metrics.js';
 import { problemResponse } from './problems.js';
@@ -43,6 +46,8 @@ export function createApp(deps: {
   rateLimit?: RateLimitConfig | undefined;
   checkReadiness?: (() => Promise<ReadinessCheck[]> | ReadinessCheck[]) | undefined;
   version?: string | undefined;
+  idempotency?: IdempotencyOptions | undefined;
+  router?: AnyTRPCRouter | undefined;
 }): Hono<{ Variables: RequestLogVariables }> {
   const app = new Hono<{ Variables: RequestLogVariables }>();
   const hasCors = deps.corsOrigins !== undefined && deps.corsOrigins.length > 0;
@@ -97,6 +102,9 @@ export function createApp(deps: {
       })
     );
   }
+
+  // Idempotency-Key replay middleware for POST/PUT/PATCH requests (Q8.A).
+  app.use('*', idempotency(deps.idempotency));
 
   // Replaces Hono's default handler, which console.error()s the stack outside
   // the JSON logs. The detail goes to the log; the client gets RFC 9457 Problem Details.
@@ -159,7 +167,7 @@ export function createApp(deps: {
   app.use(
     '/trpc/*',
     trpcServer({
-      router: appRouter,
+      router: deps.router ?? appRouter,
       createContext: (_opts, c) => ({
         core: deps.core,
         requestId: c.get('requestId'),

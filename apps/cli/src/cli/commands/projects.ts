@@ -54,9 +54,8 @@ function renderTable(projects: Project[], verbose: boolean): string {
   const head = verbose ? ['Project Name', 'Workspace', 'ID'] : ['Project Name', 'Workspace'];
   const table = new Table({ head, style: { head: [], border: [] } });
   for (const project of projects) {
-    const row = verbose
-      ? [project.name, project.workspace.name, project.id]
-      : [project.name, project.workspace.name];
+    const workspaceName = project.workspace?.name ?? '';
+    const row = verbose ? [project.name, workspaceName, project.id] : [project.name, workspaceName];
     table.push(row);
   }
   return table.toString();
@@ -148,7 +147,7 @@ async function runProjects(
   const spinner = spinnerEnabled ? deps.spinner('Fetching projects...') : undefined;
   let projects: Project[];
   try {
-    projects = await projectsService.listProjects({ workspaceName: workspace, limit });
+    projects = (await projectsService.listProjects({ workspaceName: workspace, limit })).projects;
   } finally {
     spinner?.stop();
   }
@@ -176,7 +175,8 @@ async function runProjects(
     selected = await deps.prompter(
       'Select projects:',
       projects.map((project) => ({
-        name: `${project.name} (${project.workspace.name})`,
+        name:
+          project.workspace === null ? project.name : `${project.name} (${project.workspace.name})`,
         value: project,
       }))
     );

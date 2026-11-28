@@ -42,6 +42,7 @@ describe('GET /trpc/projects.list contract fuzzing', () => {
       {
         workspaceName: workspaceArb,
         limit: fc.integer({ min: 1, max: 100 }),
+        cursor: fc.string({ minLength: 1, maxLength: 32 }),
       },
       { requiredKeys: [] }
     );

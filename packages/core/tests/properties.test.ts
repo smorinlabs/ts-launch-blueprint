@@ -1,4 +1,4 @@
-// Property-based round-trip tests for core schemas and converters (P08-TS02).
+// Property-based round-trip tests for core schemas and converters (P08-TS02, P10-TS01).
 import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
@@ -9,7 +9,7 @@ import { ProjectSchema, WorkspaceSchema } from '../src/schemas/project.schema.js
 const projectArb: fc.Arbitrary<Project> = fc.record({
   id: fc.string(),
   name: fc.string(),
-  workspace: fc.record({ name: fc.string() }),
+  workspace: fc.option(fc.record({ name: fc.string() }), { nil: null }),
 });
 
 describe('core schema and converter properties', () => {
@@ -37,14 +37,18 @@ describe('core schema and converter properties', () => {
       fc.property(
         projectArb,
         fc.dictionary(
-          fc.string().filter((k) => k !== 'id' && k !== 'name' && k !== 'workspace'),
+          fc.string().filter((k) => k !== 'id' && k !== 'gid' && k !== 'name' && k !== 'workspace'),
           fc.jsonValue()
         ),
         (project, extras) => {
+          const rawWorkspace =
+            project.workspace === null
+              ? null
+              : { ...project.workspace, extraWorkspaceKey: 'ignored' };
           const converted = convertProject({
             ...extras,
             ...project,
-            workspace: { ...project.workspace, extraWorkspaceKey: 'ignored' },
+            workspace: rawWorkspace,
           });
           expect(converted).toEqual({ ok: true, value: project });
           const roundTripped = ProjectSchema.parse(JSON.parse(JSON.stringify(project)));
@@ -60,19 +64,25 @@ describe('core schema and converter properties', () => {
       {
         workspaceName: fc.string(),
         limit: fc.integer({ min: 1, max: 1_000_000 }),
+        cursor: fc.string({ minLength: 1 }),
       },
       { requiredKeys: [] }
     );
 
     fc.assert(
-      fc.property(inputArb, fc.array(projectArb, { maxLength: 10 }), (input, projects) => {
-        const parsedInput = ListProjectsInputSchema.parse(JSON.parse(JSON.stringify(input)));
-        expect(parsedInput).toEqual(input);
+      fc.property(
+        inputArb,
+        fc.array(projectArb, { maxLength: 10 }),
+        fc.option(fc.string(), { nil: null }),
+        (input, projects, nextCursor) => {
+          const parsedInput = ListProjectsInputSchema.parse(JSON.parse(JSON.stringify(input)));
+          expect(parsedInput).toEqual(input);
 
-        const output = { projects };
-        const parsedOutput = ListProjectsOutputSchema.parse(JSON.parse(JSON.stringify(output)));
-        expect(parsedOutput).toEqual(output);
-      }),
+          const output = { projects, nextCursor };
+          const parsedOutput = ListProjectsOutputSchema.parse(JSON.parse(JSON.stringify(output)));
+          expect(parsedOutput).toEqual(output);
+        }
+      ),
       { numRuns: 100 }
     );
   });

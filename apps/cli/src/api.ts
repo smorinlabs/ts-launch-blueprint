@@ -15,13 +15,14 @@ export { BASE_URL, DEFAULT_LIMIT, DEFAULT_TIMEOUT_MS } from '@ts-launch-blueprin
 /** Constructor inputs; fetchImpl is the injected transport seam. */
 export type ApiClientOptions = HttpProjectsRepositoryOptions;
 
-/** Client surface (PyClient parity: get_workspaces/get_projects). */
+/** Client surface (PyClient parity: get_workspaces/get_projects/get_project). */
 export interface ApiClient {
   getWorkspaces: () => Promise<Workspace[]>;
   getProjects: (options?: {
     workspaceName?: string | undefined;
     limit?: number | undefined;
   }) => Promise<Project[]>;
+  getProject: (id: string) => Promise<Project>;
 }
 
 /** Create the API client (PyClient parity) over the repository + service. */
@@ -33,6 +34,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     // Plain data access with no business rule, so it goes straight to the
     // repository rather than through the service.
     getWorkspaces: () => repository.listWorkspaces(),
-    getProjects: (opts) => service.listProjects(opts),
+    getProjects: async (opts) => (await service.listProjects(opts)).projects,
+    getProject: (id) => service.getProject(id),
   };
 }

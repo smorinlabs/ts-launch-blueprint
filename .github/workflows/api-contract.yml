@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: MIT
+# D-043 — breaking-change gate on the committed Zod/tRPC contract snapshot.
+# apps/api/tests/contract-snapshot.test.ts keeps docs/api/contract.snapshot.json
+# fresh; this workflow diffs it semantically against the base branch so breaking
+# API changes fail the PR instead of surprising clients.
+
+name: api-contract
+
+on:
+  pull_request:
+    paths:
+      - docs/api/contract.snapshot.json
+
+permissions: {}
+
+concurrency:
+  group: api-contract-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  breaking:
+    name: contract-breaking
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 10.34.3
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Extract base-branch contract snapshot
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch origin "$BASE_REF" --depth=1
+          snapshot="origin/$BASE_REF:docs/api/contract.snapshot.json"
+          if git show "$snapshot" > "$RUNNER_TEMP/base-contract.snapshot.json" 2>/dev/null; then
+            echo "base snapshot extracted"
+          else
+            # First PR to introduce the snapshot: nothing to diff against.
+            printf '%s\n' '{"schemaVersion":1,"version":"0.0.0","procedures":{}}' \
+              > "$RUNNER_TEMP/base-contract.snapshot.json"
+          fi
+      - name: Check for breaking contract changes
+        run: >-
+          pnpm exec tsx scripts/check-contract-breaking.mjs
+          "$RUNNER_TEMP/base-contract.snapshot.json"
+          docs/api/contract.snapshot.json

@@ -639,6 +639,7 @@ describe('GitHub Actions workflows & Dependabot (S4: D-022, D-027)', () => {
       '.github/ISSUE_TEMPLATE/02-documentation-request.yml',
       '.github/ISSUE_TEMPLATE/03-bug-report.yml',
       '.github/ISSUE_TEMPLATE/config.yml',
+      '.github/workflows/api-contract.yml',
       '.github/workflows/audit-triage.yml',
       '.github/workflows/canary.yml',
       '.github/workflows/ci.yml',
@@ -2445,4 +2446,39 @@ describe('fork guard & bootstrap acceptance workflow (P07)', () => {
       );
     }
   );
+});
+
+describe('P10 API contract snapshot workflow', () => {
+  const WORKFLOW_DIR = join(REPO_ROOT, '.github', 'workflows');
+
+  it('api-contract.yml runs semantic breaking-change checks on PRs touching the contract snapshot', () => {
+    const raw = readFileSync(join(WORKFLOW_DIR, 'api-contract.yml'), 'utf8');
+    const parsed = parse(raw) as {
+      on?: { pull_request?: { paths?: string[] } };
+      permissions?: Record<string, unknown>;
+      concurrency?: { group?: string; 'cancel-in-progress'?: string };
+      jobs?: Record<
+        string,
+        {
+          'runs-on'?: string;
+          permissions?: Record<string, string>;
+          steps?: Array<{ run?: string; uses?: string }>;
+        }
+      >;
+    };
+
+    expect(parsed.permissions).toEqual({});
+    expect(parsed.on?.pull_request?.paths).toContain('docs/api/contract.snapshot.json');
+    expect(parsed.concurrency?.['cancel-in-progress']).toContain(
+      "github.event_name == 'pull_request'"
+    );
+    const job = parsed.jobs?.breaking;
+    expect(job).toBeDefined();
+    expect(job?.['runs-on']).toContain('RUNNER_UBUNTU');
+    expect(job?.permissions).toEqual({ contents: 'read' });
+    const runs = (job?.steps ?? []).map((s) => s.run ?? '').join('\n');
+    expect(runs).toContain('docs/api/contract.snapshot.json');
+    expect(runs).toContain('scripts/check-contract-breaking.mjs');
+    expect(runs).toContain('"schemaVersion":1');
+  });
 });

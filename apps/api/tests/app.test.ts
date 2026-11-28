@@ -41,6 +41,11 @@ async function listProjects(input?: unknown, target = app): Promise<Response> {
   return target.request(`/trpc/projects.list${query}`);
 }
 
+/** GET projects.get on `target`, with a tRPC input (URL-encoded JSON). */
+async function getProject(input: unknown, target = app): Promise<Response> {
+  return target.request(`/trpc/projects.get?input=${encodeURIComponent(JSON.stringify(input))}`);
+}
+
 /** An app whose service always rejects with `err`, plus its captured logs. */
 function failingApp(err: unknown): {
   app: ReturnType<typeof createApp>;
@@ -50,7 +55,7 @@ function failingApp(err: unknown): {
   const rejecting = async (): Promise<never> => {
     throw err;
   };
-  const core = { projects: { listProjects: rejecting } } as unknown as Core;
+  const core = { projects: { listProjects: rejecting, getProject: rejecting } } as unknown as Core;
   return { app: createApp({ core, logger }), lines };
 }
 
@@ -293,10 +298,18 @@ describe('GET /trpc/projects.list', () => {
     const response = await listProjects({ workspaceName: 'engineering' });
     expect(response.status).toBe(200);
     const body = (await response.json()) as { result: { data: { projects: Project[] } } };
-    expect(body.result.data.projects.map((project) => project.workspace.name)).toEqual([
+    expect(body.result.data.projects.map((project) => project.workspace?.name)).toEqual([
       'Engineering',
       'Engineering',
     ]);
+  });
+
+  it('limit 101 -> 400 BAD_REQUEST (MAX_API_LIMIT = 100, Q7.A)', async () => {
+    const response = await listProjects({ limit: 101 });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as TrpcError;
+    expect(body.error.data.code).toBe('BAD_REQUEST');
+    expect(body.error.data.issues?.[0]?.path).toBe('limit');
   });
 
   it('limit 0 -> 400 BAD_REQUEST with a readable message and data.issues', async () => {
@@ -318,6 +331,39 @@ describe('GET /trpc/projects.list', () => {
     expect(body.error.data.code).toBe('NOT_FOUND');
     expect(body.error.message).toBe('Workspace not found: nope');
     expect(procedureFailures(captured.lines)).toEqual([]);
+  });
+});
+
+describe('GET /trpc/projects.get', () => {
+  it('returns 200 with { project } for a known id', async () => {
+    const response = await getProject({ id: 'p-1' });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { result: { data: { project: Project } } };
+    expect(body.result.data.project).toEqual(DEFAULT_IN_MEMORY_SEED.projects[0]);
+  });
+
+  it('returns 404 NOT_FOUND for a missing id', async () => {
+    const response = await getProject({ id: 'missing' });
+    expect(response.status).toBe(404);
+    const body = (await response.json()) as TrpcError;
+    expect(body.error.data.code).toBe('NOT_FOUND');
+    expect(body.error.message).toBe('Project not found: missing');
+  });
+
+  it('returns 400 BAD_REQUEST for an empty id', async () => {
+    const response = await getProject({ id: '' });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as TrpcError;
+    expect(body.error.data.code).toBe('BAD_REQUEST');
+    expect(body.error.data.issues?.[0]?.path).toBe('id');
+  });
+
+  it('returns 502 BAD_GATEWAY when upstream fails', async () => {
+    const response = await getProject({ id: 'p-1' }, failingApp(new ApiError('boom')).app);
+    expect(response.status).toBe(502);
+    const body = (await response.json()) as TrpcError;
+    expect(body.error.data.code).toBe('BAD_GATEWAY');
+    expect(body.error.message).toBe(UPSTREAM_ERROR_MESSAGE);
   });
 });
 

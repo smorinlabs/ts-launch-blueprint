@@ -3,6 +3,7 @@
 // in-memory (in-memory-projects.repository.ts); both pass the shared
 // contract suite, so either can be swapped in without touching callers.
 import type { Project, Workspace } from '../schemas/project.schema.js';
+import type { ListProjectsOutput } from '../schemas/projects.contract.js';
 
 /** Query for listProjects. Data access only: no name lookup, and no
  * default limit (the caller always passes one). */
@@ -11,10 +12,13 @@ export interface ListProjectsQuery {
   workspaceGid?: string | undefined;
   /** Maximum number of projects to return. */
   limit: number;
+  /** Opaque pagination cursor from a previous `nextCursor` response. */
+  cursor?: string | undefined;
 }
 
 /** Data access for workspaces and projects. */
 export interface ProjectsRepository {
   listWorkspaces(): Promise<Workspace[]>;
-  listProjects(query: ListProjectsQuery): Promise<Project[]>;
+  listProjects(query: ListProjectsQuery): Promise<ListProjectsOutput>;
+  getProject(id: string): Promise<Project | null>;
 }
