@@ -415,6 +415,7 @@ jobs:
     runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
     needs: changes
     if: needs.changes.outputs.web == 'true'
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -449,16 +450,22 @@ jobs:
         id: setup
         if: steps.web-check.outputs.exists == 'true'
         run: pnpm install --frozen-lockfile
+      - name: Resolve Playwright version
+        id: pw-version
+        if: ${{ !cancelled() && steps.web-check.outputs.exists == 'true' && steps.setup.outcome == 'success' }}
+        run: |
+          PW_VERSION="$(node -p "require('./apps/web/node_modules/@playwright/test/package.json').version")"
+          echo "version=${PW_VERSION}" >> "$GITHUB_OUTPUT"
       - name: Cache Playwright Chromium browser
         id: playwright-cache
         if: ${{ !cancelled() && steps.web-check.outputs.exists == 'true' && steps.setup.outcome == 'success' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: playwright-shell-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright Chromium and OS deps
         if: ${{ !cancelled() && steps.web-check.outputs.exists == 'true' && steps.setup.outcome == 'success' && steps.playwright-cache.outputs.cache-hit != 'true' }}
-        run: pnpm --filter @ts-launch-blueprint/web exec playwright install chromium --with-deps
+        run: pnpm --filter @ts-launch-blueprint/web exec playwright install chromium --only-shell --with-deps
       - name: Install Playwright OS deps (cache hit)
         if: ${{ !cancelled() && steps.web-check.outputs.exists == 'true' && steps.setup.outcome == 'success' && steps.playwright-cache.outputs.cache-hit == 'true' }}
         run: pnpm --filter @ts-launch-blueprint/web exec playwright install-deps chromium
@@ -467,7 +474,7 @@ jobs:
         run: just test-web-e2e
       - name: Upload Playwright report on failure
         if: ${{ failure() && steps.web-check.outputs.exists == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: apps/web/playwright-report/
