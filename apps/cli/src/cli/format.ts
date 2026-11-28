@@ -62,7 +62,7 @@ export function renderMarkdown(result: CliTableResult): string {
   lines.push(`| ${columns.join(' | ')} |`);
   lines.push(`| ${columns.map(() => '---').join(' | ')} |`);
   for (const row of rows) {
-    const cells = row.map((cell) => cell.replaceAll('|', '\\|'));
+    const cells = row.map((cell) => cell.replaceAll('|', '\\|').replace(/\r\n|\r|\n/g, '<br>'));
     lines.push(`| ${cells.join(' | ')} |`);
   }
   return lines.join('\n');

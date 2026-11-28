@@ -206,7 +206,22 @@ const realFs: ConfigFs = {
   writeFileSync,
   chmodSync,
   openSync,
-  writeSync: (fd, data, position, encoding) => writeSync(fd, data, position, encoding),
+  writeSync: (fd, data, position, encoding) => {
+    const buf = Buffer.from(data, encoding ?? 'utf8');
+    let offset = 0;
+    let nextPos = position ?? null;
+    while (offset < buf.length) {
+      const written = writeSync(fd, buf, offset, buf.length - offset, nextPos);
+      if (written <= 0) {
+        throw new Error('short write while writing config file');
+      }
+      offset += written;
+      if (nextPos !== null) {
+        nextPos += written;
+      }
+    }
+    return offset;
+  },
   fsyncSync,
   closeSync,
   renameSync,
@@ -823,7 +838,25 @@ export function writeConfigData(
   try {
     const fd = isWin ? fs.openSync(tmpPath, 'wx') : fs.openSync(tmpPath, 'wx', 0o600);
     try {
-      fs.writeSync(fd, serialized, null, 'utf8');
+      if (options?.fs === undefined) {
+        writeFileSync(fd, serialized, 'utf8');
+      } else if ((fs.writeSync as unknown) === writeSync) {
+        realFs.writeSync(fd, serialized, null, 'utf8');
+      } else {
+        const buf = Buffer.from(serialized, 'utf8');
+        let offset = 0;
+        while (offset < buf.length) {
+          const byte = buf[offset];
+          const isContinuationByte = byte !== undefined && (byte & 0xc0) === 0x80;
+          const encoding: BufferEncoding = isContinuationByte ? 'latin1' : 'utf8';
+          const chunk = buf.subarray(offset).toString(encoding);
+          const written = fs.writeSync(fd, chunk, null, encoding);
+          if (written <= 0) {
+            throw new Error(`short write while writing ${configPath}`);
+          }
+          offset += written;
+        }
+      }
       fs.fsyncSync(fd);
     } finally {
       fs.closeSync(fd);

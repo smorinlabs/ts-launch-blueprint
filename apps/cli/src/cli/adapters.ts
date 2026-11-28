@@ -84,7 +84,7 @@ export const realPager: PagerRunner = (argv, input) => {
     stdio: ['pipe', 'inherit', 'inherit'],
     encoding: 'utf8',
   });
-  return result.error === undefined;
+  return result.error === undefined && result.status === 0;
 };
 
 /** Real clipboard: clipboardy behind a dynamic import. */

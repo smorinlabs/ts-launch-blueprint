@@ -1,14 +1,18 @@
 // Tests for env/flag-only tokens (ADR 0002), 3-layer TOML config discovery & degradation (ADR 0004),
 // atomic temp+fsync+rename writes, corrupt-file write refusal, and typed M3 config helpers (P11-TS03).
 // cspell:ignore gettable bcde
+import * as nodeFs from 'node:fs';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -85,6 +89,44 @@ function baseOptions(
     homedir: () => home,
     cwd: cwd ?? (() => join(home, 'no-project-here')),
   };
+}
+
+function writeWithChunkSchedule(workspace: string, schedule: number[]): string {
+  const dir = makeTempDir();
+  const target = join(dir, CONFIG_FILE_NAME);
+  const chunks: Buffer[] = [];
+  let openPath = '';
+  let callIdx = 0;
+
+  const scheduledFs: ConfigFs = {
+    existsSync,
+    readFileSync,
+    statSync,
+    mkdirSync,
+    writeFileSync,
+    chmodSync,
+    openSync: (p) => {
+      openPath = p;
+      return 1;
+    },
+    writeSync: (_fd, data, _position, encoding) => {
+      const buf = Buffer.from(data, encoding ?? 'utf8');
+      const limit = schedule[callIdx] ?? buf.length;
+      callIdx += 1;
+      const n = Math.min(limit, buf.length);
+      chunks.push(Buffer.from(buf.subarray(0, n)));
+      return n;
+    },
+    fsyncSync: () => undefined,
+    closeSync: () => {
+      writeFileSync(openPath, Buffer.concat(chunks), { mode: 0o600 });
+    },
+    renameSync,
+    unlinkSync,
+  };
+
+  writeConfigData(target, { workspace }, { fs: scheduledFs, platform: 'linux' });
+  return readFileSync(target, 'utf8');
 }
 
 describe('token resolution — env/flag only (ADR 0002)', () => {
@@ -630,7 +672,7 @@ describe('typed config key/value helpers and atomic writes', () => {
         writeFileSync(p, '', mode !== undefined ? { mode } : {});
         return openCount;
       },
-      writeSync: () => 0,
+      writeSync: (_fd, data) => Buffer.byteLength(data, 'utf8'),
       fsyncSync: () => {
         throw new Error('EIO: disk failure');
       },
@@ -669,7 +711,7 @@ describe('typed config key/value helpers and atomic writes', () => {
         writtenFiles.set(p, '');
         return 7;
       },
-      writeSync: () => 0,
+      writeSync: (_fd, data) => Buffer.byteLength(data, 'utf8'),
       fsyncSync: () => undefined,
       closeSync: () => undefined,
       renameSync: (oldPath, newPath) => {
@@ -694,6 +736,170 @@ describe('typed config key/value helpers and atomic writes', () => {
       win32.join('C:\\Users\\alice\\AppData\\Roaming', 'ts-projects', CONFIG_FILE_NAME)
     );
     expect(openModes).toEqual([undefined]);
+  });
+
+  it('CFG-17d: zero-byte short write throws, removes temp file, and leaves original config untouched', () => {
+    const dir = makeTempDir();
+    const target = join(dir, CONFIG_FILE_NAME);
+    const original = '[output]\nformat = "text"\n';
+    writeFileSync(target, original, { mode: 0o600 });
+
+    let closeCount = 0;
+    let openCount = 0;
+    const zeroWriteFs: ConfigFs = {
+      existsSync: (p) => p === target,
+      readFileSync: (p) => (p === target ? original : ''),
+      statSync,
+      mkdirSync,
+      writeFileSync,
+      chmodSync,
+      openSync: (p, flags, mode) => {
+        openCount += 1;
+        writeFileSync(p, '', mode !== undefined ? { mode } : {});
+        return openCount;
+      },
+      writeSync: () => 0,
+      fsyncSync: () => undefined,
+      closeSync: () => {
+        closeCount += 1;
+      },
+      renameSync: () => {
+        throw new Error('unexpected renameSync call');
+      },
+      unlinkSync: (p) => {
+        rmSync(p, { force: true });
+      },
+    };
+
+    expect(() =>
+      writeConfigData(target, { output: { format: 'json' } }, { fs: zeroWriteFs })
+    ).toThrow(/short write/);
+    expect(closeCount).toBe(1);
+    expect(readFileSync(target, 'utf8')).toBe(original);
+    expect(readdirSync(dir)).toEqual([CONFIG_FILE_NAME]);
+  });
+
+  it('CFG-17e: multi-chunk partial writeSync loops until all bytes are written', () => {
+    const dir = makeTempDir();
+    const target = join(dir, CONFIG_FILE_NAME);
+    const chunks: string[] = [];
+    let openPath = '';
+    const chunkedFs: ConfigFs = {
+      existsSync,
+      readFileSync,
+      statSync,
+      mkdirSync,
+      writeFileSync,
+      chmodSync,
+      openSync: (p) => {
+        openPath = p;
+        return 1;
+      },
+      writeSync: (_fd, data) => {
+        const buf = Buffer.from(data, 'utf8');
+        const n = Math.min(5, buf.length);
+        chunks.push(buf.subarray(0, n).toString('utf8'));
+        return n;
+      },
+      fsyncSync: () => undefined,
+      closeSync: () => {
+        writeFileSync(openPath, chunks.join(''), { mode: 0o600 });
+      },
+      renameSync,
+      unlinkSync,
+    };
+
+    writeConfigData(
+      target,
+      { output: { format: 'json', color: 'never' } },
+      { fs: chunkedFs, platform: 'linux' }
+    );
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(getConfigFileValue(target, 'output.format')).toBe('json');
+    expect(getConfigFileValue(target, 'output.color')).toBe('never');
+  });
+
+  it('CFG-17f: partial writeSync returning written === remaining.length < byteLen completes full UTF-8 TOML', () => {
+    // 'workspace = "ab🚀"\n': 23 UTF-8 bytes. After 13 bytes, remaining is 'ab🚀"\n'
+    // (6 UTF-16 code units, 8 UTF-8 bytes); writing 6 bytes must NOT exit early.
+    const emojiRaw = writeWithChunkSchedule('ab🚀', [13, 6, 100]);
+    expect(emojiRaw).toBe('workspace = "ab🚀"\n');
+
+    // 'workspace = "café"\n': 19 UTF-16 code units, 20 UTF-8 bytes; writing 19 bytes
+    // (data.length) on first call must still loop to write the final '\n' byte.
+    const cafeRaw = writeWithChunkSchedule('café', [19, 100]);
+    expect(cafeRaw).toBe('workspace = "café"\n');
+  });
+
+  it.each([1, 2, 3, 5])(
+    'CFG-17g: multi-byte UTF-8 partial writeSync at %i-byte boundary writes exact bytes without corruption',
+    (chunkSize) => {
+      const dir = makeTempDir();
+      const target = join(dir, CONFIG_FILE_NAME);
+      const workspace = '🚀 café 日本語';
+      const expected = `workspace = "${workspace}"\n`;
+      const expectedBytes = Buffer.from(expected, 'utf8');
+      const chunks: Buffer[] = [];
+      let openPath = '';
+      let calls = 0;
+
+      const byteChunkedFs: ConfigFs = {
+        existsSync,
+        readFileSync,
+        statSync,
+        mkdirSync,
+        writeFileSync,
+        chmodSync,
+        openSync: (p) => {
+          openPath = p;
+          return 1;
+        },
+        writeSync: (_fd, data, _position, encoding) => {
+          calls += 1;
+          if (calls > expectedBytes.length + 5) {
+            throw new Error(`infinite writeSync loop detected after ${calls} calls`);
+          }
+          const buf = Buffer.from(data, encoding ?? 'utf8');
+          const n = Math.min(chunkSize, buf.length);
+          chunks.push(Buffer.from(buf.subarray(0, n)));
+          return n;
+        },
+        fsyncSync: () => undefined,
+        closeSync: () => {
+          writeFileSync(openPath, Buffer.concat(chunks), { mode: 0o600 });
+        },
+        renameSync,
+        unlinkSync,
+      };
+
+      writeConfigData(target, { workspace }, { fs: byteChunkedFs, platform: 'linux' });
+      const actualBytes = readFileSync(target);
+      const actualText = actualBytes.toString('utf8');
+      expect(actualText).not.toContain('\uFFFD');
+      expect(actualText).toBe(expected);
+      expect(actualBytes.equals(expectedBytes)).toBe(true);
+      expect(calls).toBe(Math.ceil(expectedBytes.length / chunkSize));
+    }
+  );
+
+  it('CFG-17h: writeConfigData handles node:fs passed directly as options.fs with multi-byte UTF-8', () => {
+    const dir = makeTempDir();
+    const target = join(dir, CONFIG_FILE_NAME);
+    const workspace = '🚀 café 日本語';
+
+    writeConfigData(
+      target,
+      { workspace, output: { format: 'json' } },
+      { fs: nodeFs as unknown as ConfigFs }
+    );
+    expect(readFileSync(target, 'utf8')).toBe(
+      `workspace = "${workspace}"\n\n[output]\nformat = "json"\n`
+    );
+    expect(getConfigFileValue(target, 'output.format')).toBe('json');
+    expect(
+      resolveConfig({ env: {}, homedir: () => dir, cwd: () => dir, configPathFlag: target })
+        .workspace
+    ).toBe(workspace);
   });
 });
 
@@ -782,13 +988,18 @@ describe('prototype safety, class-based ConfigFs, and nested token stripping', (
         return fd;
       }
 
-      writeSync(fd: number, data: string): number {
+      writeSync(
+        fd: number,
+        data: string,
+        _position?: number | null,
+        encoding?: BufferEncoding
+      ): number {
         const entry = this.openBuffers.get(fd);
         if (entry === undefined) {
           throw new Error(`EBADF: ${fd}`);
         }
         entry.chunks.push(data);
-        return data.length;
+        return Buffer.byteLength(data, encoding ?? 'utf8');
       }
 
       fsyncSync(_fd: number): void {
@@ -840,6 +1051,9 @@ describe('prototype safety, class-based ConfigFs, and nested token stripping', (
 
     setConfigValue(target, 'output.color', 'never', { fs: memFs, platform: 'linux' });
     expect(getConfigFileValue(target, 'output.color', memFs)).toBe('never');
+
+    writeConfigData(target, { workspace: 'café' }, { fs: memFs, platform: 'linux' });
+    expect(memFs.files.get(target)).toBe('workspace = "café"\n');
   });
 
   it('TOK-ADV-05: writeConfigData strips nested token keys inside [output] and [logging]', () => {

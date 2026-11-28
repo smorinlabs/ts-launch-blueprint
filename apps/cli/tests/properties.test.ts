@@ -211,7 +211,9 @@ describe('CLI formatting and config properties', () => {
   it('CFG-18: writeConfigData and readConfigForWrite round-trip arbitrary TOML section tables', () => {
     const dir = makeTempDir();
     const target = join(dir, 'roundtrip.toml');
-    const safeKeyArb = fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9_]{0,12}$/);
+    const safeKeyArb = fc
+      .stringMatching(/^[a-zA-Z][a-zA-Z0-9_]{0,12}$/)
+      .filter((key) => key !== 'token');
     const scalarArb = fc.oneof(
       fc.boolean(),
       fc.integer({ min: Number.MIN_SAFE_INTEGER, max: Number.MAX_SAFE_INTEGER }),

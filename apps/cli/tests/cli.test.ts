@@ -568,4 +568,25 @@ describe('machine-mode JSON error envelope (ADR 0006)', () => {
     expect(h.stderr()).toContain('hint:');
     expect(() => JSON.parse(h.stderr())).toThrow(SyntaxError);
   });
+
+  it('Commander usage errors under --json emit valid JSON error envelope on stderr (exit 2)', async () => {
+    const hMissingArg = makeHarness();
+    expect(await runCli(['--json', 'projects', 'get'], hMissingArg.deps)).toBe(2);
+    expect(hMissingArg.stdout()).toBe('');
+    const missingEnv = JSON.parse(hMissingArg.stderr()) as {
+      error: { code: number; name: string; message: string };
+    };
+    expect(missingEnv.error.code).toBe(2);
+    expect(missingEnv.error.name).toBe('USAGE');
+    expect(missingEnv.error.message).toContain("missing required argument 'id'");
+
+    const hSub = makeHarness();
+    expect(await runCli(['--json', 'projects', 'lst'], hSub.deps)).toBe(2);
+    const subEnv = JSON.parse(hSub.stderr()) as {
+      error: { code: number; name: string; message: string };
+    };
+    expect(subEnv.error.code).toBe(2);
+    expect(subEnv.error.name).toBe('USAGE');
+    expect(subEnv.error.message).toContain("unknown command 'lst'");
+  });
 });

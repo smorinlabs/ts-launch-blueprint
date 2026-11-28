@@ -88,13 +88,25 @@ hint: supply it via --token or $TS_PROJECTS_TOKEN; `ts-projects doctor` checks s
 
 1. **A `warning: ignoring invalid config value ...` line appears on stderr**
 
-   - **Cause**: A discovered config layer has an invalid value (e.g.
-     `output.color = "yes"`) or invalid TOML syntax. Per ADR 0004,
-     discovered files degrade cleanly instead of crashing.
-   - **Solution**: Run `ts-projects config set <key> <valid-value>` (or
-     inspect `ts-projects config path`) to repair the offending setting.
+   - **Cause**: A discovered config layer (`system`, `user`, or `project`) has
+     an invalid setting value (e.g. `output.color = "yes"`). Per ADR 0004,
+     discovered files degrade cleanly by dropping only the invalid key instead
+     of crashing.
+   - **Solution**: Inspect the path shown in the warning (or
+     `ts-projects config path` for the user file), then run
+     `ts-projects config set <key> <valid-value>` (omit `--config` for the user
+     file, or pass `--config <path>` to target a non-user layer).
 
-2. **`config set` or `config init` refuses to write**
+2. **A `warning: ignoring unreadable config file ...` line appears on stderr**
+
+   - **Cause**: A discovered config layer is unreadable or contains invalid TOML
+     syntax. Per ADR 0004, discovered files degrade cleanly by skipping the
+     broken layer.
+   - **Solution**: Manually edit or remove the offending file shown in the
+     warning (`config set` and `config init` refuse to overwrite corrupt TOML
+     files).
+
+3. **`config set` or `config init` refuses to write**
 
    - **Cause**: Either the target TOML file has a syntax error (corrupt
      files are never overwritten silently), or `--no-input` was passed
@@ -102,14 +114,14 @@ hint: supply it via --token or $TS_PROJECTS_TOKEN; `ts-projects doctor` checks s
    - **Solution**: Fix/remove the corrupt file, or pass `--yes` for
      non-interactive scripts.
 
-3. **Explicit `--config <path>` fails with exit `1` (`TS001`)**
+4. **Explicit `--config <path>` fails with exit `1` (`TS001`)**
 
    - **Cause**: Unlike missing explicit paths (which are tolerated), an
      unreadable or syntactically invalid explicit `--config` raises
      `ConfigError` (`TS001`).
    - **Solution**: Validate the TOML syntax in the explicit file.
 
-4. **Unexpected crash (`TS000`)**
+5. **Unexpected crash (`TS000`)**
 
    - **Cause**: An unexpected runtime failure wrote a full traceback to
      `<state>/ts-projects/ts-projects_crash.log`.

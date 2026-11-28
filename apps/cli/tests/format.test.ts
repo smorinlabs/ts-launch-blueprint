@@ -10,6 +10,7 @@ import type { Project } from '@ts-launch-blueprint/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { PagerRunner } from '../src/cli/adapters.js';
+import { realPager } from '../src/cli/adapters.js';
 import { colorEnabled, createColors } from '../src/cli/colors.js';
 import { CONFIG_FILE_NAME, TOKEN_ENV_VAR } from '../src/cli/config.js';
 import type { CliDeps } from '../src/cli/deps.js';
@@ -26,7 +27,12 @@ import {
   resolveLevel,
   resolveLogFilePath,
 } from '../src/cli/logger.js';
-import { DEFAULT_PAGER, parsePagerArgv, resolvePagerCommand } from '../src/cli/pager.js';
+import {
+  DEFAULT_PAGER,
+  parsePagerArgv,
+  resolvePagerCommand,
+  writePagedOutput,
+} from '../src/cli/pager.js';
 import { runCli } from '../src/cli/router.js';
 import { configDir } from '../src/cli/xdg-paths.js';
 
@@ -96,6 +102,20 @@ describe('OUTPUT_FORMATS and pure formatters', () => {
     expect(formatOutput([], 'markdown')).toBe('No projects found.');
   });
 
+  it('formatOutput escapes newlines and carriage returns as <br> in markdown table cells', () => {
+    const projects: Project[] = [{ id: '1\n2', name: 'A\nB\r\nC', workspace: { name: 'W|1\rZ' } }];
+    const md = formatOutput(projects, 'markdown');
+    expect(md).toBe(
+      [
+        '## Projects (1)',
+        '',
+        '| Name | Workspace | ID |',
+        '| --- | --- | --- |',
+        '| A<br>B<br>C | W\\|1<br>Z | 1<br>2 |',
+      ].join('\n')
+    );
+  });
+
   it('renderFormattedResult handles empty table with humanNote and non-empty CSV/Markdown/JSON/Text', () => {
     const empty = {
       tableTitle: 'Projects (0)',
@@ -161,6 +181,16 @@ describe('global output precedence & --output-file across subcommands', () => {
     const h = makeHarness({ env: { TS_PROJECTS_OUTPUT: 'yaml' } });
     expect(await runCli(['config', 'path'], h.deps)).toBe(2);
     expect(h.stderr()).toContain('yaml');
+  });
+
+  it('explicit --json and -o flags override invalid TS_PROJECTS_OUTPUT env', async () => {
+    const hJson = makeHarness({ env: { TS_PROJECTS_OUTPUT: 'yaml' } });
+    expect(await runCli(['--json', 'config', 'path'], hJson.deps)).toBe(0);
+    expect(JSON.parse(hJson.stdout())).toHaveProperty('path');
+
+    const hCsv = makeHarness({ env: { TS_PROJECTS_OUTPUT: 'yaml' } });
+    expect(await runCli(['-o', 'csv', 'config', 'path'], hCsv.deps)).toBe(0);
+    expect(hCsv.stdout()).toContain('Config path,Exists');
   });
 
   it('--output-file works across all subcommands and strips ANSI unless color=always', async () => {
@@ -369,6 +399,28 @@ describe('interactive pager (ADR 0008)', () => {
     });
     expect(await runCli(['projects', 'list'], hFallback.deps)).toBe(0);
     expect(hFallback.stdout()).toContain('Proj 29');
+  });
+
+  it('realPager returns true on exit 0, false on non-zero exit, and writePagedOutput falls back on non-zero exit', () => {
+    expect(realPager([process.execPath, '-e', 'process.exit(0)'], 'hi')).toBe(true);
+    expect(realPager([process.execPath, '-e', 'process.exit(1)'], 'hi')).toBe(false);
+
+    const out: string[] = [];
+    const tallText = Array.from({ length: 30 }, (_, i) => `line-${i}`).join('\n');
+    writePagedOutput(
+      tallText,
+      'text',
+      { paging: true },
+      {
+        stdout: (text) => out.push(text),
+        stdoutIsTTY: true,
+        terminalRows: 10,
+        env: { TS_PROJECTS_PAGER: `"${process.execPath}" -e "process.exit(1)"` },
+        platform: process.platform,
+        pager: realPager,
+      }
+    );
+    expect(out.join('')).toContain('line-29');
   });
 });
 

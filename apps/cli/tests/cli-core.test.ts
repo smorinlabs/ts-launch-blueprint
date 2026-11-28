@@ -1,7 +1,8 @@
 // In-process CLI core tests (P11-TS04): noun-verb CLI tree, bare group
 // help, did-you-mean suggestions, config init/path/get/set, doctor [--bundle],
 // completion {bash,zsh,fish}, single-emission config warnings, logging & color.
-// cspell:ignore verbos projcts envtoken envtokenvalue flagtokenvalue filetoken powershell
+// cspell:ignore verbos projcts envtoken envtokenvalue flagtokenvalue filetoken powershell compgen COMPREPLY CWORD
+import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -520,9 +521,45 @@ describe('doctor and doctor --bundle', () => {
     expect(bundle.env['TS_PROJECTS_SOURCE']).toBe('memory');
     expect(typeof bundle.log_file).toBe('string');
   });
+
+  it('doctor --bundle redacts URL userinfo and sensitive query params in TS_PROJECTS_API_URL while preserving clean URLs', async () => {
+    const hDirty = makeHarness({
+      env: {
+        TS_PROJECTS_API_URL:
+          'https://alice:s3cr3t@api.example.test/api/1.0?access_token=tok999&auth=bearer&region=us',
+      },
+    });
+    expect(await runCli(['doctor', '--bundle', '--json'], hDirty.deps)).toBe(0);
+    const dirtyOut = hDirty.stdout();
+    expect(dirtyOut).not.toContain('alice');
+    expect(dirtyOut).not.toContain('s3cr3t');
+    expect(dirtyOut).not.toContain('tok999');
+    expect(dirtyOut).not.toContain('bearer');
+    const dirtyBundle = JSON.parse(dirtyOut) as { env: Record<string, string> };
+    const sanitized = dirtyBundle.env['TS_PROJECTS_API_URL'] ?? '';
+    expect(sanitized).toContain('REDACTED');
+    expect(sanitized).toContain('region=us');
+    expect(sanitized).toContain('api.example.test/api/1.0');
+
+    const hClean = makeHarness({
+      env: {
+        TS_PROJECTS_API_URL: 'https://app.ts.com/api/1.0',
+      },
+    });
+    expect(await runCli(['doctor', '--bundle', '--json'], hClean.deps)).toBe(0);
+    const cleanBundle = JSON.parse(hClean.stdout()) as { env: Record<string, string> };
+    expect(cleanBundle.env['TS_PROJECTS_API_URL']).toBe('https://app.ts.com/api/1.0');
+  });
 });
 
 describe('completion {bash,zsh,fish}', () => {
+  const hasBash =
+    process.platform !== 'win32' &&
+    spawnSync('bash', ['-c', 'command -v compgen >/dev/null'], { encoding: 'utf8' }).status === 0;
+  const hasZsh =
+    process.platform !== 'win32' &&
+    spawnSync('zsh', ['-c', 'true'], { encoding: 'utf8' }).status === 0;
+
   it.each(['bash', 'zsh', 'fish'] as const)(
     'emits %s completion script to stdout',
     async (shell) => {
@@ -534,6 +571,80 @@ describe('completion {bash,zsh,fish}', () => {
       expect(h.stdout()).toContain(`_${TOOL_DIR_NAME.replaceAll('-', '_')}_completion`);
     }
   );
+
+  it('bash completion handles leading global options before noun/verb', async () => {
+    const h = makeHarness();
+    expect(await runCli(['completion', 'bash'], h.deps)).toBe(0);
+    const script = h.stdout();
+    expect(script).not.toContain('case "${COMP_WORDS[1]}"');
+    expect(script).toContain('pos=()');
+  });
+
+  it.runIf(hasBash)(
+    'bash completion passes bash -n and completes with leading global flags',
+    async () => {
+      const h = makeHarness();
+      expect(await runCli(['completion', 'bash'], h.deps)).toBe(0);
+      const script = h.stdout();
+      const fnName = `_${TOOL_DIR_NAME.replaceAll('-', '_')}_completion`;
+      const syntax = spawnSync('bash', ['-n'], { input: script, encoding: 'utf8' });
+      expect(syntax.status).toBe(0);
+
+      const probe = [
+        script,
+        'COMP_WORDS=(ts-projects --json projects "")',
+        'COMP_CWORD=3',
+        fnName,
+        'printf "1:%s\\n" "${COMPREPLY[*]}"',
+        'COMP_WORDS=(ts-projects -o json config "")',
+        'COMP_CWORD=4',
+        fnName,
+        'printf "2:%s\\n" "${COMPREPLY[*]}"',
+        'COMP_WORDS=(ts-projects --json config get "")',
+        'COMP_CWORD=4',
+        fnName,
+        'printf "3:%s\\n" "${COMPREPLY[*]}"',
+      ].join('\n');
+      const run = spawnSync('bash', ['-c', probe], { encoding: 'utf8' });
+      expect(run.status).toBe(0);
+      expect(run.stdout).toContain('1:');
+      expect(run.stdout).toMatch(/1:.*\blist\b.*\bget\b/);
+      expect(run.stdout).toMatch(/2:.*\binit\b.*\bpath\b.*\bget\b.*\bset\b/);
+      expect(run.stdout).toMatch(/3:.*\boutput\.format\b.*\btoken\b/);
+    }
+  );
+
+  it('zsh completion includes args) state handler for projects, config, doctor, and completion', async () => {
+    const h = makeHarness();
+    expect(await runCli(['completion', 'zsh'], h.deps)).toBe(0);
+    const script = h.stdout();
+    expect(script).toContain('args)');
+    expect(script).toContain('$line[1]');
+    expect(script).toContain('projects)');
+    expect(script).toContain('config)');
+    expect(script).toContain('doctor)');
+    expect(script).toContain('completion)');
+    expect(script).toContain('bash zsh fish');
+  });
+
+  it.runIf(hasZsh)('zsh completion passes zsh -n syntax check', async () => {
+    const h = makeHarness();
+    expect(await runCli(['completion', 'zsh'], h.deps)).toBe(0);
+    const syntax = spawnSync('zsh', ['-n'], { input: h.stdout(), encoding: 'utf8' });
+    expect(syntax.status).toBe(0);
+  });
+
+  it('fish completion tracks positional depth and dispatches subcommand flags and keys', async () => {
+    const h = makeHarness();
+    expect(await runCli(['completion', 'fish'], h.deps)).toBe(0);
+    const script = h.stdout();
+    expect(script).toContain('count $pos');
+    expect(script).toContain('--workspace');
+    expect(script).toContain('output.format');
+    expect(script).toContain('--dry-run');
+    expect(script).toContain('--bundle');
+    expect(script).toContain('bash zsh fish');
+  });
 
   it('rejects unsupported shell with exit 2', async () => {
     const h = makeHarness();

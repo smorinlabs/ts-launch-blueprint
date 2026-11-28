@@ -109,6 +109,33 @@ export function runDiagnostics(
   };
 }
 
+const SENSITIVE_URL_PARAM_MARKERS: readonly string[] = [...SENSITIVE_ENV_MARKERS, 'AUTH'];
+
+function sanitizeEnvValue(raw: string): string {
+  try {
+    const url = new URL(raw);
+    let modified = false;
+    if (url.username !== '') {
+      url.username = 'REDACTED';
+      modified = true;
+    }
+    if (url.password !== '') {
+      url.password = 'REDACTED';
+      modified = true;
+    }
+    for (const paramKey of Array.from(url.searchParams.keys())) {
+      const upper = paramKey.toUpperCase();
+      if (SENSITIVE_URL_PARAM_MARKERS.some((marker) => upper.includes(marker))) {
+        url.searchParams.set(paramKey, 'REDACTED');
+        modified = true;
+      }
+    }
+    return modified ? url.toString() : raw;
+  } catch {
+    return raw;
+  }
+}
+
 function redactAppEnv(env: Record<string, string | undefined>): Record<string, string> {
   const out: Record<string, string> = {};
   const keys = Object.keys(env);
@@ -123,7 +150,7 @@ function redactAppEnv(env: Record<string, string | undefined>): Record<string, s
     }
     const sensitive = SENSITIVE_ENV_MARKERS.some((marker) => key.includes(marker));
     Object.defineProperty(out, key, {
-      value: sensitive ? '<redacted>' : raw,
+      value: sensitive ? '<redacted>' : sanitizeEnvValue(raw),
       enumerable: true,
       writable: true,
       configurable: true,

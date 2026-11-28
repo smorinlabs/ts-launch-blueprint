@@ -88,7 +88,12 @@ function resolveOutputMode(
   env: Record<string, string | undefined>,
   configFormat: OutputFormat
 ): OutputFormat {
-  let envFormat: OutputFormat | undefined;
+  if (opts.json === true) {
+    return 'json';
+  }
+  if (opts.output !== undefined) {
+    return opts.output;
+  }
   const rawEnv = env[OUTPUT_ENV_VAR];
   if (rawEnv !== undefined && rawEnv !== '') {
     if (!(OUTPUT_FORMATS as readonly string[]).includes(rawEnv)) {
@@ -96,16 +101,7 @@ function resolveOutputMode(
         `Invalid ${OUTPUT_ENV_VAR} "${rawEnv}": expected one of ${OUTPUT_FORMATS.join(', ')}`
       );
     }
-    envFormat = rawEnv as OutputFormat;
-  }
-  if (opts.json === true) {
-    return 'json';
-  }
-  if (opts.output !== undefined) {
-    return opts.output;
-  }
-  if (envFormat !== undefined) {
-    return envFormat;
+    return rawEnv as OutputFormat;
   }
   return configFormat;
 }
@@ -247,7 +243,7 @@ function buildContext(
   return ctx;
 }
 
-function buildProgram(deps: CliDeps, ctxRef: ContextRef): Command {
+function buildProgram(deps: CliDeps, ctxRef: ContextRef, errChunks: string[]): Command {
   const program = new HelpGroupCommand();
   program
     .name(TOOL_DIR_NAME)
@@ -257,7 +253,9 @@ function buildProgram(deps: CliDeps, ctxRef: ContextRef): Command {
     .showSuggestionAfterError(true)
     .configureOutput({
       writeOut: (text) => deps.stdout(text),
-      writeErr: (text) => deps.stderr(text),
+      writeErr: (text) => {
+        errChunks.push(text);
+      },
       getOutHelpWidth: () => (deps.stdoutIsTTY ? (process.stdout.columns ?? 80) : 80),
     })
     .addOption(new Option('-o, --output <format>', 'output format').choices(OUTPUT_FORMATS))
@@ -295,13 +293,28 @@ function buildProgram(deps: CliDeps, ctxRef: ContextRef): Command {
  */
 export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
   const ctxRef: ContextRef = { current: undefined, outputMode: undefined, colors: undefined };
-  const program = buildProgram(deps, ctxRef);
+  const errChunks: string[] = [];
+  const program = buildProgram(deps, ctxRef, errChunks);
   try {
     await program.parseAsync(argv, { from: 'user' });
     return EXIT_CODES.success;
   } catch (err) {
     if (err instanceof CommanderError) {
-      return err.exitCode === 0 ? EXIT_CODES.success : EXIT_CODES.usage;
+      if (err.exitCode === 0) {
+        return EXIT_CODES.success;
+      }
+      const rawErrText = errChunks.join('');
+      if (fallbackIsJson(program, deps)) {
+        const firstLine = (rawErrText.split('\n', 1)[0] ?? err.message).trim();
+        const normalized = firstLine.startsWith('error: ')
+          ? firstLine.slice('error: '.length)
+          : firstLine;
+        const message = normalized !== '' ? normalized : err.message;
+        deps.stderr(`${formatJsonError({ exitCode: EXIT_CODES.usage, message })}\n`);
+      } else if (rawErrText !== '') {
+        deps.stderr(rawErrText);
+      }
+      return EXIT_CODES.usage;
     }
     if (err instanceof SilentExitError) {
       return err.exitCode;
