@@ -48,7 +48,7 @@ what to write.
 - **A route handler that throws** (outside tRPC): one `handler failed` line
   at `ERROR` with the error's name and message, and the request's
   `request completed` line carries `errorName`. The client gets
-  `500 {"error":"Internal server error"}`.
+  `500 application/problem+json` (`{"type":"about:blank","title":"Internal Server Error","status":500,"detail":"Internal server error","instance":"…"}`).
 - **Startup and shutdown:** `… listening on :8080 (source: memory)` and
   `shutting down (SIGTERM)` at `INFO`. A busy port gives one `CRITICAL` line
   (`port 8080 is already in use`) and exit 1, with no stack trace.
@@ -101,7 +101,7 @@ just api | pnpm exec pino-pretty
 ## Metrics
 
 `GET /metrics` serves [Prometheus](https://prometheus.io/) text format
-(`prom-client`), readable by any Prometheus-compatible scraper, including
+(`@prometheus-io/client`), readable by any Prometheus-compatible scraper, including
 Google Cloud Managed Service for Prometheus. Like logging, metrics live in
 the controller; the core has none.
 

@@ -92,6 +92,27 @@ describe('createShutdown', () => {
       vi.useRealTimers();
     }
   });
+
+  it('uses a custom timeoutMs when provided', () => {
+    const exits: number[] = [];
+    const logs: string[] = [];
+    let timer: { callback: () => void; ms: number } | undefined;
+    const shutdown = createShutdown({
+      close: () => undefined,
+      exit: (code) => exits.push(code),
+      log: (line) => logs.push(line),
+      timeoutMs: 2500,
+      setTimer: (callback, ms) => {
+        timer = { callback, ms };
+        return { unref: () => {} };
+      },
+    });
+    shutdown('SIGTERM');
+    expect(timer?.ms).toBe(2500);
+    timer?.callback();
+    expect(exits).toEqual([1]);
+    expect(logs).toContain('shutdown timed out after 2500ms');
+  });
 });
 
 /** A shutdown whose close succeeds (or fails) and whose flush is `flush`,

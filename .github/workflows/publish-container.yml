@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: MIT
+
+# Version publication is independent of npm and of other release versions.
+name: publish-container
+
+on:
+  release:
+    types: [published]
+  pull_request:
+  merge_group:
+
+permissions: {}
+
+jobs:
+  container-check:
+    if: github.event_name != 'release'
+    # Job-level so the release jobs keep their own groups. Cancels superseded
+    # PR runs only; merge_group runs group per commit.
+    concurrency:
+      group: container-check-${{ github.event.pull_request.number || github.sha }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build and smoke-test the container without registry credentials
+        run: node scripts/publish-container.mjs check
+
+  publish-version:
+    if: >-
+      github.event_name == 'release' &&
+      !github.event.release.draft && !github.event.release.prerelease
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: container-version-${{ github.event.release.tag_name }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Publish or verify the released version and check anonymous access
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/publish-container.mjs publish
+
+  promote-latest:
+    needs: publish-version
+    runs-on: ${{ vars.RUNNER_UBUNTU || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    # GitHub can replace a pending promotion. Every surviving job reconciles
+    # the highest published version, including versions from replaced jobs.
+    concurrency:
+      group: container-latest
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Promote the highest published stable version without rebuilding
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/publish-container.mjs promote

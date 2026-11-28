@@ -1,30 +1,44 @@
-// resolveApiConfig: the API's defaults (port 8080, in-memory data) and the
-// startup errors for bad values.
+// resolveApiConfig: the API's defaults (127.0.0.1:8080, in-memory data) and
+// the startup errors for bad values.
 import { describe, expect, it } from 'vitest';
 
-import { ConfigError, resolveApiConfig } from '../src/config.js';
+import { ConfigError, parseRateLimit, resolveApiConfig } from '../src/config.js';
 
 describe('resolveApiConfig', () => {
-  it('defaults to port 8080 and the in-memory source', () => {
+  it('defaults to 127.0.0.1:8080, in-memory source, no CORS/rate-limit, and 10s shutdown', () => {
     expect(resolveApiConfig({})).toEqual({
+      host: '127.0.0.1',
       port: 8080,
       source: 'memory',
       logLevel: 'info',
       gcpProjectId: undefined,
       metricsEnabled: true,
       tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
+      corsOrigins: [],
+      rateLimit: undefined,
+      shutdownTimeoutMs: 10_000,
     });
   });
 
-  it('reads a valid PORT', () => {
-    expect(resolveApiConfig({ PORT: '3000' })).toEqual({
+  it('reads a valid PORT and HOST', () => {
+    expect(resolveApiConfig({ HOST: '0.0.0.0', PORT: '3000' })).toEqual({
+      host: '0.0.0.0',
       port: 3000,
       source: 'memory',
       logLevel: 'info',
       gcpProjectId: undefined,
       metricsEnabled: true,
       tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
+      corsOrigins: [],
+      rateLimit: undefined,
+      shutdownTimeoutMs: 10_000,
     });
+    expect(resolveApiConfig({ HOST: '' }).host).toBe('127.0.0.1');
+  });
+
+  it('rejects a whitespace-only HOST', () => {
+    expect(() => resolveApiConfig({ HOST: '   ' })).toThrow(ConfigError);
+    expect(() => resolveApiConfig({ HOST: '   ' })).toThrow('Invalid HOST "   "');
   });
 
   it.each(['abc', '0', '65536', '80.5', '-1'])('rejects PORT=%s', (value) => {
@@ -52,6 +66,7 @@ describe('resolveApiConfig', () => {
         TS_PROJECTS_API_URL: 'http://127.0.0.1:1/api',
       })
     ).toEqual({
+      host: '127.0.0.1',
       port: 8080,
       source: 'http',
       token: 't',
@@ -60,8 +75,12 @@ describe('resolveApiConfig', () => {
       gcpProjectId: undefined,
       metricsEnabled: true,
       tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
+      corsOrigins: [],
+      rateLimit: undefined,
+      shutdownTimeoutMs: 10_000,
     });
     expect(resolveApiConfig({ TS_PROJECTS_SOURCE: 'http', TS_PROJECTS_TOKEN: 't' })).toEqual({
+      host: '127.0.0.1',
       port: 8080,
       source: 'http',
       token: 't',
@@ -70,6 +89,9 @@ describe('resolveApiConfig', () => {
       gcpProjectId: undefined,
       metricsEnabled: true,
       tracing: { tracesUrl: undefined, serviceName: 'ts-launch-blueprint-api', sampleRatio: 1 },
+      corsOrigins: [],
+      rateLimit: undefined,
+      shutdownTimeoutMs: 10_000,
     });
   });
 
@@ -160,5 +182,85 @@ describe('resolveApiConfig', () => {
     expect(() => resolveApiConfig({ METRICS_ENABLED: value })).toThrow(
       `Invalid METRICS_ENABLED "${value}": expected "true" or "false"`
     );
+  });
+
+  describe('CORS_ORIGINS', () => {
+    it.each([
+      [undefined, []],
+      ['', []],
+      ['   ', []],
+      ['[]', []],
+      ['*', ['*']],
+      ['https://app.example.com', ['https://app.example.com']],
+      ['https://a.example, http://localhost:5173', ['https://a.example', 'http://localhost:5173']],
+      ['["https://app.example.com"]', ['https://app.example.com']],
+      [
+        '["https://a.example", "http://localhost:5173"]',
+        ['https://a.example', 'http://localhost:5173'],
+      ],
+    ])('parses CORS_ORIGINS=%j as %j', (value, expected) => {
+      expect(resolveApiConfig({ CORS_ORIGINS: value }).corsOrigins).toEqual(expected);
+    });
+
+    it.each([
+      '[invalid',
+      '{"origin":"https://a.example"}',
+      '[""]',
+      'https://a.example,',
+      'not-a-url',
+      'ftp://a.example',
+      'https://a.example/path',
+      'https://a.example/',
+      'https://a.example?x=1',
+      'https://user:pass@a.example',
+    ])('rejects invalid CORS_ORIGINS=%s', (value) => {
+      expect(() => resolveApiConfig({ CORS_ORIGINS: value })).toThrow(ConfigError);
+      expect(() => resolveApiConfig({ CORS_ORIGINS: value })).toThrow(
+        `Invalid CORS_ORIGINS "${value}"`
+      );
+    });
+  });
+
+  describe('RATE_LIMIT', () => {
+    it.each([
+      ['5/second', { limit: 5, windowMs: 1_000, unit: 'second' }],
+      ['10/seconds', { limit: 10, windowMs: 1_000, unit: 'second' }],
+      ['100/minute', { limit: 100, windowMs: 60_000, unit: 'minute' }],
+      ['2/MINUTES', { limit: 2, windowMs: 60_000, unit: 'minute' }],
+      ['1000/hour', { limit: 1000, windowMs: 3_600_000, unit: 'hour' }],
+      ['5000/days', { limit: 5000, windowMs: 86_400_000, unit: 'day' }],
+    ] as const)('parses RATE_LIMIT=%s', (value, expected) => {
+      expect(resolveApiConfig({ RATE_LIMIT: value }).rateLimit).toEqual(expected);
+      expect(parseRateLimit(value)).toEqual(expected);
+    });
+
+    it('treats empty RATE_LIMIT as disabled (undefined)', () => {
+      expect(resolveApiConfig({ RATE_LIMIT: '' }).rateLimit).toBeUndefined();
+    });
+
+    it.each(['0/minute', '-1/minute', '10/week', 'abc', '10/', '/minute', '1.5/minute'])(
+      'rejects invalid RATE_LIMIT=%s',
+      (value) => {
+        expect(() => resolveApiConfig({ RATE_LIMIT: value })).toThrow(ConfigError);
+        expect(() => resolveApiConfig({ RATE_LIMIT: value })).toThrow(
+          `Invalid RATE_LIMIT "${value}"`
+        );
+      }
+    );
+  });
+
+  describe('SHUTDOWN_TIMEOUT_MS', () => {
+    it('defaults to 10_000 when unset or empty and parses positive integers', () => {
+      expect(resolveApiConfig({}).shutdownTimeoutMs).toBe(10_000);
+      expect(resolveApiConfig({ SHUTDOWN_TIMEOUT_MS: '' }).shutdownTimeoutMs).toBe(10_000);
+      expect(resolveApiConfig({ SHUTDOWN_TIMEOUT_MS: '2500' }).shutdownTimeoutMs).toBe(2500);
+    });
+
+    it.each(['0', '-5', '10.5', 'abc'])('rejects SHUTDOWN_TIMEOUT_MS=%s', (value) => {
+      expect(() => resolveApiConfig({ SHUTDOWN_TIMEOUT_MS: value })).toThrow(ConfigError);
+      expect(() => resolveApiConfig({ SHUTDOWN_TIMEOUT_MS: value })).toThrow(
+        `Invalid SHUTDOWN_TIMEOUT_MS "${value}": expected a positive integer`
+      );
+    });
   });
 });

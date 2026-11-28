@@ -91,9 +91,29 @@ updates:
           - 'react-dom'
           - 'pino'
           - 'pino-pretty'
-          - 'prom-client'
+          - '@prometheus-io/*'
           - '@opentelemetry/*'
       npm-minor-patch:
         update-types:
           - 'minor'
           - 'patch'
+
+  # Digest-pinned Node base image in apps/api/Dockerfile (P09).
+  - package-ecosystem: 'docker'
+    directory: '/apps/api'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    cooldown:
+      default-days: 5
+    open-pull-requests-limit: 5
+    labels:
+      - 'dependencies'
+      - 'docker'
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    groups:
+      docker:
+        patterns:
+          - '*'

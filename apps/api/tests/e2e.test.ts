@@ -43,6 +43,7 @@ function buildIfStale(): void {
   const sourcesMtime = Math.max(
     newestMtime(join(ROOT, 'src')),
     newestMtime(join(ROOT, '..', '..', 'packages', 'core', 'src')),
+    statSync(join(ROOT, '..', '..', 'package.json')).mtimeMs,
     statSync(join(ROOT, 'package.json')).mtimeMs,
     statSync(join(ROOT, 'tsdown.config.ts')).mtimeMs
   );
@@ -116,10 +117,14 @@ describe('API end-to-end (built server)', () => {
     expect(line['service']).toBe('ts-launch-blueprint-api');
   });
 
-  it('GET /healthz -> 200 {status: ok}', async () => {
+  it('GET /healthz -> 200 {status: ok, version, runtime}', async () => {
     const response = await fetch(`${baseUrl}/healthz`);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: 'ok' });
+    expect(await response.json()).toEqual({
+      status: 'ok',
+      version: expect.any(String),
+      runtime: process.version,
+    });
   });
 
   it('an unknown workspace -> 404 NOT_FOUND', async () => {
@@ -249,7 +254,7 @@ describe('API process lifecycle (built server)', () => {
       try {
         const response = await fetch(`${server.url}/trpc/projects.list`);
         expect(response.status).toBe(200);
-        // prom-client (and its @opentelemetry/api dependency) is bundled too.
+        // @prometheus-io/client (and its @opentelemetry/api dependency) is bundled too.
         expect((await fetch(`${server.url}/metrics`)).status).toBe(200);
       } finally {
         // Await child termination/close before deleting `folder` so Windows

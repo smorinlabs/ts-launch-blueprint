@@ -17,6 +17,8 @@ export interface ShutdownDeps {
   log: (line: string) => void;
   /** Schedules the safety exit; returns a handle with `unref`. */
   setTimer?: (callback: () => void, ms: number) => { unref: () => void };
+  /** Safety timeout in milliseconds (defaults to SHUTDOWN_TIMEOUT_MS). */
+  timeoutMs?: number | undefined;
 }
 
 /** How long closing may take before the process exits 1. */
@@ -41,6 +43,7 @@ async function flushThenExit(
 /** Build the signal handler: call it with the signal name. */
 export function createShutdown(deps: ShutdownDeps): (signal: string) => void {
   const setTimer = deps.setTimer ?? ((callback, ms) => setTimeout(callback, ms));
+  const timeoutMs = deps.timeoutMs ?? SHUTDOWN_TIMEOUT_MS;
   let shuttingDown = false;
   return (signal) => {
     if (shuttingDown) {
@@ -49,9 +52,9 @@ export function createShutdown(deps: ShutdownDeps): (signal: string) => void {
     shuttingDown = true;
     deps.log(`shutting down (${signal})`);
     setTimer(() => {
-      deps.log(`shutdown timed out after ${SHUTDOWN_TIMEOUT_MS}ms`);
+      deps.log(`shutdown timed out after ${timeoutMs}ms`);
       deps.exit(1);
-    }, SHUTDOWN_TIMEOUT_MS).unref();
+    }, timeoutMs).unref();
     deps.close((err) => {
       const code = err === undefined ? 0 : 1;
       if (deps.flush === undefined) {

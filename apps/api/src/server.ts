@@ -38,12 +38,20 @@ const core =
         http: { token: config.token, fetchImpl: globalThis.fetch, baseUrl: config.baseUrl },
       });
 
-const { port, source } = config;
+const { host, port, source, corsOrigins, rateLimit, shutdownTimeoutMs } = config;
 const metrics = config.metricsEnabled ? createMetrics({ collectDefaults: true }) : undefined;
-const app = createApp({ core, logger, gcpProjectId: config.gcpProjectId, metrics, tracing });
-const server = serve({ fetch: app.fetch, port }, () => {
+const app = createApp({
+  core,
+  logger,
+  gcpProjectId: config.gcpProjectId,
+  metrics,
+  tracing,
+  corsOrigins,
+  rateLimit,
+});
+const server = serve({ fetch: app.fetch, hostname: host, port }, () => {
   logger.info(
-    { port, source },
+    { host, port, source },
     `ts-launch-blueprint api listening on :${port} (source: ${source})`
   );
 });
@@ -61,6 +69,7 @@ const shutdown = createShutdown({
   flush: () => tracing.shutdown(),
   exit: (code) => process.exit(code),
   log: (line) => logger.info(line),
+  timeoutMs: shutdownTimeoutMs,
 });
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
