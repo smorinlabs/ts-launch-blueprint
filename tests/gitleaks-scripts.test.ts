@@ -196,6 +196,66 @@ describe('scripts/check-gitleaks.sh & scripts/install-gitleaks.sh (POSIX)', () =
         });
         expect(upstream.status).toBe(0);
         expect(readFileSync(argsLog, 'utf8')).toContain('--log-opts=origin/feat/branch..HEAD');
+
+        // 4. Multi-ref pre-push stdin: scans each pushed ref range accurately (even non-HEAD),
+        //    skips deleted refs, handles new branches, and fails if any ref fails.
+        runGit(repoDir, ['checkout', '-q', '-b', 'feat/other', 'main']);
+        writeFileSync(join(repoDir, 'other.txt'), 'other\n', 'utf8');
+        runGit(repoDir, ['add', 'other.txt']);
+        runGit(repoDir, ['commit', '-q', '-m', 'other 1']);
+        const otherSha = spawnSync('git', ['rev-parse', 'HEAD'], {
+          cwd: repoDir,
+          encoding: 'utf8',
+        }).stdout.trim();
+        const featOldSha = spawnSync('git', ['rev-parse', 'origin/feat/branch'], {
+          cwd: repoDir,
+          encoding: 'utf8',
+        }).stdout.trim();
+        const featNewSha = spawnSync('git', ['rev-parse', 'feat/branch'], {
+          cwd: repoDir,
+          encoding: 'utf8',
+        }).stdout.trim();
+        const zeroSha = '0'.repeat(40);
+
+        // Stay checked out on main while pushing feat/branch (update), feat/other (new), and deleting stale.
+        runGit(repoDir, ['checkout', '-q', 'main']);
+        const multiLog = join(dir, 'multi-args.log');
+        const stdinPayload = [
+          `refs/heads/feat/branch ${featNewSha} refs/heads/feat/branch ${featOldSha}`,
+          `refs/heads/feat/other ${otherSha} refs/heads/feat/other ${zeroSha}`,
+          `(delete) ${zeroSha} refs/heads/stale ${featOldSha}`,
+        ].join('\n');
+        const multiRes = spawnSync('bash', [CHECK_SCRIPT, '--range'], {
+          cwd: repoDir,
+          encoding: 'utf8',
+          input: `${stdinPayload}\n`,
+          env: {
+            ...process.env,
+            PATH: `${binDir}:${process.env.PATH}`,
+            GITLEAKS_ARGS_LOG: multiLog,
+          },
+        });
+        expect(multiRes.status).toBe(0);
+        expect(multiRes.stderr).toContain('skipping deleted ref refs/heads/stale');
+        const multiLogged = readFileSync(multiLog, 'utf8');
+        expect(multiLogged).toContain(`--log-opts=${featOldSha}..${featNewSha}`);
+        expect(multiLogged).toContain(`--log-opts=origin/main..${otherSha}`);
+        expect(multiLogged).not.toContain('HEAD');
+
+        // Secret found in pushed ref -> non-zero exit.
+        const failBin = join(dir, 'fail-bin');
+        mkdirSync(failBin, { recursive: true });
+        makeStubGitleaks(failBin, 1);
+        const failRes = spawnSync('bash', [CHECK_SCRIPT, '--range'], {
+          cwd: repoDir,
+          encoding: 'utf8',
+          input: `refs/heads/feat/branch ${featNewSha} refs/heads/feat/branch ${featOldSha}\n`,
+          env: {
+            ...process.env,
+            PATH: `${failBin}:${process.env.PATH}`,
+          },
+        });
+        expect(failRes.status).toBe(1);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }

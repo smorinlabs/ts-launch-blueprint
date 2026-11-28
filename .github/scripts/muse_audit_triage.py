@@ -197,15 +197,286 @@ def strip_ansi(text: str) -> str:
 
 
 _BROKEN_RE = re.compile(r"\)\s+broken\s+(https?://\S+)", re.ASCII)
+_CHECK_LINKS_RE = re.compile(r"broken link:\s+(\S+)\s+->\s+(\S+)", re.ASCII)
+_SAFE_NPMRC_KEY_RE = re.compile(r"^[A-Za-z0-9._\-\[\]]+$", re.ASCII)
+_FORBIDDEN_NPMRC_TOKENS = (
+    "auth",
+    "token",
+    "password",
+    "secret",
+    "key",
+    "username",
+    "email",
+    "cert",
+    "ca",
+    "registry",
+)
+BOT_LOGIN = "github-actions[bot]"
+BOT_EMAIL = "41898282+github-actions[bot]@users.noreply.github.com"
+VERIFICATION_HEADING = "## Triage URL verification"
 
 
 def extract_broken_lines(log_text: str) -> list[str]:
-    """Sphinx linkcheck 'broken' result lines, ANSI-stripped, timestamp-trimmed."""
+    """Sphinx linkcheck or scripts/check-links.mjs broken-link lines, ANSI-stripped."""
     found = []
     for line in strip_ansi(log_text).splitlines():
-        if _BROKEN_RE.search(line):
+        if _BROKEN_RE.search(line) or _CHECK_LINKS_RE.search(line):
             found.append(re.sub(r"^\S+Z\s+", "", line).strip())
     return found
+
+
+def extract_finding_targets(broken_lines: list[str]) -> tuple[list[str], list[str]]:
+    """Extract (files, broken_targets) from extracted broken-link lines."""
+    files: list[str] = []
+    targets: list[str] = []
+    for line in broken_lines:
+        sphinx_match = _BROKEN_RE.search(line)
+        if sphinx_match:
+            target = sphinx_match.group(1).rstrip(".,;")
+            if target not in targets:
+                targets.append(target)
+            file_match = re.search(r"\(([^:()]+):", line)
+            if file_match:
+                doc_file = file_match.group(1).strip()
+                if doc_file not in files:
+                    files.append(doc_file)
+            continue
+        check_match = _CHECK_LINKS_RE.search(line)
+        if check_match:
+            doc_file = check_match.group(1).strip()
+            target = check_match.group(2).strip().strip("<>")
+            if doc_file not in files:
+                files.append(doc_file)
+            if target not in targets:
+                targets.append(target)
+    return files, targets
+
+
+def is_safe_tracked_npmrc(root: Path, name: str) -> bool:
+    """Allow only a root tracked .npmrc containing non-secret pnpm/npm settings."""
+    if name != ".npmrc":
+        return False
+    path = root / name
+    if path.is_symlink() or not path.is_file():
+        return False
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return False
+    if len(raw) > 8192:
+        return False
+    try:
+        text = raw.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return False
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith(("#", ";")):
+            continue
+        if "=" not in line:
+            return False
+        key, value = (part.strip() for part in line.split("=", 1))
+        if not _SAFE_NPMRC_KEY_RE.fullmatch(key):
+            return False
+        lower_key = key.lower()
+        if any(token in lower_key for token in _FORBIDDEN_NPMRC_TOKENS):
+            return False
+        if "${" in value or "://" in value:
+            return False
+    return True
+
+
+def validate_triage_tree(guard: Any, root: Path) -> None:
+    """Validate checkout like guard.validate_tree('review'), permitting safe root .npmrc."""
+    budget, checked = [guard.MAX_SYMLINK_NODES], set()
+    for entry in git(root, "ls-files", "--stage", "-z").split("\0"):
+        if not entry:
+            continue
+        kind, name = entry.split(" ", 1)[0], entry.split("\t", 1)[1]
+        if kind == "160000":
+            raise RefusalError("Muse templates do not support submodules")
+        if kind == "120000":
+            if guard.restored_path(name):
+                raise RefusalError(
+                    "Review symlink under an Action-restored path is unsupported by snapshot verification"
+                )
+            guard.validate_review_symlink(root, name, budget, checked)
+        if guard.sensitive(name) and not is_safe_tracked_npmrc(root, name):
+            raise RefusalError(
+                "Checkout contains credential-like files; review its secret-file policy first"
+            )
+        if name.startswith(".claude-pr/"):
+            raise RefusalError("Tracked .claude-pr content conflicts with the action snapshot")
+    for name in git(root, "ls-files", "--others", "-z").split("\0"):
+        if name and guard.sensitive(name):
+            raise RefusalError("Checkout contains an untracked credential-like file")
+        if name and (root / name).is_symlink():
+            if guard.restored_path(name):
+                raise RefusalError(
+                    "Review symlink under an Action-restored path is unsupported by snapshot verification"
+                )
+            guard.validate_review_symlink(root, name, budget, checked)
+
+
+def diff_addresses_findings(
+    paths: list[str],
+    diff_text: str,
+    finding_files: list[str],
+    finding_targets: list[str],
+) -> bool:
+    """Confirm the staged docs diff removes/rewrites a broken target or creates a missing doc."""
+    if not finding_targets and not finding_files:
+        return True
+    removed_lines = [
+        line[1:]
+        for line in diff_text.splitlines()
+        if line.startswith("-") and not line.startswith("---")
+    ]
+    for target in finding_targets:
+        bare_target = target.split("#", 1)[0]
+        if any(target in line or (bare_target and bare_target in line) for line in removed_lines):
+            return True
+    # Relative link fixes may also create the missing target file under docs/.
+    normalized_paths = {Path(p).as_posix() for p in paths}
+    for doc_file, target in zip(finding_files, finding_targets, strict=False):
+        if "://" in target:
+            continue
+        bare_target = target.split("#", 1)[0]
+        if not bare_target:
+            continue
+        resolved = Path(os.path.normpath(str(Path(doc_file).parent / bare_target))).as_posix()
+        if resolved in normalized_paths:
+            return True
+    return False
+
+
+def _verify_bot_branch(root: Path, base: str, branch: str, run_id: str) -> list[str]:
+    """Ensure an existing triage branch contains only bot-authored docs commits over base."""
+    git(root, "fetch", "--no-tags", "origin", f"refs/heads/{branch}:refs/remotes/origin/{branch}")
+    remote_ref = f"refs/remotes/origin/{branch}"
+    git(root, "merge-base", "--is-ancestor", base, remote_ref)
+    log_raw = git(root, "log", "--format=%ae\t%s", f"{base}..{remote_ref}")
+    commits = [line.split("\t", 1) for line in log_raw.splitlines() if line.strip()]
+    if not commits:
+        raise RefusalError(f"Existing triage branch {branch} has no commits beyond base")
+    if any(email != BOT_EMAIL for email, _ in commits):
+        raise RefusalError(f"Existing triage branch {branch} has non-bot commits; refusing resume")
+    expected_subject = f"fix(docs): triage weekly-audit run {run_id}"
+    if commits[0][1] != expected_subject:
+        raise RefusalError(
+            f"Existing triage branch {branch} tip commit does not match expected triage subject"
+        )
+    raw = git(root, "diff", "--name-only", "-z", base, remote_ref)
+    changes = [path for path in raw.split("\0") if path]
+    if not changes or not scope_ok(changes):
+        raise RefusalError(f"Existing triage branch {branch} contains out-of-scope changes")
+    return changes
+
+
+def _setup_runtime_dir(environ: Mapping[str, str], state: dict[str, Any]) -> Path:
+    runtime = Path(environ["RUNNER_TEMP"]) / ("audit-triage-" + uuid4().hex)
+    runtime.mkdir(mode=0o700)
+    helper = runtime / "muse_audit_triage.py"
+    shutil.copyfile(__file__, helper)
+    shutil.copyfile(
+        Path(__file__).parent.parent / "muse-audit-triage/runtime.py", runtime / "runtime.py"
+    )
+    for folder in ("hooks", "claude", "config", "cache", "data", "state"):
+        (runtime / folder).mkdir()
+    (runtime / "state.json").write_text(json.dumps(state))
+    output(environ["GITHUB_ENV"], "MUSE_TRIAGE_HELPER", str(helper))
+    output(environ["GITHUB_ENV"], "MUSE_TRIAGE_STATE", str(runtime / "state.json"))
+    return runtime
+
+
+def prepare_resume(
+    root: Path,
+    api: GitHub,
+    repo: str,
+    owner_login: str,
+    default_branch: str,
+    run_id: str,
+    base: str,
+    checkout_sha: str,
+    branch: str,
+    environ: Mapping[str, str],
+) -> str | None:
+    """Resume partial publication (branch-only or PR-without-table) with ownership checks."""
+    pulls = api.get(f"repos/{repo}/pulls?head={owner_login}:{branch}&state=open")
+    if not isinstance(pulls, list):
+        raise RefusalError("Unable to verify existing triage PRs")
+    if pulls:
+        pr = pulls[0]
+        user = pr.get("user") if isinstance(pr, dict) else None
+        if (
+            not isinstance(pr, dict)
+            or not isinstance(user, dict)
+            or user.get("login") != BOT_LOGIN
+            or user.get("type") != "Bot"
+            or pr.get("head", {}).get("ref") != branch
+            or pr.get("base", {}).get("ref") != default_branch
+            or not isinstance(pr.get("number"), int)
+        ):
+            raise RefusalError(f"Existing PR for {branch} is not an owned bot triage PR")
+        number = str(pr["number"])
+        comments = api.get(f"repos/{repo}/issues/{number}/comments?per_page=100")
+        if not isinstance(comments, list):
+            raise RefusalError("Unable to verify existing triage PR comments")
+        has_table = any(
+            isinstance(item, dict)
+            and isinstance(item.get("user"), dict)
+            and item["user"].get("login") == BOT_LOGIN
+            and VERIFICATION_HEADING in str(item.get("body", ""))
+            for item in comments
+        )
+        if has_table:
+            raise RefusalError(f"Run {run_id} already has a completed triage PR #{number}")
+        _verify_bot_branch(root, base, branch, run_id)
+        git(root, "checkout", "-B", branch, f"refs/remotes/origin/{branch}")
+        state = {
+            "base": base,
+            "checkout_sha": checkout_sha,
+            "default_branch": default_branch,
+            "run_id": run_id,
+            "branch": branch,
+            "repository": repo,
+        }
+        _setup_runtime_dir(environ, state)
+        output(environ["GITHUB_OUTPUT"], "should_run", "false")
+        output(environ["GITHUB_OUTPUT"], "resume_mode", "finish")
+        output(environ["GITHUB_OUTPUT"], "resume_pr", number)
+        output(environ["GITHUB_OUTPUT"], "branch", branch)
+        output(environ["GITHUB_OUTPUT"], "prompt", "")
+        summary(environ, f"Resuming verification table for existing triage PR #{number}.")
+        print(f"Resuming finish phase for run {run_id} on PR #{number}")
+        return "finish"
+
+    refs = api.get(f"repos/{repo}/git/matching-refs/heads/{branch}")
+    if not isinstance(refs, list) or any(
+        not isinstance(item, dict) or not isinstance(item.get("ref"), str) for item in refs
+    ):
+        raise RefusalError("Unable to verify existing triage branches")
+    if any(item["ref"] == f"refs/heads/{branch}" for item in refs):
+        _verify_bot_branch(root, base, branch, run_id)
+        git(root, "checkout", "-B", branch, f"refs/remotes/origin/{branch}")
+        state = {
+            "base": base,
+            "checkout_sha": checkout_sha,
+            "default_branch": default_branch,
+            "run_id": run_id,
+            "branch": branch,
+            "repository": repo,
+        }
+        _setup_runtime_dir(environ, state)
+        output(environ["GITHUB_OUTPUT"], "should_run", "false")
+        output(environ["GITHUB_OUTPUT"], "resume_mode", "create_pr")
+        output(environ["GITHUB_OUTPUT"], "resume_pr", "")
+        output(environ["GITHUB_OUTPUT"], "branch", branch)
+        output(environ["GITHUB_OUTPUT"], "prompt", "")
+        summary(environ, f"Resuming PR creation for existing bot branch `{branch}`.")
+        print(f"Resuming create_pr phase for run {run_id} on branch {branch}")
+        return "create_pr"
+    return None
 
 
 def tail_lines(log_text: str, count: int = 40) -> list[str]:
@@ -540,16 +811,20 @@ def prepare(environ: Mapping[str, str] = os.environ) -> None:
     guard = guard_module()
     guard.validate_permission_profile(profile)
     branch = f"bot/weekly-audit-{run_id}"
-    pulls = api.get(f"repos/{repo}/pulls?head={owner.get('login')}:{branch}&state=open")
-    if not isinstance(pulls, list):
-        raise RefusalError("Unable to verify existing triage PRs")
-    if pulls:
-        raise RefusalError(f"Run {run_id} already has a triage PR")
-    refs = api.get(f"repos/{repo}/git/matching-refs/heads/{branch}")
-    if not isinstance(refs, list) or any(not isinstance(item, dict) or not isinstance(item.get("ref"), str) for item in refs):
-        raise RefusalError("Unable to verify existing triage branches")
-    if any(item["ref"] == f"refs/heads/{branch}" for item in refs):
-        raise RefusalError(f"Triage branch {branch} already exists; inspect the branch and recover or create its PR before retrying")
+    resumed = prepare_resume(
+        root,
+        api,
+        repo,
+        owner.get("login", ""),
+        default_branch,
+        run_id,
+        base,
+        checkout_sha,
+        branch,
+        environ,
+    )
+    if resumed is not None:
+        return
     jobs = api.get(jobs_path_for_run(repo, run))
     if not isinstance(jobs, dict):
         raise RefusalError("Job listing failed")
@@ -558,21 +833,24 @@ def prepare(environ: Mapping[str, str] = os.environ) -> None:
         raise RefusalError("Run has no failed jobs to triage")
     if all(job.get("name") != "docs-linkcheck" for job in failed):
         output(environ["GITHUB_OUTPUT"], "should_run", "false")
+        output(environ["GITHUB_OUTPUT"], "resume_mode", "")
+        output(environ["GITHUB_OUTPUT"], "resume_pr", "")
         output(environ["GITHUB_OUTPUT"], "branch", "")
         output(environ["GITHUB_OUTPUT"], "prompt", "")
         summary(environ, f"Run `{run_id}` has no docs failure; skipping the agent run.")
         print(f"No docs failure in run {run_id}; agent run skipped")
         return
     findings: list[str] = []
+    docs_broken_lines: list[str] = []
     for job in sorted(failed, key=lambda job: job.get("name") != "docs-linkcheck")[:5]:
         logs = download_logs(
             f"https://api.github.com/repos/{repo}/actions/jobs/{job['id']}/logs",
             environ.get("GH_TOKEN", ""),
         )
         if job.get("name") == "docs-linkcheck":
-            findings.extend(
-                f"{job['name']}: {line}" for line in extract_broken_lines(logs)
-            )
+            broken = extract_broken_lines(logs)
+            docs_broken_lines.extend(broken)
+            findings.extend(f"{job['name']}: {line}" for line in broken)
         else:
             findings.append(f"{job['name']} (last log lines):")
             findings.extend(tail_lines(logs))
@@ -584,6 +862,7 @@ def prepare(environ: Mapping[str, str] = os.environ) -> None:
         raise RefusalError("Failure bundle exceeds the size limit; triage by hand")
     if not bundle.strip():
         raise RefusalError("No findings extracted; triage by hand")
+    finding_files, finding_targets = extract_finding_targets(docs_broken_lines)
     runtime = Path(environ["RUNNER_TEMP"]) / ("audit-triage-" + uuid4().hex)
     runtime.mkdir(mode=0o700)
     helper = runtime / "muse_audit_triage.py"
@@ -592,7 +871,7 @@ def prepare(environ: Mapping[str, str] = os.environ) -> None:
     for folder in ("hooks", "claude", "config", "cache", "data", "state"):
         (runtime / folder).mkdir()
     git(root, "checkout", "--detach", base)
-    guard.validate_tree(root, "review")
+    validate_triage_tree(guard, root)
     settings = runtime / "settings.json"
     generated = triage_configuration(guard, root, runtime, profile)
     settings.write_text(json.dumps(generated))
@@ -604,6 +883,8 @@ def prepare(environ: Mapping[str, str] = os.environ) -> None:
         "branch": branch,
         "repository": repo,
         "failed_jobs": [job.get("name", "?") for job in failed],
+        "finding_files": finding_files,
+        "finding_targets": finding_targets,
     }
     prompt = (
         f"Triage weekly-audit run {run_id} at commit {base}.\n"
@@ -658,6 +939,8 @@ def prepare(environ: Mapping[str, str] = os.environ) -> None:
     output(environ["GITHUB_OUTPUT"], "base", base)
     output(environ["GITHUB_OUTPUT"], "branch", branch)
     output(environ["GITHUB_OUTPUT"], "should_run", "true")
+    output(environ["GITHUB_OUTPUT"], "resume_mode", "")
+    output(environ["GITHUB_OUTPUT"], "resume_pr", "")
     summary(environ, f"Prepared audit triage for run `{run_id}` from base `{base}`.")
     print(
         f"Authorized triage for run {run_id}; trusted configuration {checkout_sha}; audited input {base}; no credential values written"
@@ -711,6 +994,26 @@ def validate(environ: Mapping[str, str] = os.environ) -> None:
             raise RefusalError("Triage changed a non-regular file")
     if paths:
         git(root, "add", "-A", "--", *(f":(literal){name}" for name in paths))
+        staged_diff = git(
+            root,
+            "diff",
+            "--cached",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-color",
+            "--unified=0",
+            "--",
+        )
+        if not diff_addresses_findings(
+            paths,
+            staged_diff,
+            state.get("finding_files", []),
+            state.get("finding_targets", []),
+        ):
+            git(root, "reset", "-q")
+            raise RefusalError(
+                "Staged docs diff does not address any broken-link finding from the frozen audit bundle"
+            )
     output(environ["GITHUB_OUTPUT"], "has_changes", "true" if paths else "false")
 
 

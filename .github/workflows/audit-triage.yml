@@ -130,7 +130,9 @@ jobs:
 
       - name: Create triage PR
         id: create-pr
-        if: steps.commit.outcome == 'success' && steps.commit.outputs.committed == 'true'
+        if: >-
+          (steps.commit.outcome == 'success' && steps.commit.outputs.committed == 'true') ||
+          steps.prepare.outputs.resume_mode == 'create_pr'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -151,8 +153,10 @@ jobs:
           echo "number=$number" >> "$GITHUB_OUTPUT"
 
       - name: Verify scope and touched URLs
-        if: always() && steps.create-pr.outcome == 'success'
+        if: >-
+          always() &&
+          (steps.create-pr.outcome == 'success' || steps.prepare.outputs.resume_mode == 'finish')
         env:
           GH_TOKEN: ${{ github.token }}
-          MUSE_CI_PR: ${{ steps.create-pr.outputs.number }}
+          MUSE_CI_PR: ${{ steps.create-pr.outputs.number || steps.prepare.outputs.resume_pr }}
         run: python3 "$MUSE_TRIAGE_HELPER" finish triage

@@ -1115,8 +1115,13 @@ describe('P04 secret scanning, audits, canary, CodeQL & Dependabot', () => {
       true
     );
     expect(parsed.jobs['osv-scanner']).toBeDefined();
+    const docsLinkcheckJob = parsed.jobs['docs-linkcheck'];
+    expect(docsLinkcheckJob).toBeDefined();
+    expect(docsLinkcheckJob!.steps.some((s) => s.run?.includes('scripts/check-links.mjs'))).toBe(
+      true
+    );
     const issueJob = parsed.jobs['file-tracking-issue'];
-    expect(issueJob?.needs).toEqual(['pnpm-audit', 'osv-scanner']);
+    expect(issueJob?.needs).toEqual(['pnpm-audit', 'osv-scanner', 'docs-linkcheck']);
     expect(issueJob?.if).toBe("failure() && github.event_name == 'schedule'");
     expect(raw).toContain('<!-- weekly-audit-tracking -->');
   });
@@ -1224,7 +1229,7 @@ describe('P04 secret scanning, audits, canary, CodeQL & Dependabot', () => {
 
     const lefthook = parse(readFileSync(join(REPO_ROOT, 'lefthook.yml'), 'utf8')) as {
       'pre-commit': { jobs: Array<{ name: string; run: string }> };
-      'pre-push': { jobs: Array<{ name: string; run: string }> };
+      'pre-push': { jobs: Array<{ name: string; run: string; use_stdin?: boolean }> };
     };
     const preCommitGitleaks = lefthook['pre-commit'].jobs.find((j) => j.name === 'gitleaks');
     expect(preCommitGitleaks).toBeDefined();
@@ -1233,6 +1238,7 @@ describe('P04 secret scanning, audits, canary, CodeQL & Dependabot', () => {
     const prePushGitleaks = lefthook['pre-push'].jobs.find((j) => j.name === 'gitleaks-range');
     expect(prePushGitleaks).toBeDefined();
     expect(prePushGitleaks!.run).toContain('check-gitleaks.sh --range');
+    expect(prePushGitleaks!.use_stdin).toBe(true);
 
     const actionlint = parse(
       readFileSync(join(REPO_ROOT, '.github', 'actionlint.yaml'), 'utf8')

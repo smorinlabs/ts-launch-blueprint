@@ -123,6 +123,7 @@ pre-push:
   parallel: true
   jobs:
     - name: gitleaks-range
+      use_stdin: true
       run: bash scripts/check-gitleaks.sh --range
     - name: press-verify
       run: just press-verify
