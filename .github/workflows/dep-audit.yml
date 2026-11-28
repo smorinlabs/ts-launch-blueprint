@@ -34,10 +34,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '24.x'
-          cache: 'pnpm'
-
-      - name: Install locked dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Audit against known vulnerabilities
         run: pnpm audit --audit-level=high

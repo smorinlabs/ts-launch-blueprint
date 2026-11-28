@@ -44,10 +44,15 @@ on:
 # set CodeQL requires.
 permissions: {}
 
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   repository-visibility:
     name: Inspect repository visibility
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
     outputs:
@@ -71,6 +76,7 @@ jobs:
     #   - https://gh.io/supported-runners-and-hardware-resources
     #   - https://gh.io/using-larger-runners (GitHub.com only)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       # required for all workflows
       security-events: write
